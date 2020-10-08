@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 project(
-  fiber_sim
+  skelly_sim
   VERSION 0.0.1
   LANGUAGES CXX)
 
@@ -36,8 +36,8 @@ find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 # find_package(Ifpack REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 message(${Teuchos_LIBRARIES})
 
-add_executable(fiber_sim src/fiber_sim.cpp src/fiber.cpp)
-target_include_directories(fiber_sim PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
-target_link_libraries(fiber_sim PRIVATE  Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX
+add_executable(skelly_sim src/skelly_sim.cpp src/fiber.cpp)
+target_include_directories(skelly_sim PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
+target_link_libraries(skelly_sim PRIVATE  Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES}
   libSTKFMM_STATIC.a ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB})
