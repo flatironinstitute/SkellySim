@@ -2,7 +2,13 @@
 #include <fiber.hpp>
 #include <unordered_map>
 
-void Fiber::update_derivatives() { return; }
+void Fiber::update_derivatives() {
+    auto &fib_mats = matrices.at(num_points);
+    xs = std::pow(2.0 / length, 1) * fib_mats.D_1_0 * x;
+    xss = std::pow(2.0 / length, 2) * fib_mats.D_2_0 * x;
+    xsss = std::pow(2.0 / length, 3) * fib_mats.D_3_0 * x;
+    xssss = std::pow(2.0 / length, 4) * fib_mats.D_4_0 * x;
+}
 
 //  Following the paper Calculation of weights in finite different formulas,
 //  Bengt Fornberg, SIAM Rev. 40 (3), 685 (1998).
@@ -147,3 +153,8 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
 }
 
 const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices = compute_matrices<4>();
+
+void FiberContainer::update_derivatives() {
+    for (Fiber &fib : fibers)
+        fib.update_derivatives();
+}

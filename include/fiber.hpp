@@ -15,6 +15,7 @@ class Fiber {
     matrix_t xs;
     matrix_t xss;
     matrix_t xsss;
+    matrix_t xssss;
 
     typedef struct {
         array_t alpha;
@@ -35,6 +36,7 @@ class Fiber {
         this->xs.resize(num_points, 3);
         this->xss.resize(num_points, 3);
         this->xsss.resize(num_points, 3);
+        this->xssss.resize(num_points, 3);
     }
 
     void update_derivatives();
@@ -51,6 +53,8 @@ class FiberContainer {
             fibers.push_back(Fiber(num_points, bending_rigidity));
         }
     }
+
+    void update_derivatives();
 };
 
 #endif
