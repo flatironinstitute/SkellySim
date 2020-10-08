@@ -14,7 +14,7 @@ void Fiber::update_derivatives() { return; }
 //
 //  Outputs:
 //  D_s = Mth derivative matrix
-Fiber::matrix_t finite_diff(Fiber::array_t &s, int M, int n_s) {
+Fiber::matrix_t finite_diff(const Fiber::array_t &s, int M, int n_s) {
     int N = s.size() - 1;
     Fiber::matrix_t D_s = Fiber::matrix_t::Zero(s.size(), s.size());
     int n_s_half = (n_s - 1) / 2;
@@ -36,7 +36,7 @@ Fiber::matrix_t finite_diff(Fiber::array_t &s, int M, int n_s) {
         }
         xlow = xlow < 0 ? s.size() + xlow : xlow;
 
-        Eigen::Map<Fiber::array_t> x(s.data() + xlow, xhigh - xlow);
+        Eigen::Map<const Fiber::array_t> x(s.data() + xlow, xhigh - xlow);
 
         // Computer coefficients of differential matrices
         double c1 = 1.0;
@@ -73,6 +73,38 @@ Fiber::matrix_t finite_diff(Fiber::array_t &s, int M, int n_s) {
     return D_s;
 }
 
+// Return resampling matrix P_{N,-m}.
+// Inputs:
+//   x = Eigen array, N points x_k.
+//   y = Eigen array, N-m points.
+Fiber::matrix_t barycentric_matrix(const Eigen::ArrayXd &x, const Eigen::ArrayXd &y) {
+    int N = x.size();
+    int M = y.size();
+    int m = N - M;
+
+    Eigen::ArrayXd w = Eigen::ArrayXd::Ones(N);
+    for (int i = 1; i < N; i += 2)
+        w(i) = -1.0;
+    w(0) = 0.5;
+    w(N-1) = -0.5 * std::pow(-1, N);
+
+    Fiber::matrix_t P = Fiber::matrix_t::Zero(M, N);
+    for (int j = 0; j < M; ++j) {
+        double S = 0.0;
+        for (int k = 0; k < N; ++k) {
+            S += w(k) / (y(j) - x(k));
+        }
+        for (int k = 0; k < N; ++k) {
+            if (std::fabs(y(j) - x(k)) > std::numeric_limits<double>::epsilon())
+                P(j, k) = w(k) / (y(j) - x(k)) / S;
+            else
+                P(j, k) = 1.0;
+        }
+    }
+    return P;
+}
+
+
 template <int num_points_finite_diff>
 std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
     std::unordered_map<int, Fiber::fib_mat_t> res;
@@ -83,11 +115,11 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
         mats.alpha = Fiber::array_t::LinSpaced(num_points, -1.0, 1.0);
 
         auto num_points_roots = num_points - 4;
-        auto alpha_roots =
+        mats.alpha_roots =
             2 * (0.5 + array_t::LinSpaced(num_points_roots, 0, num_points_roots - 1)) / num_points_roots - 1;
 
         auto num_points_tension = num_points - 2;
-        auto alpha_tension =
+        mats.alpha_tension =
             2 * (0.5 + array_t::LinSpaced(num_points_tension, 0, num_points_tension - 1)) / num_points_tension - 1;
 
         // this is the order of the finite differencing
@@ -97,6 +129,19 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
         mats.D_2_0 = finite_diff(mats.alpha, 2, num_points_finite_diff + 1);
         mats.D_3_0 = finite_diff(mats.alpha, 3, num_points_finite_diff + 1);
         mats.D_4_0 = finite_diff(mats.alpha, 4, num_points_finite_diff + 1);
+
+        mats.P_X = barycentric_matrix(mats.alpha, mats.alpha_roots);
+        mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
+        mats.P_cheb_representations_all_dof = Fiber::matrix_t::Zero(4 * num_points - 14, 4 * num_points);
+
+        for (int i = 0; i < num_points - 4; ++i) {
+            for (int j = 0; j < num_points; ++j) {
+                mats.P_cheb_representations_all_dof(i + 0 * (num_points - 4), j + 0 * num_points) = mats.P_X(i, j);
+                mats.P_cheb_representations_all_dof(i + 1 * (num_points - 4), j + 1 * num_points) = mats.P_X(i, j);
+                mats.P_cheb_representations_all_dof(i + 2 * (num_points - 4), j + 2 * num_points) = mats.P_X(i, j);
+                mats.P_cheb_representations_all_dof(i + 3 * (num_points - 4), j + 3 * num_points) = mats.P_T(i, j);
+            }
+        }
     }
     return res;
 }

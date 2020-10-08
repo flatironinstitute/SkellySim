@@ -18,10 +18,15 @@ class Fiber {
 
     typedef struct {
         array_t alpha;
+        array_t alpha_roots;
+        array_t alpha_tension;
         matrix_t D_1_0;
         matrix_t D_2_0;
         matrix_t D_3_0;
         matrix_t D_4_0;
+        matrix_t P_X;
+        matrix_t P_T;
+        matrix_t P_cheb_representations_all_dof;
     } fib_mat_t;
     const static std::unordered_map<int, fib_mat_t> matrices;
 
