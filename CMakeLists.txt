@@ -34,7 +34,6 @@ find_package(Tpetra REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 # find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 # find_package(Ifpack REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
-message(${Teuchos_LIBRARIES})
 
 add_executable(skelly_sim src/skelly_sim.cpp src/fiber.cpp)
 target_include_directories(skelly_sim PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
