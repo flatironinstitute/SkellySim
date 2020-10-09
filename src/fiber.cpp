@@ -2,6 +2,121 @@
 #include <fiber.hpp>
 #include <unordered_map>
 
+// Build the Oseen tensor for N points (sources == targets).
+// Set to zero diagonal terms.
+//
+// G = f(r) * I + g(r) * (r.T*r)
+//
+// Input:
+//   r_vectors = coordinates.
+//   eta = (default 1.0) viscosity
+//   reg = (default 5e-3) regularization term
+//   epsilon_distance = (default 1e-10) set elements to zero for distances < epsilon_distance.
+//
+// Output:
+//   G = Oseen tensor with dimensions (3*num_points) x (3*num_points).
+Fiber::matrix_t oseen_tensor(Fiber::matrix_t r_vectors, double eta = 1.0, double reg = 5E-3,
+                             double epsilon_distance = 1E-5) {
+
+    using namespace Eigen;
+    int N = r_vectors.size() / 3;
+
+    // # Compute matrix of size 3N \times 3N
+    MatrixXd G = MatrixXd::Zero(3 * N, 3 * N);
+
+    const double factor = 1.0 / (8.0 * M_PI * eta);
+    const double reg2 = std::pow(reg, 2);
+    for (int col = 0; col < N; ++col) {
+        for (int row = 0; row < N; ++row) {
+            double fr, gr;
+            double dx = r_vectors(row, 0) - r_vectors(col, 0);
+            double dy = r_vectors(row, 1) - r_vectors(col, 1);
+            double dz = r_vectors(row, 2) - r_vectors(col, 2);
+            double dr2 = dx * dx + dy * dy + dz * dz;
+            double dr = sqrt(dr2);
+
+            if (dr > epsilon_distance) {
+                fr = factor / dr;
+                gr = factor / std::pow(dr, 3);
+            } else {
+                double denom_inv = 1.0 / sqrt(std::pow(dr, 2) + reg2);
+                fr = factor * denom_inv;
+                gr = factor * std::pow(denom_inv, 3);
+            }
+
+            G(row * 3 + 0, col * 3 + 0) = fr + gr * dx * dx;
+            G(row * 3 + 0, col * 3 + 1) = gr * dx * dy;
+            G(row * 3 + 0, col * 3 + 2) = gr * dx * dz;
+
+            G(row * 3 + 1, col * 3 + 0) = gr * dy * dx;
+            G(row * 3 + 1, col * 3 + 1) = fr + gr * dy * dy;
+            G(row * 3 + 1, col * 3 + 2) = gr * dy * dz;
+
+            G(row * 3 + 2, col * 3 + 0) = gr * dz * dx;
+            G(row * 3 + 2, col * 3 + 1) = gr * dz * dy;
+            G(row * 3 + 2, col * 3 + 2) = fr + gr * dz * dz;
+        }
+    }
+
+    // ArrayXXd drx(N, N);
+    // ArrayXXd dry(N, N);
+    // ArrayXXd drz(N, N);
+
+    // for (int i = 0; i < N; ++i) {
+    //     for (int j = 0; j < N; ++j) {
+    //         drx(j, i) = r_vectors(i, 0) - r_vectors(j, 0);
+    //         dry(j, i) = r_vectors(i, 1) - r_vectors(j, 1);
+    //         drz(j, i) = r_vectors(i, 2) - r_vectors(j, 2);
+    //     }
+    // }
+    // ArrayXXd dr = (drx.pow(2) + dry.pow(2) + drz.pow(2)).sqrt();
+
+    // ArrayXXd fr = MatrixXd::Zero(N, N);
+    // ArrayXXd gr = MatrixXd::Zero(N, N);
+    // {
+    //     const double factor = 1.0 / (8.0 * M_PI * eta);
+    //     const double reg2 = std::pow(reg, 2);
+    //     for (int i = 0; i < N; ++i) {
+    //         for (int j = 0; j < N; ++j) {
+    //             if (dr(j, i) > epsilon_distance) {
+    //                 fr(j, i) = factor / dr(j, i);
+    //                 gr(j, i) = factor / std::pow(dr(j, i), 3);
+    //             } else {
+    //                 // Need to regularize when points below threshold
+    //                 double denom = sqrt(std::pow(dr(j, i), 2) + reg2);
+    //                 fr(j, i) = factor / denom;
+    //                 gr(j, i) = factor / std::pow(denom, 3);
+    //             }
+    //         }
+    //     }
+    // }
+
+    // constexpr int row_stride = 3;
+    // const int col_stride = 9 * N;
+    // typedef Stride<Dynamic, row_stride> viewstride;
+    // Map<MatrixXd, 0, viewstride>(G.data(), N, N, viewstride(col_stride, row_stride)) = drx + gr * drx * drx;
+    // Map<MatrixXd, 0, viewstride>(G.data() + 3 * N, N, N, viewstride(col_stride, row_stride)) = gr * drx * dry;
+    // Map<MatrixXd, 0, viewstride>(G.data() + 2 * 3 * N, N, N, viewstride(col_stride, row_stride)) = gr * drx * drz;
+
+    // Map<MatrixXd, 0, viewstride>(G.data() + 1, N, N, viewstride(col_stride, row_stride)) = gr * dry * drx;
+    // Map<MatrixXd, 0, viewstride>(G.data() + 1 + 3 * N, N, N, viewstride(col_stride, row_stride)) = fr + gr * dry *
+    // dry; Map<MatrixXd, 0, viewstride>(G.data() + 1 + 2 * 3 * N, N, N, viewstride(col_stride, row_stride)) = gr * dry
+    // * drz;
+
+    // Map<MatrixXd, 0, viewstride>(G.data() + 2, N, N, viewstride(col_stride, row_stride)) = gr * drz * drx;
+    // Map<MatrixXd, 0, viewstride>(G.data() + 2 + 3 * N, N, N, viewstride(col_stride, row_stride)) = gr * drz * dry;
+    // Map<MatrixXd, 0, viewstride>(G.data() + 2 + 2 * 3 * N, N, N, viewstride(col_stride, row_stride)) =
+    //     fr + gr * drz * drz;
+
+    return G;
+}
+
+void Fiber::update_stokeslet() {
+    stokeslet = oseen_tensor(x);
+    for (int i = 0; i < num_points * 3; ++i)
+        stokeslet(i, i) = 0.0;
+}
+
 void Fiber::update_derivatives() {
     auto &fib_mats = matrices.at(num_points);
     xs = std::pow(2.0 / length, 1) * fib_mats.D_1_0 * x;
@@ -92,7 +207,7 @@ Fiber::matrix_t barycentric_matrix(const Eigen::ArrayXd &x, const Eigen::ArrayXd
     for (int i = 1; i < N; i += 2)
         w(i) = -1.0;
     w(0) = 0.5;
-    w(N-1) = -0.5 * std::pow(-1, N);
+    w(N - 1) = -0.5 * std::pow(-1, N);
 
     Fiber::matrix_t P = Fiber::matrix_t::Zero(M, N);
     for (int j = 0; j < M; ++j) {
@@ -109,7 +224,6 @@ Fiber::matrix_t barycentric_matrix(const Eigen::ArrayXd &x, const Eigen::ArrayXd
     }
     return P;
 }
-
 
 template <int num_points_finite_diff>
 std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
@@ -157,4 +271,9 @@ const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices = compute_matric
 void FiberContainer::update_derivatives() {
     for (Fiber &fib : fibers)
         fib.update_derivatives();
+}
+
+void FiberContainer::update_stokeslets() {
+    for (Fiber &fib : fibers)
+        fib.update_stokeslet();
 }

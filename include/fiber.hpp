@@ -16,6 +16,7 @@ class Fiber {
     matrix_t xss;
     matrix_t xsss;
     matrix_t xssss;
+    matrix_t stokeslet;
 
     typedef struct {
         array_t alpha;
@@ -40,6 +41,7 @@ class Fiber {
     }
 
     void update_derivatives();
+    void update_stokeslet();
 };
 
 class FiberContainer {
@@ -55,6 +57,7 @@ class FiberContainer {
     }
 
     void update_derivatives();
+    void update_stokeslets();
 };
 
 #endif
