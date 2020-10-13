@@ -107,56 +107,6 @@ Fiber::matrix_t oseen_tensor_direct(const Eigen::Ref<Fiber::matrix_t> &r_src, co
         }
     }
 
-    // ArrayXXd drx(N, N);
-    // ArrayXXd dry(N, N);
-    // ArrayXXd drz(N, N);
-
-    // for (int i = 0; i < N; ++i) {
-    //     for (int j = 0; j < N; ++j) {
-    //         drx(j, i) = r_vectors(i, 0) - r_vectors(j, 0);
-    //         dry(j, i) = r_vectors(i, 1) - r_vectors(j, 1);
-    //         drz(j, i) = r_vectors(i, 2) - r_vectors(j, 2);
-    //     }
-    // }
-    // ArrayXXd dr = (drx.pow(2) + dry.pow(2) + drz.pow(2)).sqrt();
-
-    // ArrayXXd fr = MatrixXd::Zero(N, N);
-    // ArrayXXd gr = MatrixXd::Zero(N, N);
-    // {
-    //     const double factor = 1.0 / (8.0 * M_PI * eta);
-    //     const double reg2 = std::pow(reg, 2);
-    //     for (int i = 0; i < N; ++i) {
-    //         for (int j = 0; j < N; ++j) {
-    //             if (dr(j, i) > epsilon_distance) {
-    //                 fr(j, i) = factor / dr(j, i);
-    //                 gr(j, i) = factor / std::pow(dr(j, i), 3);
-    //             } else {
-    //                 // Need to regularize when points below threshold
-    //                 double denom = sqrt(std::pow(dr(j, i), 2) + reg2);
-    //                 fr(j, i) = factor / denom;
-    //                 gr(j, i) = factor / std::pow(denom, 3);
-    //             }
-    //         }
-    //     }
-    // }
-
-    // constexpr int row_stride = 3;
-    // const int col_stride = 9 * N;
-    // typedef Stride<Dynamic, row_stride> viewstride;
-    // Map<MatrixXd, 0, viewstride>(G.data(), N, N, viewstride(col_stride, row_stride)) = drx + gr * drx * drx;
-    // Map<MatrixXd, 0, viewstride>(G.data() + 3 * N, N, N, viewstride(col_stride, row_stride)) = gr * drx * dry;
-    // Map<MatrixXd, 0, viewstride>(G.data() + 2 * 3 * N, N, N, viewstride(col_stride, row_stride)) = gr * drx * drz;
-
-    // Map<MatrixXd, 0, viewstride>(G.data() + 1, N, N, viewstride(col_stride, row_stride)) = gr * dry * drx;
-    // Map<MatrixXd, 0, viewstride>(G.data() + 1 + 3 * N, N, N, viewstride(col_stride, row_stride)) = fr + gr * dry *
-    // dry; Map<MatrixXd, 0, viewstride>(G.data() + 1 + 2 * 3 * N, N, N, viewstride(col_stride, row_stride)) = gr * dry
-    // * drz;
-
-    // Map<MatrixXd, 0, viewstride>(G.data() + 2, N, N, viewstride(col_stride, row_stride)) = gr * drz * drx;
-    // Map<MatrixXd, 0, viewstride>(G.data() + 2 + 3 * N, N, N, viewstride(col_stride, row_stride)) = gr * drz * dry;
-    // Map<MatrixXd, 0, viewstride>(G.data() + 2 + 2 * 3 * N, N, N, viewstride(col_stride, row_stride)) =
-    //     fr + gr * drz * drz;
-
     return G;
 }
 
