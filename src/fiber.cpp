@@ -2,6 +2,54 @@
 #include <fiber.hpp>
 #include <unordered_map>
 
+Eigen::MatrixX3d oseen_tensor_contract_direct(const Eigen::Ref<Fiber::matrix_t> &r_src,
+                                              const Eigen::Ref<Fiber::matrix_t> &r_trg,
+                                              const Eigen::Ref<Fiber::matrix_t> &density, double eta = 1.0,
+                                              double reg = 5E-3, double epsilon_distance = 1E-5) {
+
+    using namespace Eigen;
+    const int N_src = r_src.size() / 3;
+    const int N_trg = r_trg.size() / 3;
+
+    // # Compute matrix of size 3N \times 3N
+    MatrixX3d res = MatrixXd::Zero(N_trg, 3);
+
+    const double factor = 1.0 / (8.0 * M_PI * eta);
+    const double reg2 = std::pow(reg, 2);
+    for (int i_trg = 0; i_trg < N_trg; ++i_trg) {
+        for (int i_src = 0; i_src < N_src; ++i_src) {
+            double fr, gr;
+            double dx = r_src(i_src, 0) - r_trg(i_trg, 0);
+            double dy = r_src(i_src, 1) - r_trg(i_trg, 1);
+            double dz = r_src(i_src, 2) - r_trg(i_trg, 2);
+            double dr2 = dx * dx + dy * dy + dz * dz;
+            double dr = sqrt(dr2);
+
+            if (dr > epsilon_distance) {
+                fr = factor / dr;
+                gr = factor / std::pow(dr, 3);
+            } else {
+                double denom_inv = 1.0 / sqrt(std::pow(dr, 2) + reg2);
+                fr = factor * denom_inv;
+                gr = factor * std::pow(denom_inv, 3);
+            }
+
+            double Mxx = fr + gr * dx * dx;
+            double Mxy = gr * dx * dy;
+            double Mxz = gr * dx * dz;
+            double Myy = fr + gr * dy * dy;
+            double Myz = gr * dy * dz;
+            double Mzz = fr + gr * dz * dz;
+
+            res(i_trg, 0) += Mxx * density(i_src, 0) + Mxy * density(i_src, 1) + Mxz * density(i_src, 2);
+            res(i_trg, 1) += Mxy * density(i_src, 0) + Myy * density(i_src, 1) + Myz * density(i_src, 2);
+            res(i_trg, 2) += Mxz * density(i_src, 0) + Myz * density(i_src, 1) + Mzz * density(i_src, 2);
+        }
+    }
+
+    return res;
+}
+
 // Build the Oseen tensor for N points (sources == targets).
 // Set to zero diagonal terms.
 //
@@ -15,23 +63,24 @@
 //
 // Output:
 //   G = Oseen tensor with dimensions (3*num_points) x (3*num_points).
-Fiber::matrix_t oseen_tensor(Fiber::matrix_t r_vectors, double eta = 1.0, double reg = 5E-3,
-                             double epsilon_distance = 1E-5) {
+Fiber::matrix_t oseen_tensor_direct(const Eigen::Ref<Fiber::matrix_t> &r_src, const Eigen::Ref<Fiber::matrix_t> &r_trg,
+                                    double eta = 1.0, double reg = 5E-3, double epsilon_distance = 1E-5) {
 
     using namespace Eigen;
-    int N = r_vectors.size() / 3;
+    const int N_src = r_src.size() / 3;
+    const int N_trg = r_trg.size() / 3;
 
     // # Compute matrix of size 3N \times 3N
-    MatrixXd G = MatrixXd::Zero(3 * N, 3 * N);
+    MatrixXd G = MatrixXd::Zero(r_trg.size(), r_src.size());
 
     const double factor = 1.0 / (8.0 * M_PI * eta);
     const double reg2 = std::pow(reg, 2);
-    for (int col = 0; col < N; ++col) {
-        for (int row = 0; row < N; ++row) {
+    for (int i_src = 0; i_src < N_trg; ++i_src) {
+        for (int i_trg = 0; i_trg < N_src; ++i_trg) {
             double fr, gr;
-            double dx = r_vectors(row, 0) - r_vectors(col, 0);
-            double dy = r_vectors(row, 1) - r_vectors(col, 1);
-            double dz = r_vectors(row, 2) - r_vectors(col, 2);
+            double dx = r_src(i_src, 0) - r_trg(i_trg, 0);
+            double dy = r_src(i_src, 1) - r_trg(i_trg, 1);
+            double dz = r_src(i_src, 2) - r_trg(i_trg, 2);
             double dr2 = dx * dx + dy * dy + dz * dz;
             double dr = sqrt(dr2);
 
@@ -44,17 +93,17 @@ Fiber::matrix_t oseen_tensor(Fiber::matrix_t r_vectors, double eta = 1.0, double
                 gr = factor * std::pow(denom_inv, 3);
             }
 
-            G(row * 3 + 0, col * 3 + 0) = fr + gr * dx * dx;
-            G(row * 3 + 0, col * 3 + 1) = gr * dx * dy;
-            G(row * 3 + 0, col * 3 + 2) = gr * dx * dz;
+            G(i_trg * 3 + 0, i_src * 3 + 0) = fr + gr * dx * dx;
+            G(i_trg * 3 + 0, i_src * 3 + 1) = gr * dx * dy;
+            G(i_trg * 3 + 0, i_src * 3 + 2) = gr * dx * dz;
 
-            G(row * 3 + 1, col * 3 + 0) = gr * dy * dx;
-            G(row * 3 + 1, col * 3 + 1) = fr + gr * dy * dy;
-            G(row * 3 + 1, col * 3 + 2) = gr * dy * dz;
+            G(i_trg * 3 + 1, i_src * 3 + 0) = gr * dy * dx;
+            G(i_trg * 3 + 1, i_src * 3 + 1) = fr + gr * dy * dy;
+            G(i_trg * 3 + 1, i_src * 3 + 2) = gr * dy * dz;
 
-            G(row * 3 + 2, col * 3 + 0) = gr * dz * dx;
-            G(row * 3 + 2, col * 3 + 1) = gr * dz * dy;
-            G(row * 3 + 2, col * 3 + 2) = fr + gr * dz * dz;
+            G(i_trg * 3 + 2, i_src * 3 + 0) = gr * dz * dx;
+            G(i_trg * 3 + 2, i_src * 3 + 1) = gr * dz * dy;
+            G(i_trg * 3 + 2, i_src * 3 + 2) = fr + gr * dz * dz;
         }
     }
 
@@ -112,7 +161,7 @@ Fiber::matrix_t oseen_tensor(Fiber::matrix_t r_vectors, double eta = 1.0, double
 }
 
 void Fiber::update_stokeslet() {
-    stokeslet = oseen_tensor(x);
+    stokeslet = oseen_tensor_direct(x, x);
     for (int i = 0; i < num_points * 3; ++i)
         stokeslet(i, i) = 0.0;
 }
@@ -198,7 +247,7 @@ Fiber::matrix_t finite_diff(const Fiber::array_t &s, int M, int n_s) {
 // Inputs:
 //   x = Eigen array, N points x_k.
 //   y = Eigen array, N-m points.
-Fiber::matrix_t barycentric_matrix(const Eigen::ArrayXd &x, const Eigen::ArrayXd &y) {
+Fiber::matrix_t barycentric_matrix(const Eigen::Ref<Eigen::ArrayXd> &x, const Eigen::Ref<Eigen::ArrayXd> &y) {
     int N = x.size();
     int M = y.size();
     int m = N - M;
@@ -254,6 +303,11 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
         mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
         mats.P_cheb_representations_all_dof = Fiber::matrix_t::Zero(4 * num_points - 14, 4 * num_points);
 
+        mats.weights_0 = Fiber::array_t::Ones(mats.alpha.size()) * 2.0;
+        mats.weights_0(0) = 1.0;
+        mats.weights_0(mats.weights_0.size() - 1) = 1.0;
+        mats.weights_0 /= (num_points - 1);
+
         for (int i = 0; i < num_points - 4; ++i) {
             for (int j = 0; j < num_points; ++j) {
                 mats.P_cheb_representations_all_dof(i + 0 * (num_points - 4), j + 0 * num_points) = mats.P_X(i, j);
@@ -276,4 +330,26 @@ void FiberContainer::update_derivatives() {
 void FiberContainer::update_stokeslets() {
     for (Fiber &fib : fibers)
         fib.update_stokeslet();
+}
+
+void FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen::Ref<Eigen::MatrixX3d> &forces) {
+    const size_t n_pts_tot = forces.size() / 3;
+
+    Eigen::MatrixX3d weighted_forces(n_pts_tot, 3);
+    Eigen::MatrixX3d r_src(n_pts_tot, 3);
+    size_t offset = 0;
+
+    for (const Fiber &fib : fibers) {
+        const Fiber::array_t &weights = fib.matrices.at(fib.num_points).weights_0;
+        double half_length = 0.5 * fib.length;
+        for (int i_pt = 0; i_pt < fib.num_points; ++i_pt) {
+            for (int i = 0; i < 3; ++i) {
+                weighted_forces(i_pt + offset, i) = half_length * weights[i] * forces(i_pt + offset, i);
+                r_src(i_pt + offset, i) = fib.x(i_pt, i);
+            }
+        }
+        offset += fib.num_points;
+    }
+
+    Eigen::MatrixX3d vel = oseen_tensor_contract_direct(r_src, r_trg, weighted_forces);
 }

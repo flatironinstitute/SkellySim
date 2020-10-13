@@ -22,6 +22,7 @@ class Fiber {
         array_t alpha;
         array_t alpha_roots;
         array_t alpha_tension;
+        array_t weights_0;
         matrix_t D_1_0;
         matrix_t D_2_0;
         matrix_t D_3_0;
@@ -58,6 +59,7 @@ class FiberContainer {
 
     void update_derivatives();
     void update_stokeslets();
+    void flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen::Ref<Eigen::MatrixX3d> &forces);
 };
 
 #endif
