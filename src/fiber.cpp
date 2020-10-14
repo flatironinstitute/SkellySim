@@ -25,6 +25,9 @@ Eigen::MatrixX3d oseen_tensor_contract_direct(const Eigen::Ref<Fiber::matrix_t> 
             double dr2 = dx * dx + dy * dy + dz * dz;
             double dr = sqrt(dr2);
 
+            if (dr == 0.0)
+                continue;
+
             if (dr > epsilon_distance) {
                 fr = factor / dr;
                 gr = factor / std::pow(dr, 3);
@@ -84,6 +87,9 @@ Fiber::matrix_t oseen_tensor_direct(const Eigen::Ref<Fiber::matrix_t> &r_src, co
             double dr2 = dx * dx + dy * dy + dz * dz;
             double dr = sqrt(dr2);
 
+            if (dr == 0.0)
+                continue;
+
             if (dr > epsilon_distance) {
                 fr = factor / dr;
                 gr = factor / std::pow(dr, 3);
@@ -113,9 +119,6 @@ Fiber::matrix_t oseen_tensor_direct(const Eigen::Ref<Fiber::matrix_t> &r_src, co
 void Fiber::update_stokeslet(double eta) {
     // FIXME: Remove arguments for stokeslet?
     stokeslet = oseen_tensor_direct(x, x, eta=eta);
-    // FIXME: Control flow for FMM-like stokeslet?
-    // for (int i = 0; i < num_points * 3; ++i)
-    //     stokeslet(i, i) = 0.0;
 }
 
 void Fiber::update_derivatives() {
