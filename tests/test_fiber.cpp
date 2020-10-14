@@ -1,8 +1,15 @@
 #include "cnpy.hpp"
 #include <Eigen/Core>
-#include <assert.h>
 #include <iostream>
 #include <mpi.h>
+
+#ifdef NDEBUG
+#undef NDEBUG
+#include <cassert>
+#define NDEBUG
+#else
+#include <cassert>
+#endif
 
 #include <fiber.hpp>
 
@@ -36,10 +43,10 @@ int main(int argc, char *argv[]) {
 
     auto &mat = Fiber::matrices.at(x.rows());
 
-    assert(allclose(mat.D_1_0, D_1_0));
-    assert(allclose(mat.D_2_0, D_2_0));
-    assert(allclose(mat.D_3_0, D_3_0));
-    assert(allclose(mat.D_4_0, D_4_0));
+    assert(allclose(mat.D_1_0, D_1_0, 0, 1E-9));
+    assert(allclose(mat.D_2_0, D_2_0, 0, 1E-9));
+    assert(allclose(mat.D_3_0, D_3_0, 0, 1E-9));
+    assert(allclose(mat.D_4_0, D_4_0, 0, 1E-9));
 
     double bending_rigidity = *np_fib["bending_rigidity"].data<double>();
     double length = *np_fib["length"].data<double>();
