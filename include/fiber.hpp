@@ -42,7 +42,7 @@ class Fiber {
     }
 
     void update_derivatives();
-    void update_stokeslet();
+    void update_stokeslet(double);
 };
 
 class FiberContainer {
@@ -58,7 +58,7 @@ class FiberContainer {
     }
 
     void update_derivatives();
-    void update_stokeslets();
+    void update_stokeslets(double eta=1.0);
     void flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen::Ref<Eigen::MatrixX3d> &forces);
 };
 

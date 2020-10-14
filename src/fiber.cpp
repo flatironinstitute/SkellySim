@@ -110,10 +110,12 @@ Fiber::matrix_t oseen_tensor_direct(const Eigen::Ref<Fiber::matrix_t> &r_src, co
     return G;
 }
 
-void Fiber::update_stokeslet() {
-    stokeslet = oseen_tensor_direct(x, x);
-    for (int i = 0; i < num_points * 3; ++i)
-        stokeslet(i, i) = 0.0;
+void Fiber::update_stokeslet(double eta) {
+    // FIXME: Remove arguments for stokeslet?
+    stokeslet = oseen_tensor_direct(x, x, eta=eta);
+    // FIXME: Control flow for FMM-like stokeslet?
+    // for (int i = 0; i < num_points * 3; ++i)
+    //     stokeslet(i, i) = 0.0;
 }
 
 void Fiber::update_derivatives() {
@@ -245,9 +247,9 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
         // 2nd order scheme: 3 points for 1st der, 4 points for 2nd, 5 points for 3rd, 6 points for 4th
         // 4th order scheme: 5 points for 1st der, 6 points for 2nd, 7 points for 3rd, 8 points for 4th
         mats.D_1_0 = finite_diff(mats.alpha, 1, num_points_finite_diff + 1);
-        mats.D_2_0 = finite_diff(mats.alpha, 2, num_points_finite_diff + 1);
-        mats.D_3_0 = finite_diff(mats.alpha, 3, num_points_finite_diff + 1);
-        mats.D_4_0 = finite_diff(mats.alpha, 4, num_points_finite_diff + 1);
+        mats.D_2_0 = finite_diff(mats.alpha, 2, num_points_finite_diff + 2);
+        mats.D_3_0 = finite_diff(mats.alpha, 3, num_points_finite_diff + 3);
+        mats.D_4_0 = finite_diff(mats.alpha, 4, num_points_finite_diff + 4);
 
         mats.P_X = barycentric_matrix(mats.alpha, mats.alpha_roots);
         mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
@@ -277,9 +279,10 @@ void FiberContainer::update_derivatives() {
         fib.update_derivatives();
 }
 
-void FiberContainer::update_stokeslets() {
+void FiberContainer::update_stokeslets(double eta) {
+    // FIXME: Remove default arguments for stokeslets
     for (Fiber &fib : fibers)
-        fib.update_stokeslet();
+        fib.update_stokeslet(eta);
 }
 
 void FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen::Ref<Eigen::MatrixX3d> &forces) {
