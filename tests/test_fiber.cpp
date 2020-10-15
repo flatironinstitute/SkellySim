@@ -67,11 +67,11 @@ int main(int argc, char *argv[]) {
     MatrixXd stokeslet = load_mat(np_fib, "stokeslet");
     assert(allclose(fib.stokeslet, stokeslet));
 
-    Eigen::RowVector3d pt1 = fib.x.row(1);
+    Eigen::Vector3d pt1 = fib.x.col(1);
     fib.translate({1.0, 0.0, 0.0});
-    assert(fib.x(1, 0) == pt1(0) + 1.0);
+    assert(fib.x(0, 1) == pt1(0) + 1.0);
     assert(fib.x(1, 1) == pt1(1));
-    assert(fib.x(1, 2) == pt1(2));
+    assert(fib.x(2, 1) == pt1(2));
 
     std::cout << "Test passed\n";
     return 0;

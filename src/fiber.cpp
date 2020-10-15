@@ -55,7 +55,7 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
 
     for (auto num_points : {8, 16, 32, 64, 96}) {
         auto &mats = res[num_points];
-        mats.alpha = Fiber::array_t::LinSpaced(num_points, -1.0, 1.0);
+        mats.alpha = array_t::LinSpaced(num_points, -1.0, 1.0);
 
         auto num_points_roots = num_points - 4;
         mats.alpha_roots =
@@ -77,7 +77,7 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
         mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
         mats.P_cheb_representations_all_dof = Fiber::matrix_t::Zero(4 * num_points - 14, 4 * num_points);
 
-        mats.weights_0 = Fiber::array_t::Ones(mats.alpha.size()) * 2.0;
+        mats.weights_0 = array_t::Ones(mats.alpha.size()) * 2.0;
         mats.weights_0(0) = 1.0;
         mats.weights_0(mats.weights_0.size() - 1) = 1.0;
         mats.weights_0 /= (num_points - 1);

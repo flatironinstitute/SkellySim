@@ -34,15 +34,15 @@ class Fiber {
     const static std::unordered_map<int, fib_mat_t> matrices;
 
     Fiber(int num_points, double bending_rigidity) : num_points(num_points), bending_rigidity(bending_rigidity) {
-        x = Eigen::MatrixXd::Zero(num_points, 3);
-        x.col(0) = Eigen::VectorXd::LinSpaced(num_points, 0, 1.0);
-        xs.resize(num_points, 3);
-        xss.resize(num_points, 3);
-        xsss.resize(num_points, 3);
-        xssss.resize(num_points, 3);
+        x = Eigen::MatrixXd::Zero(3, num_points);
+        x.row(0) = Eigen::VectorXd::LinSpaced(num_points, 0, 1.0).transpose();
+        xs.resize(3, num_points);
+        xss.resize(3, num_points);
+        xsss.resize(3, num_points);
+        xssss.resize(3, num_points);
     };
 
-    void translate(const Eigen::RowVector3d &r) { x.rowwise() += r; };
+    void translate(const Eigen::Vector3d &r) { x.colwise() += r; };
 
     void update_derivatives();
     void update_stokeslet(double);
