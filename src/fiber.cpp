@@ -2,6 +2,7 @@
 #include <fiber.hpp>
 #include <kernels.hpp>
 #include <unordered_map>
+#include <utils.hpp>
 
 void Fiber::update_stokeslet(double eta) {
     // FIXME: Remove arguments for stokeslet?
@@ -14,75 +15,6 @@ void Fiber::update_derivatives() {
     xss = std::pow(2.0 / length, 2) * fib_mats.D_2_0 * x;
     xsss = std::pow(2.0 / length, 3) * fib_mats.D_3_0 * x;
     xssss = std::pow(2.0 / length, 4) * fib_mats.D_4_0 * x;
-}
-
-//  Following the paper Calculation of weights in finite different formulas,
-//  Bengt Fornberg, SIAM Rev. 40 (3), 685 (1998).
-//
-//  Inputs:
-//  s = grid points
-//  M = order of the highest derivative to compute
-//  n_s = support to compute the derivatives
-//
-//  Outputs:
-//  D_s = Mth derivative matrix
-Eigen::MatrixXd finite_diff(const Fiber::array_t &s, int M, int n_s) {
-    int N = s.size() - 1;
-    Fiber::matrix_t D_s = Fiber::matrix_t::Zero(s.size(), s.size());
-    int n_s_half = (n_s - 1) / 2;
-    n_s = n_s - 1;
-
-    for (size_t xi = 0; xi < s.size(); ++xi) {
-        auto &si = s[xi];
-        int xlow, xhigh;
-
-        if (xi < n_s_half) {
-            xlow = 0;
-            xhigh = n_s + 1;
-        } else if (xi > (s.size() - n_s_half - 2)) {
-            xlow = -n_s - 1;
-            xhigh = s.size();
-        } else {
-            xlow = xi - n_s_half;
-            xhigh = xi - n_s_half + n_s + 1;
-        }
-        xlow = xlow < 0 ? s.size() + xlow : xlow;
-
-        Eigen::Map<const Fiber::array_t> x(s.data() + xlow, xhigh - xlow);
-
-        // Computer coefficients of differential matrices
-        double c1 = 1.0;
-        double c4 = x[0] - si;
-        Fiber::matrix_t c = Fiber::matrix_t::Zero(n_s + 1, M + 1);
-        c(0, 0) = 1.0;
-
-        for (int i = 1; i < n_s + 1; ++i) {
-            int mn = std::min(i, M);
-            double c2 = 1.0;
-            double c5 = c4;
-            c4 = x(i) - si;
-            for (int j = 0; j < i; ++j) {
-                double c3 = x(i) - x(j);
-                c2 = c2 * c3;
-                if (j == i - 1) {
-                    for (int k = mn; k > 0; --k) {
-                        c(i, k) = c1 * (k * c(i - 1, k - 1) - c5 * c(i - 1, k)) / c2;
-                    }
-                    c(i, 0) = -c1 * c5 * c(i - 1, 0) / c2;
-                }
-                for (int k = mn; k > 0; --k) {
-                    c(j, k) = (c4 * c(j, k) - k * c(j, k - 1)) / c3;
-                }
-                c(j, 0) = c4 * c(j, 0) / c3;
-            }
-            c1 = c2;
-        }
-
-        for (int i = 0; i < n_s + 1; ++i) {
-            D_s(xi, xlow + i) = c(i, M);
-        }
-    }
-    return D_s;
 }
 
 // Return resampling matrix P_{N,-m}.
@@ -136,10 +68,10 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
         // this is the order of the finite differencing
         // 2nd order scheme: 3 points for 1st der, 4 points for 2nd, 5 points for 3rd, 6 points for 4th
         // 4th order scheme: 5 points for 1st der, 6 points for 2nd, 7 points for 3rd, 8 points for 4th
-        mats.D_1_0 = finite_diff(mats.alpha, 1, num_points_finite_diff + 1);
-        mats.D_2_0 = finite_diff(mats.alpha, 2, num_points_finite_diff + 2);
-        mats.D_3_0 = finite_diff(mats.alpha, 3, num_points_finite_diff + 3);
-        mats.D_4_0 = finite_diff(mats.alpha, 4, num_points_finite_diff + 4);
+        mats.D_1_0 = utils::finite_diff(mats.alpha, 1, num_points_finite_diff + 1);
+        mats.D_2_0 = utils::finite_diff(mats.alpha, 2, num_points_finite_diff + 2);
+        mats.D_3_0 = utils::finite_diff(mats.alpha, 3, num_points_finite_diff + 3);
+        mats.D_4_0 = utils::finite_diff(mats.alpha, 4, num_points_finite_diff + 4);
 
         mats.P_X = barycentric_matrix(mats.alpha, mats.alpha_roots);
         mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
@@ -175,7 +107,8 @@ void FiberContainer::update_stokeslets(double eta) {
         fib.update_stokeslet(eta);
 }
 
-Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen::Ref<Eigen::MatrixX3d> &forces) {
+Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg,
+                                     const Eigen::Ref<Eigen::MatrixX3d> &forces) {
     const size_t n_pts_tot = forces.size() / 3;
 
     Eigen::MatrixX3d weighted_forces(n_pts_tot, 3);
