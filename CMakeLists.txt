@@ -35,7 +35,7 @@ find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 # find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 # find_package(Ifpack REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 
-add_library(skelly STATIC src/fiber.cpp)
+add_library(skelly STATIC src/fiber.cpp src/kernels.cpp)
 target_include_directories(skelly PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
 target_link_libraries(skelly PRIVATE  Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES}
