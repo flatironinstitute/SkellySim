@@ -26,7 +26,7 @@ void Fiber::update_derivatives() {
 //
 //  Outputs:
 //  D_s = Mth derivative matrix
-Fiber::matrix_t finite_diff(const Fiber::array_t &s, int M, int n_s) {
+Eigen::MatrixXd finite_diff(const Fiber::array_t &s, int M, int n_s) {
     int N = s.size() - 1;
     Fiber::matrix_t D_s = Fiber::matrix_t::Zero(s.size(), s.size());
     int n_s_half = (n_s - 1) / 2;
@@ -175,7 +175,7 @@ void FiberContainer::update_stokeslets(double eta) {
         fib.update_stokeslet(eta);
 }
 
-void FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen::Ref<Eigen::MatrixX3d> &forces) {
+Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen::Ref<Eigen::MatrixX3d> &forces) {
     const size_t n_pts_tot = forces.size() / 3;
 
     Eigen::MatrixX3d weighted_forces(n_pts_tot, 3);
@@ -183,16 +183,28 @@ void FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen:
     size_t offset = 0;
 
     for (const Fiber &fib : fibers) {
-        const Fiber::array_t &weights = fib.matrices.at(fib.num_points).weights_0;
-        double half_length = 0.5 * fib.length;
+        const Fiber::array_t &weights = 0.5 * fib.length * fib.matrices.at(fib.num_points).weights_0;
+
         for (int i_pt = 0; i_pt < fib.num_points; ++i_pt) {
             for (int i = 0; i < 3; ++i) {
-                weighted_forces(i_pt + offset, i) = half_length * weights[i] * forces(i_pt + offset, i);
+                weighted_forces(i_pt + offset, i) = weights[i] * forces(i_pt + offset, i);
                 r_src(i_pt + offset, i) = fib.x(i_pt, i);
             }
         }
         offset += fib.num_points;
     }
 
+    // All-to-all
+    // FIXME: call to should be distributed
     Eigen::MatrixX3d vel = kernels::oseen_tensor_contract_direct(r_src, r_trg, weighted_forces);
+
+    // Subtract self term
+    // FIXME: Subtracting self flow only works when system has only fibers
+    offset = 0;
+    for (const Fiber &fib : fibers) {
+        vel.block(offset, 0, fib.num_points, 3) -= fib.stokeslet * weighted_forces.block(offset, 0, fib.num_points, 3);
+        offset += fib.num_points;
+    }
+
+    return vel;
 }
