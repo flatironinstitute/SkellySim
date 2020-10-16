@@ -62,7 +62,7 @@ class FiberContainer {
 
     void update_derivatives();
     void update_stokeslets(double eta = 1.0);
-    Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg, const Eigen::Ref<Eigen::MatrixX3d> &forces);
+    Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixXd> &forces);
 };
 
 #endif

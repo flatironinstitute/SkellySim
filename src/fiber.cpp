@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <fiber.hpp>
+#include <iostream>
 #include <kernels.hpp>
 #include <unordered_map>
 #include <utils.hpp>
@@ -11,10 +12,10 @@ void Fiber::update_stokeslet(double eta) {
 
 void Fiber::update_derivatives() {
     auto &fib_mats = matrices.at(num_points);
-    xs = std::pow(2.0 / length, 1) * fib_mats.D_1_0 * x;
-    xss = std::pow(2.0 / length, 2) * fib_mats.D_2_0 * x;
-    xsss = std::pow(2.0 / length, 3) * fib_mats.D_3_0 * x;
-    xssss = std::pow(2.0 / length, 4) * fib_mats.D_4_0 * x;
+    xs = std::pow(2.0 / length, 1) * x * fib_mats.D_1_0;
+    xss = std::pow(2.0 / length, 2) * x * fib_mats.D_2_0;
+    xsss = std::pow(2.0 / length, 3) * x * fib_mats.D_3_0;
+    xssss = std::pow(2.0 / length, 4) * x * fib_mats.D_4_0;
 }
 
 // Return resampling matrix P_{N,-m}.
@@ -68,10 +69,11 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
         // this is the order of the finite differencing
         // 2nd order scheme: 3 points for 1st der, 4 points for 2nd, 5 points for 3rd, 6 points for 4th
         // 4th order scheme: 5 points for 1st der, 6 points for 2nd, 7 points for 3rd, 8 points for 4th
-        mats.D_1_0 = utils::finite_diff(mats.alpha, 1, num_points_finite_diff + 1);
-        mats.D_2_0 = utils::finite_diff(mats.alpha, 2, num_points_finite_diff + 2);
-        mats.D_3_0 = utils::finite_diff(mats.alpha, 3, num_points_finite_diff + 3);
-        mats.D_4_0 = utils::finite_diff(mats.alpha, 4, num_points_finite_diff + 4);
+        // Pre-transpose so can be left multiplied by our point-vectors-as-columns position format
+        mats.D_1_0 = utils::finite_diff(mats.alpha, 1, num_points_finite_diff + 1).transpose();
+        mats.D_2_0 = utils::finite_diff(mats.alpha, 2, num_points_finite_diff + 2).transpose();
+        mats.D_3_0 = utils::finite_diff(mats.alpha, 3, num_points_finite_diff + 3).transpose();
+        mats.D_4_0 = utils::finite_diff(mats.alpha, 4, num_points_finite_diff + 4).transpose();
 
         mats.P_X = barycentric_matrix(mats.alpha, mats.alpha_roots);
         mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
@@ -107,12 +109,11 @@ void FiberContainer::update_stokeslets(double eta) {
         fib.update_stokeslet(eta);
 }
 
-Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg,
-                                     const Eigen::Ref<Eigen::MatrixX3d> &forces) {
-    const size_t n_pts_tot = forces.size() / 3;
+Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) {
+    const size_t n_pts_tot = forces.cols();
 
-    Eigen::MatrixX3d weighted_forces(n_pts_tot, 3);
-    Eigen::MatrixX3d r_src(n_pts_tot, 3);
+    Eigen::MatrixXd weighted_forces(3, n_pts_tot);
+    Eigen::MatrixXd r_src(3, n_pts_tot);
     size_t offset = 0;
 
     for (const Fiber &fib : fibers) {
@@ -120,22 +121,26 @@ Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixX3d> r_trg,
 
         for (int i_pt = 0; i_pt < fib.num_points; ++i_pt) {
             for (int i = 0; i < 3; ++i) {
-                weighted_forces(i_pt + offset, i) = weights[i] * forces(i_pt + offset, i);
-                r_src(i_pt + offset, i) = fib.x(i_pt, i);
+                weighted_forces(i, i_pt + offset) = weights[i] * forces(i, i_pt + offset);
+                r_src(i, i_pt + offset) = fib.x(i, i_pt);
             }
         }
         offset += fib.num_points;
     }
 
     // All-to-all
-    // FIXME: call to should be distributed
-    Eigen::MatrixX3d vel = kernels::oseen_tensor_contract_direct(r_src, r_trg, weighted_forces);
+    // FIXME: MPI not compatible with direct calculation
+    Eigen::MatrixXd r_trg = r_src;
+    // Eigen::MatrixXd vel = kernels::oseen_tensor_contract_direct(r_src, r_trg, weighted_forces);
+    Eigen::MatrixXd vel = kernels::oseen_tensor_contract_fmm(r_src, r_trg, weighted_forces);
 
     // Subtract self term
     // FIXME: Subtracting self flow only works when system has only fibers
     offset = 0;
     for (const Fiber &fib : fibers) {
-        vel.block(offset, 0, fib.num_points, 3) -= fib.stokeslet * weighted_forces.block(offset, 0, fib.num_points, 3);
+        Eigen::Map<Eigen::VectorXd> wf_flat(weighted_forces.data() + offset * 3, fib.num_points * 3);
+        Eigen::Map<Eigen::VectorXd> vel_flat(vel.data() + offset * 3, fib.num_points * 3);
+        vel_flat -= fib.stokeslet * wf_flat;
         offset += fib.num_points;
     }
 

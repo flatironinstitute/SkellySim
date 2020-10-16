@@ -1,25 +1,29 @@
+#include <Teuchos_RCP.hpp>
+#include <Tpetra_Core.hpp>
 #include <kernels.hpp>
 
-Eigen::MatrixX3d kernels::oseen_tensor_contract_direct(const Eigen::Ref<Eigen::MatrixXd> &r_src,
-                                                       const Eigen::Ref<Eigen::MatrixXd> &r_trg,
-                                                       const Eigen::Ref<Eigen::MatrixXd> &density, double eta,
-                                                       double reg, double epsilon_distance) {
+#include <STKFMM/STKFMM.hpp>
+
+Eigen::MatrixXd kernels::oseen_tensor_contract_direct(const Eigen::Ref<Eigen::MatrixXd> &r_src,
+                                                      const Eigen::Ref<Eigen::MatrixXd> &r_trg,
+                                                      const Eigen::Ref<Eigen::MatrixXd> &density, double eta,
+                                                      double reg, double epsilon_distance) {
 
     using namespace Eigen;
     const int N_src = r_src.size() / 3;
     const int N_trg = r_trg.size() / 3;
 
     // # Compute matrix of size 3N \times 3N
-    MatrixX3d res = MatrixXd::Zero(N_trg, 3);
+    MatrixXd res = MatrixXd::Zero(3, N_trg);
 
     const double factor = 1.0 / (8.0 * M_PI * eta);
     const double reg2 = std::pow(reg, 2);
     for (int i_trg = 0; i_trg < N_trg; ++i_trg) {
         for (int i_src = 0; i_src < N_src; ++i_src) {
             double fr, gr;
-            double dx = r_src(i_src, 0) - r_trg(i_trg, 0);
-            double dy = r_src(i_src, 1) - r_trg(i_trg, 1);
-            double dz = r_src(i_src, 2) - r_trg(i_trg, 2);
+            double dx = r_src(0, i_src) - r_trg(0, i_trg);
+            double dy = r_src(1, i_src) - r_trg(1, i_trg);
+            double dz = r_src(2, i_src) - r_trg(2, i_trg);
             double dr2 = dx * dx + dy * dy + dz * dz;
             double dr = sqrt(dr2);
 
@@ -42,9 +46,9 @@ Eigen::MatrixX3d kernels::oseen_tensor_contract_direct(const Eigen::Ref<Eigen::M
             double Myz = gr * dy * dz;
             double Mzz = fr + gr * dz * dz;
 
-            res(i_trg, 0) += Mxx * density(i_src, 0) + Mxy * density(i_src, 1) + Mxz * density(i_src, 2);
-            res(i_trg, 1) += Mxy * density(i_src, 0) + Myy * density(i_src, 1) + Myz * density(i_src, 2);
-            res(i_trg, 2) += Mxz * density(i_src, 0) + Myz * density(i_src, 1) + Mzz * density(i_src, 2);
+            res(0, i_trg) += Mxx * density(0, i_src) + Mxy * density(1, i_src) + Mxz * density(2, i_src);
+            res(1, i_trg) += Mxy * density(0, i_src) + Myy * density(1, i_src) + Myz * density(2, i_src);
+            res(2, i_trg) += Mxz * density(0, i_src) + Myz * density(1, i_src) + Mzz * density(2, i_src);
         }
     }
 
@@ -80,9 +84,9 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<Eigen::MatrixXd> &
     for (int i_src = 0; i_src < N_trg; ++i_src) {
         for (int i_trg = 0; i_trg < N_src; ++i_trg) {
             double fr, gr;
-            double dx = r_src(i_src, 0) - r_trg(i_trg, 0);
-            double dy = r_src(i_src, 1) - r_trg(i_trg, 1);
-            double dz = r_src(i_src, 2) - r_trg(i_trg, 2);
+            double dx = r_src(0, i_src) - r_trg(0, i_trg);
+            double dy = r_src(1, i_src) - r_trg(1, i_trg);
+            double dz = r_src(2, i_src) - r_trg(2, i_trg);
             double dr2 = dx * dx + dy * dy + dz * dz;
             double dr = sqrt(dr2);
 
@@ -113,4 +117,31 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<Eigen::MatrixXd> &
     }
 
     return G;
+}
+
+Eigen::MatrixXd kernels::oseen_tensor_contract_fmm(const Eigen::Ref<Eigen::MatrixXd> &r_src,
+                                                   const Eigen::Ref<Eigen::MatrixXd> &r_trg,
+                                                   const Eigen::Ref<Eigen::MatrixXd> &f_src) {
+    Teuchos::RCP<const Teuchos::Comm<int>> comm = Tpetra::getDefaultComm();
+    const int rank = comm->getRank();
+    const int nprocs = comm->getSize();
+    const unsigned k = static_cast<unsigned>(stkfmm::KERNEL::Stokes);
+    const stkfmm::PAXIS paxis = static_cast<stkfmm::PAXIS>(0);
+    const int maxPoints = 50;
+
+    Teuchos::RCP<stkfmm::STKFMM> fmmPtr_ = Teuchos::rcp(new stkfmm::Stk3DFMM(8, maxPoints, paxis, k));
+    fmmPtr_->showActiveKernels();
+    Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, r_trg.size() / 3);
+
+    double origin[3] = {0.0};
+    fmmPtr_->setBox(origin, 1.0);
+
+    const int n_trg_local = r_trg.size() / 3;
+
+    fmmPtr_->setPoints(r_src.size() / 3, r_src.data(), n_trg_local, r_trg.data());
+
+    fmmPtr_->setupTree(stkfmm::KERNEL::Stokes);
+    fmmPtr_->evaluateFMM(stkfmm::KERNEL::Stokes, f_src.size() / 3, f_src.data(), n_trg_local, res.data());
+
+    return res;
 }

@@ -17,7 +17,7 @@ using Eigen::Map;
 using Eigen::MatrixXd;
 
 MatrixXd load_mat(cnpy::npz_t &npz, const char *var) {
-    return Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0]).matrix().transpose();
+    return Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0]).matrix();
 }
 
 template <typename DerivedA, typename DerivedB>
@@ -30,6 +30,7 @@ bool allclose(
 
 int main(int argc, char *argv[]) {
     cnpy::npz_t np_fib = cnpy::npz_load("np_fib.npz");
+
     MatrixXd x = load_mat(np_fib, "x");
     MatrixXd xs = load_mat(np_fib, "xs");
     MatrixXd xss = load_mat(np_fib, "xss");
@@ -41,7 +42,7 @@ int main(int argc, char *argv[]) {
     MatrixXd D_3_0 = load_mat(np_fib, "D_3_0");
     MatrixXd D_4_0 = load_mat(np_fib, "D_4_0");
 
-    auto &mat = Fiber::matrices.at(x.rows());
+    auto &mat = Fiber::matrices.at(x.cols());
 
     assert(allclose(mat.D_1_0, D_1_0, 0, 1E-9));
     assert(allclose(mat.D_2_0, D_2_0, 0, 1E-9));
@@ -52,7 +53,7 @@ int main(int argc, char *argv[]) {
     double length = *np_fib["length"].data<double>();
     double eta = *np_fib["eta"].data<double>();
 
-    Fiber fib(x.rows(), bending_rigidity);
+    Fiber fib(x.cols(), bending_rigidity);
     fib.length = length;
     fib.x = x;
     fib.update_derivatives();
