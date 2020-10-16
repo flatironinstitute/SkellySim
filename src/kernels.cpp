@@ -8,7 +8,6 @@ Eigen::MatrixXd kernels::oseen_tensor_contract_direct(const Eigen::Ref<Eigen::Ma
                                                       const Eigen::Ref<Eigen::MatrixXd> &r_trg,
                                                       const Eigen::Ref<Eigen::MatrixXd> &density, double eta,
                                                       double reg, double epsilon_distance) {
-
     using namespace Eigen;
     const int N_src = r_src.size() / 3;
     const int N_trg = r_trg.size() / 3;
@@ -121,27 +120,15 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<Eigen::MatrixXd> &
 
 Eigen::MatrixXd kernels::oseen_tensor_contract_fmm(const Eigen::Ref<Eigen::MatrixXd> &r_src,
                                                    const Eigen::Ref<Eigen::MatrixXd> &r_trg,
-                                                   const Eigen::Ref<Eigen::MatrixXd> &f_src) {
-    Teuchos::RCP<const Teuchos::Comm<int>> comm = Tpetra::getDefaultComm();
-    const int rank = comm->getRank();
-    const int nprocs = comm->getSize();
-    const unsigned k = static_cast<unsigned>(stkfmm::KERNEL::Stokes);
-    const stkfmm::PAXIS paxis = static_cast<stkfmm::PAXIS>(0);
-    const int maxPoints = 50;
+                                                   const Eigen::Ref<Eigen::MatrixXd> &f_src, stkfmm::STKFMM *fmmPtr,
+                                                   stkfmm::KERNEL kernel) {
+    if (fmmPtr == NULL) {
+        std::cerr << "Error: passing null pointer to oseen_tensor_contract_fmm. Use kernels::FMM wrapper class.\n\n";
+        exit(1);
+    }
 
-    Teuchos::RCP<stkfmm::STKFMM> fmmPtr_ = Teuchos::rcp(new stkfmm::Stk3DFMM(8, maxPoints, paxis, k));
-    fmmPtr_->showActiveKernels();
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, r_trg.size() / 3);
-
-    double origin[3] = {0.0};
-    fmmPtr_->setBox(origin, 1.0);
-
-    const int n_trg_local = r_trg.size() / 3;
-
-    fmmPtr_->setPoints(r_src.size() / 3, r_src.data(), n_trg_local, r_trg.data());
-
-    fmmPtr_->setupTree(stkfmm::KERNEL::Stokes);
-    fmmPtr_->evaluateFMM(stkfmm::KERNEL::Stokes, f_src.size() / 3, f_src.data(), n_trg_local, res.data());
+    fmmPtr->evaluateFMM(kernel, f_src.size() / 3, f_src.data(), r_trg.size() / 3, res.data());
 
     return res;
 }

@@ -54,7 +54,7 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
     std::unordered_map<int, Fiber::fib_mat_t> res;
     typedef Fiber::array_t array_t;
 
-    for (auto num_points : {8, 16, 32, 64, 96}) {
+    for (auto num_points : {16, 24, 32, 48, 64, 96}) {
         auto &mats = res[num_points];
         mats.alpha = array_t::LinSpaced(num_points, -1.0, 1.0);
 
@@ -110,6 +110,9 @@ void FiberContainer::update_stokeslets(double eta) {
 }
 
 Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) {
+    // FIXME: Move fmm object and make more flexible
+    static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 500, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes,
+                                              kernels::oseen_tensor_contract_fmm);
     const size_t n_pts_tot = forces.cols();
 
     Eigen::MatrixXd weighted_forces(3, n_pts_tot);
@@ -132,7 +135,7 @@ Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) 
     // FIXME: MPI not compatible with direct calculation
     Eigen::MatrixXd r_trg = r_src;
     // Eigen::MatrixXd vel = kernels::oseen_tensor_contract_direct(r_src, r_trg, weighted_forces);
-    Eigen::MatrixXd vel = kernels::oseen_tensor_contract_fmm(r_src, r_trg, weighted_forces);
+    Eigen::MatrixXd vel = fmm(r_src, r_trg, weighted_forces);
 
     // Subtract self term
     // FIXME: Subtracting self flow only works when system has only fibers
