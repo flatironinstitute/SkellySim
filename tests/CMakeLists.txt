@@ -17,6 +17,6 @@ foreach(file ${files})
 		PASS_REGULAR_EXPRESSION "Test passed"
         FAIL_REGULAR_EXPRESSION "(Exception|Test failed)"
         TIMEOUT 120
-        ENVIRONMENT "OMP_NUM_THREADS=1")
+        )
 
 endforeach()

@@ -118,17 +118,10 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<Eigen::MatrixXd> &
     return G;
 }
 
-Eigen::MatrixXd kernels::oseen_tensor_contract_fmm(const Eigen::Ref<Eigen::MatrixXd> &r_src,
-                                                   const Eigen::Ref<Eigen::MatrixXd> &r_trg,
-                                                   const Eigen::Ref<Eigen::MatrixXd> &f_src, stkfmm::STKFMM *fmmPtr,
-                                                   stkfmm::KERNEL kernel) {
-    if (fmmPtr == NULL) {
-        std::cerr << "Error: passing null pointer to oseen_tensor_contract_fmm. Use kernels::FMM wrapper class.\n\n";
-        exit(1);
-    }
-
+Eigen::MatrixXd kernels::stokes_vel_fmm(const Eigen::Ref<Eigen::MatrixXd> &r_src,
+                                        const Eigen::Ref<Eigen::MatrixXd> &r_trg,
+                                        const Eigen::Ref<Eigen::MatrixXd> &f_src, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, r_trg.size() / 3);
-    fmmPtr->evaluateFMM(kernel, f_src.size() / 3, f_src.data(), r_trg.size() / 3, res.data());
-
+    fmmPtr->evaluateFMM(stkfmm::KERNEL::Stokes, f_src.size() / 3, f_src.data(), r_trg.size() / 3, res.data());
     return res;
 }

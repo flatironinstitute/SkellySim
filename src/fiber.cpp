@@ -112,7 +112,7 @@ void FiberContainer::update_stokeslets(double eta) {
 Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) {
     // FIXME: Move fmm object and make more flexible
     static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 500, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes,
-                                              kernels::oseen_tensor_contract_fmm);
+                                              kernels::stokes_vel_fmm);
     const size_t n_pts_tot = forces.cols();
 
     Eigen::MatrixXd weighted_forces(3, n_pts_tot);
