@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
     MatrixXd D_3_0 = load_mat(np_fib, "D_3_0");
     MatrixXd D_4_0 = load_mat(np_fib, "D_4_0");
 
+    MatrixXd A = load_mat(np_fib, "A").transpose();
     auto &mat = Fiber::matrices.at(x.cols());
 
     assert(allclose(mat.D_1_0, D_1_0, 0, 1E-9));
@@ -52,6 +53,7 @@ int main(int argc, char *argv[]) {
     double bending_rigidity = *np_fib["bending_rigidity"].data<double>();
     double length = *np_fib["length"].data<double>();
     double eta = *np_fib["eta"].data<double>();
+    double dt = *np_fib["dt"].data<double>();
 
     Fiber fib(x.cols(), bending_rigidity);
     fib.length = length;
@@ -73,6 +75,17 @@ int main(int argc, char *argv[]) {
     assert(fib.x(0, 1) == pt1(0) + 1.0);
     assert(fib.x(1, 1) == pt1(1));
     assert(fib.x(2, 1) == pt1(2));
+
+    fib.form_linear_operator(dt, eta);
+    int np = fib.num_points;
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            Eigen::MatrixXd Apy = A.block(i * np, j * np, np, np);
+            Eigen::MatrixXd Acpp = fib.A_.block(i * np, j * np, np, np);
+            assert(allclose(Apy, Acpp, 0, 1E-7));
+        }
+    }
 
     std::cout << "Test passed\n";
     return 0;

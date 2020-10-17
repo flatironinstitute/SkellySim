@@ -21,6 +21,7 @@ int main(int argc, char *argv[]) {
 
     const int n_pts = 48;
     const int n_fib_per_rank = 3000 / size;
+    const int n_time = 10;
 
     FiberContainer fibs(n_fib_per_rank, n_pts, 0.1);
     Eigen::MatrixXd f_fib = Eigen::MatrixXd::Zero(3, n_pts * n_fib_per_rank);
@@ -34,13 +35,21 @@ int main(int argc, char *argv[]) {
     }
 
     double st = omp_get_wtime();
-    fibs.update_stokeslets();
+    for (int i = 0; i < n_time; ++i)
+        fibs.update_stokeslets();
     if (rank == 0)
         std::cout << omp_get_wtime() - st << std::endl;
 
     auto vel = fibs.flow(f_fib);
     st = omp_get_wtime();
-    vel = fibs.flow(f_fib);
+    for (int i = 0; i < n_time; ++i)
+        vel = fibs.flow(f_fib);
+    if (rank == 0)
+        std::cout << omp_get_wtime() - st << std::endl;
+
+    st = omp_get_wtime();
+    for (int i = 0; i < n_time; ++i)
+        fibs.form_linear_operators(0.005);
     if (rank == 0)
         std::cout << omp_get_wtime() - st << std::endl;
 

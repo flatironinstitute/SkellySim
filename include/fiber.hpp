@@ -17,6 +17,7 @@ class Fiber {
     matrix_t xsss;
     matrix_t xssss;
     matrix_t stokeslet;
+    matrix_t A_;
 
     typedef struct {
         array_t alpha;
@@ -42,8 +43,8 @@ class Fiber {
         xssss.resize(3, num_points);
     };
 
+    void form_linear_operator(double dt, double eta = 1.0);
     void translate(const Eigen::Vector3d &r) { x.colwise() += r; };
-
     void update_derivatives();
     void update_stokeslet(double);
 };
@@ -62,6 +63,7 @@ class FiberContainer {
 
     void update_derivatives();
     void update_stokeslets(double eta = 1.0);
+    void form_linear_operators(double dt, double eta = 1.0);
     Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixXd> &forces);
 };
 
