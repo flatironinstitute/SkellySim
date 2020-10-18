@@ -42,7 +42,7 @@ void Fiber::form_linear_operator(double dt, double eta) {
     auto A_YZ = A_.block(1 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
     auto A_YT = A_.block(1 * num_points_up, 3 * num_points_down, num_points_up, num_points_down); 
 
-
+    auto A_ZX = A_.block(2 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
     auto A_ZY = A_.block(2 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
     auto A_ZZ = A_.block(2 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
     auto A_ZT = A_.block(2 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
@@ -72,22 +72,22 @@ void Fiber::form_linear_operator(double dt, double eta) {
     Eigen::ArrayXd xsss_x = xsss.block(0, 0, 1, num_points).transpose().array();
     Eigen::ArrayXd xsss_y = xsss.block(1, 0, 1, num_points).transpose().array();
     Eigen::ArrayXd xsss_z = xsss.block(2, 0, 1, num_points).transpose().array();
-    
 
+    A_XX = beta_tstep / dt * I_vec.asDiagonal();
     A_XX += bending_rigidity * (c_0) * (D_4.colwise() * (I_vec.array() + xs_x.pow(2))).matrix();
     A_XX += bending_rigidity * (c_1) * (D_4.colwise() * (I_vec.array() - xs_x.pow(2))).matrix();
-    A_XY += bending_rigidity * (c_0 - c_1) * (D_4.colwise() * (xs_x * xs_y)).matrix();
-    A_XZ += bending_rigidity * (c_0 - c_1) * (D_4.colwise() * (xs_x * xs_z)).matrix();
+    A_XY = bending_rigidity * (c_0 - c_1) * (D_4.colwise() * (xs_x * xs_y)).matrix();
+    A_XZ = bending_rigidity * (c_0 - c_1) * (D_4.colwise() * (xs_x * xs_z)).matrix();
 
     A_YX = A_XY;
-    A_YY = beta_tstep * (I / dt) * I_vec.asDiagonal();
+    A_YY = beta_tstep / dt * I_vec.asDiagonal();
     A_YY += bending_rigidity * (c_0) * (D_4.colwise() * (I_vec.array() + xs_y.pow(2))).matrix();
     A_YY += bending_rigidity * (c_1) * (D_4.colwise() * (I_vec.array() - xs_y.pow(2))).matrix();
     A_YZ = bending_rigidity * (c_0 - c_1) * (D_4.colwise() * (xs_y * xs_z)).matrix();
 
     A_ZX = A_XZ;
     A_ZY = A_YZ;
-    A_ZZ = beta_tstep * (I / dt) * I_vec.asDiagonal();
+    A_ZZ = beta_tstep / dt * I_vec.asDiagonal();
     A_ZZ += bending_rigidity * (c_0) * (D_4.colwise() * (I_vec.array() + xs_z.pow(2))).matrix();
     A_ZZ += bending_rigidity * (c_1) * (D_4.colwise() * (I_vec.array() - xs_z.pow(2))).matrix();
 
@@ -97,7 +97,7 @@ void Fiber::form_linear_operator(double dt, double eta) {
     A_YT = -(c_0 * 2.0) * (D_1.colwise() * xs_y);
     A_YT += -(c_0 * 2.0 + c_1) * xss_y.matrix().asDiagonal(); 
 
-
+    A_ZT = -(c_0 * 2.0) * (D_1.colwise() * xs_z);
     A_ZT += -(c_0 * 2.0 + c_1) * xss_z.matrix().asDiagonal();
 
     A_TX = (-c_1 + 7.0 * c_0) * bending_rigidity * (D_4.colwise() * xss_x);
