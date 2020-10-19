@@ -115,7 +115,8 @@ void Fiber::form_linear_operator(double dt, double eta) {
 // A * (X^{n+1}, T^{n+1}) = RHS
 // with
 // RHS = (X^n / dt + flow + Mobility * force_external, ...)
-void Fiber::compute_RHS(double dt, Eigen::Ref<Eigen::MatrixXd> flow, Eigen::Ref<Eigen::MatrixXd> f_external) {
+void Fiber::compute_RHS(double dt, const Eigen::Ref<Eigen::MatrixXd> flow,
+                        const Eigen::Ref<Eigen::MatrixXd> f_external) {
     const int np = num_points_;
     const auto &mats = matrices_.at(np);
     Eigen::MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
@@ -196,6 +197,129 @@ void Fiber::compute_RHS(double dt, Eigen::Ref<Eigen::MatrixXd> flow, Eigen::Ref<
     }
 }
 
+void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<Eigen::MatrixXd> &v_on_fiber,
+                                 const Eigen::Ref<Eigen::MatrixXd> &f_on_fiber) {
+    const int np = num_points_;
+    const auto &mats = matrices_.at(np);
+    Eigen::MatrixXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);
+    Eigen::MatrixXd D_2 = mats.D_2_0.transpose() * std::pow(2.0 / length_, 2);
+    Eigen::MatrixXd D_3 = mats.D_3_0.transpose() * std::pow(2.0 / length_, 3);
+    Eigen::MatrixXd D_4 = mats.D_4_0.transpose() * std::pow(2.0 / length_, 4);
+    auto &x_rhs = x_;
+    auto &xs_rhs = xs_;
+
+    // Downsample A, leaving last 14 rows untouched
+    A_.block(0, 0, 4 * np - 14, 4 * np) = mats.P_downsample_bc * A_;
+
+    // Downsampled RHS, with rest of RHS filled in by BC calculations
+    RHS_.segment(0, 4 * np - 14) = mats.P_downsample_bc * RHS_;
+    auto B_RHS = RHS_.segment(4 * np - 14, 14);
+    B_RHS.setZero();
+    auto B = A_.block(4 * np - 14, 0, 14, 4 * np);
+    B.setZero();
+
+    switch (bc_minus_.first) {
+    case BC::Velocity:
+        B(0, 0 * np) = beta_tstep_ / dt;
+        B(1, 1 * np) = beta_tstep_ / dt;
+        B(2, 2 * np) = beta_tstep_ / dt;
+        B.block(3, 0 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(0, 0) * D_3.row(0);
+        B.block(3, 1 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(1, 0) * D_3.row(0);
+        B.block(3, 2 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(2, 0) * D_3.row(0);
+        B.block(3, 3 * np, 1, np) = (2.0 * c_0_) * D_1.row(0);
+
+        // FIXME: Tag fibers with BC_minus_vec[2]
+        Eigen::Vector3d BC_minus_vec_0({0.0, 0.0, 0.0});
+        B_RHS.segment(0, 3) = x_.col(0) / dt + BC_minus_vec_0;
+        B_RHS(3) = 0.0;
+
+        if (v_on_fiber.size())
+            B_RHS(3) -= xs_.col(0).dot(v_on_fiber.col(0));
+        if (f_on_fiber.size())
+            B_RHS(3) -= 2 * c_0_ * xs_.col(0).dot(f_on_fiber.col(0));
+
+        break;
+    default:
+        std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
+        exit(1);
+    }
+
+    switch (bc_minus_.second) {
+    case BC::AngularVelocity:
+        B.block(4, 0, 1, np) = (beta_tstep_ / dt) * D_1.row(0);
+        B.block(5, np, 1, np) = (beta_tstep_ / dt) * D_1.row(0);
+        B.block(6, 2 * np, 1, np) = (beta_tstep_ / dt) * D_1.row(0);
+
+        // FIXME: Tag fibers with BC_minus_vec[2]
+        Eigen::Vector3d BC_minus_vec_1({0.0, 0.0, 0.0});
+        B_RHS.segment(4, 3) = xs_.col(0) / dt + BC_minus_vec_1;
+
+        break;
+    default:
+        std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
+        exit(1);
+    }
+
+    switch (bc_plus_.first) {
+    // FIXME: implement more BC
+    // case BC::Velocity:
+    //     B(7, 4 * np - 1) = beta_tstep_ / dt;
+    //     B(8, 4 * np - 1) = beta_tstep_ / dt;
+    //     B(9, 4 * np - 1) = beta_tstep_ / dt;
+    //     int endc = xss_.cols() - 1;
+    //     int endr = D_3.rows() - 1;
+    //     B.block(10, 0 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(0, endc) * D_3.row(endr);
+    //     B.block(10, 1 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(1, endc) * D_3.row(endr);
+    //     B.block(10, 2 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(2, endc) * D_3.row(endr);
+    //     B.block(10, 3 * np, 1, np) = (2.0 * c_0_) * D_1.row(endr);
+
+    //     // FIXME: Tag fibers with BC_plus_vec[2]
+    //     Eigen::Vector3d BC_plus_vec_0({0.0, 0.0, 0.0});
+    //     B_RHS.segment(7, 3) = x_.col(0) / dt + BC_plus_vec_0;
+    //     B_RHS(10) = 0.0;
+
+    //     if (v_on_fiber.size())
+    //         B_RHS(10) -= xs_.col(xs_.cols() - 1).dot(v_on_fiber.col(v_on_fiber.cols() - 1));
+    //     if (f_on_fiber.size())
+    //         B_RHS(10) -= 2 * c_0_ * xs_.col(xs_.cols() - 1).dot(f_on_fiber.col(f_on_fiber.cols() - 1));
+    //     break;
+    case BC::Force:
+        B.block(7, 0, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
+        B(7, 4 * np - 1) = xs_(0, xs_.cols() - 1);
+        B.block(8, np, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
+        B(8, 4 * np - 1) = xs_(1, xs_.cols() - 1);
+        B.block(9, 2 * np, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
+        B(9, 4 * np - 1) = xs_(2, xs_.cols() - 1);
+        B.block(10, 0 * np, 1, np) = bending_rigidity_ * D_2.row(D_2.rows() - 1) * xss_(0, xss_.rows() - 1);
+        B.block(10, 1 * np, 1, np) = bending_rigidity_ * D_2.row(D_2.rows() - 1) * xss_(1, xss_.rows() - 1);
+        B.block(10, 2 * np, 1, np) = bending_rigidity_ * D_2.row(D_2.rows() - 1) * xss_(2, xss_.rows() - 1);
+        B(10, 4 * np - 1) = 1.0;
+
+        Eigen::Vector3d BC_end_vec_0 = {0.0, 0.0, 0.0};
+        B_RHS.segment(7, 3) = BC_end_vec_0;
+        B_RHS(10) = BC_end_vec_0.dot(xs_.col(xs_.cols() - 1));
+        break;
+    default:
+        std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
+        exit(1);
+    }
+
+    switch (bc_plus_.second) {
+    case BC::Torque:
+        B.block(11, 0 * np, 1, np) = D_2.row(D_2.rows() - 1);
+        B.block(12, 1 * np, 1, np) = D_2.row(D_2.rows() - 1);
+        B.block(13, 2 * np, 1, np) = D_2.row(D_2.rows() - 1);
+
+        // FIXME: Tag fibers with BC_plus_vec[2]
+        Eigen::Vector3d BC_plus_vec_1({0.0, 0.0, 0.0});
+        B_RHS.segment(11, 3) = BC_plus_vec_1;
+        break;
+    default:
+        std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
+        exit(1);
+    }
+}
+
 // Return resampling matrix P_{N,-m}.
 // Inputs:
 //   x = Eigen array, N points x_k.
@@ -255,21 +379,18 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
 
         mats.P_X = barycentric_matrix(mats.alpha, mats.alpha_roots);
         mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
-        mats.P_cheb_representations_all_dof = Fiber::matrix_t::Zero(4 * num_points - 14, 4 * num_points);
 
         mats.weights_0 = array_t::Ones(mats.alpha.size()) * 2.0;
         mats.weights_0(0) = 1.0;
         mats.weights_0(mats.weights_0.size() - 1) = 1.0;
         mats.weights_0 /= (num_points - 1);
 
-        for (int i = 0; i < num_points - 4; ++i) {
-            for (int j = 0; j < num_points; ++j) {
-                mats.P_cheb_representations_all_dof(i + 0 * (num_points - 4), j + 0 * num_points) = mats.P_X(i, j);
-                mats.P_cheb_representations_all_dof(i + 1 * (num_points - 4), j + 1 * num_points) = mats.P_X(i, j);
-                mats.P_cheb_representations_all_dof(i + 2 * (num_points - 4), j + 2 * num_points) = mats.P_X(i, j);
-                mats.P_cheb_representations_all_dof(i + 3 * (num_points - 4), j + 3 * num_points) = mats.P_T(i, j);
-            }
-        }
+        const int np = num_points;
+        mats.P_downsample_bc = Fiber::matrix_t::Zero(4 * num_points - 14, 4 * num_points);
+        mats.P_downsample_bc.block(0 * (np - 4), 0 * np, np - 4, np) = mats.P_X;
+        mats.P_downsample_bc.block(1 * (np - 4), 1 * np, np - 4, np) = mats.P_X;
+        mats.P_downsample_bc.block(2 * (np - 4), 2 * np, np - 4, np) = mats.P_X;
+        mats.P_downsample_bc.block(3 * (np - 4), 3 * np, np - 2, np) = mats.P_T;
     }
     return res;
 }

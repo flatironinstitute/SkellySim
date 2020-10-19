@@ -47,17 +47,26 @@ int main(int argc, char *argv[]) {
     MatrixXd D_3_0 = load_mat(np_fib, "D_3_0");
     MatrixXd D_4_0 = load_mat(np_fib, "D_4_0");
 
+    MatrixXd P_X = load_mat(np_fib, "P_X").transpose();
+    MatrixXd P_T = load_mat(np_fib, "P_T").transpose();
+    MatrixXd P_downsample_bc = load_mat(np_fib, "P_downsample_bc").transpose();
+
     MatrixXd force_external = load_mat(np_fib, "force_external");
     MatrixXd flow_on = load_mat(np_fib, "flow_on");
 
     MatrixXd A = load_mat(np_fib, "A").transpose();
+    MatrixXd ABC = load_mat(np_fib, "ABC").transpose();
     VectorXd RHS = load_vec(np_fib, "RHS");
+    VectorXd RHSBC = load_vec(np_fib, "RHSBC");
     auto &mat = Fiber::matrices_.at(x.cols());
 
     assert(allclose(mat.D_1_0, D_1_0, 0, 1E-9));
     assert(allclose(mat.D_2_0, D_2_0, 0, 1E-9));
     assert(allclose(mat.D_3_0, D_3_0, 0, 1E-9));
     assert(allclose(mat.D_4_0, D_4_0, 0, 1E-9));
+    assert(allclose(mat.P_X, P_X, 0, 1E-9));
+    assert(allclose(mat.P_T, P_T, 0, 1E-9));
+    assert(allclose(mat.P_downsample_bc, P_downsample_bc, 0, 1E-9));
 
     double bending_rigidity = *np_fib["bending_rigidity"].data<double>();
     double length = *np_fib["length"].data<double>();
@@ -93,6 +102,20 @@ int main(int argc, char *argv[]) {
     // Test right-hand-side computation
     fib.compute_RHS(dt, flow_on, force_external);
     assert(allclose(RHS, fib.RHS_));
+
+    // Test BC calculation
+    fib.bc_minus_ = {Fiber::BC::Velocity, Fiber::BC::AngularVelocity};
+    fib.bc_plus_ = {Fiber::BC::Force, Fiber::BC::Torque};
+    fib.apply_bc_rectangular(dt, flow_on, force_external);
+    assert(allclose(RHSBC, fib.RHS_));
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            Eigen::MatrixXd Apy = ABC.block(i * np, j * np, np, np);
+            Eigen::MatrixXd Acpp = fib.A_.block(i * np, j * np, np, np);
+            assert(allclose(Apy, Acpp, 0, 1E-7));
+        }
+    }
 
     // Check translation operator
     Eigen::Vector3d pt1 = fib.x_.col(1);

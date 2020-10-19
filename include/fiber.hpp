@@ -6,6 +6,8 @@
 
 class Fiber {
   public:
+    enum BC { Force, Torque, Velocity, AngularVelocity, Position, Angle };
+
     int num_points_;
     double length_;
     double bending_rigidity_;
@@ -15,6 +17,9 @@ class Fiber {
     double epsilon_ = 1E-3;
     double v_length_ = 0.0;
     double c_0_, c_1_;
+
+    std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
+    std::pair<BC, BC> bc_plus_ = {BC::Velocity, BC::AngularVelocity};
 
     typedef Eigen::MatrixXd matrix_t;
     typedef Eigen::ArrayXd array_t;
@@ -38,7 +43,7 @@ class Fiber {
         matrix_t D_4_0;
         matrix_t P_X;
         matrix_t P_T;
-        matrix_t P_cheb_representations_all_dof;
+        matrix_t P_downsample_bc;
     } fib_mat_t;
     const static std::unordered_map<int, fib_mat_t> matrices_;
 
@@ -55,8 +60,10 @@ class Fiber {
         c_1_ = 2.0 / (8.0 * M_PI * eta);
     };
 
-    void compute_RHS(double dt, Eigen::Ref<Eigen::MatrixXd> flow, Eigen::Ref<Eigen::MatrixXd> f_external);
+    void compute_RHS(double dt, const Eigen::Ref<Eigen::MatrixXd> flow, const Eigen::Ref<Eigen::MatrixXd> f_external);
     void form_linear_operator(double dt, double eta = 1.0);
+    void apply_bc_rectangular(double dt, const Eigen::Ref<Eigen::MatrixXd> &v_on_fiber,
+                              const Eigen::Ref<Eigen::MatrixXd> &f_on_fiber);
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
     void update_stokeslet(double);
