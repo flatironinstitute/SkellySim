@@ -183,13 +183,16 @@ void Fiber::compute_RHS(double dt, Eigen::Ref<Eigen::MatrixXd> flow, Eigen::Ref<
             c_1_ * ((      - xs_z * xs_x) * f_x) +
             c_1_ * ((      - xs_z * xs_y) * f_y) +
             c_1_ * ((I_arr - xs_z * xs_z) * f_z);
-        // clang-format on
 
         RHS_.segment(3 * np, np).array() +=
-            2 * c_0_ * (xs_x.transpose() * fs.row(0) + xs_y.transpose() * fs.row(1) + xs_z.transpose() * fs.row(2));
+            2 * c_0_ * (xs_x.transpose() * fs.row(0) +
+                        xs_y.transpose() * fs.row(1) +
+                        xs_z.transpose() * fs.row(2));
         RHS_.segment(3 * np, np).array() +=
-            (c_0_ - c_1_) * (xss_.row(0).transpose().array() * f_x + xss_.row(1).transpose().array() * f_y +
+            (c_0_ - c_1_) * (xss_.row(0).transpose().array() * f_x +
+                             xss_.row(1).transpose().array() * f_y +
                              xss_.row(2).transpose().array() * f_z);
+        // clang-format on
     }
 }
 
