@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
     const int n_fib_per_rank = 3000 / size;
     const int n_time = 10;
 
-    FiberContainer fibs(n_fib_per_rank, n_pts, 0.1);
+    FiberContainer fibs(n_fib_per_rank, n_pts, 0.1, 1.0);
     Eigen::MatrixXd f_fib = Eigen::MatrixXd::Zero(3, n_pts * n_fib_per_rank);
 
     for (int i = 0; i < n_fib_per_rank; ++i) {
@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
             {0., 0., 100 * static_cast<double>(i + n_fib_per_rank * rank) / (size * n_fib_per_rank + 1)});
         for (int j = 0; j < n_pts; ++j)
             f_fib(2, i * n_pts + j) = 1.0;
-        fibs.fibers[i].length = 1.0;
+        fibs.fibers[i].length_ = 1.0;
     }
 
     double st = omp_get_wtime();

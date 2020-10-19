@@ -6,18 +6,26 @@
 
 class Fiber {
   public:
-    int num_points;
-    double length;
-    double bending_rigidity;
+    int num_points_;
+    double length_;
+    double bending_rigidity_;
+    double penalty_param_ = 500.0;
+    // FIXME: Magic numbers in linear operator calculation
+    double beta_tstep_ = 1.0;
+    double epsilon_ = 1E-3;
+    double v_length_ = 0.0;
+    double c_0_, c_1_;
+
     typedef Eigen::MatrixXd matrix_t;
     typedef Eigen::ArrayXd array_t;
-    matrix_t x;
-    matrix_t xs;
-    matrix_t xss;
-    matrix_t xsss;
-    matrix_t xssss;
-    matrix_t stokeslet;
+    matrix_t x_;
+    matrix_t xs_;
+    matrix_t xss_;
+    matrix_t xsss_;
+    matrix_t xssss_;
+    matrix_t stokeslet_;
     matrix_t A_;
+    Eigen::VectorXd RHS_;
 
     typedef struct {
         array_t alpha;
@@ -32,19 +40,24 @@ class Fiber {
         matrix_t P_T;
         matrix_t P_cheb_representations_all_dof;
     } fib_mat_t;
-    const static std::unordered_map<int, fib_mat_t> matrices;
+    const static std::unordered_map<int, fib_mat_t> matrices_;
 
-    Fiber(int num_points, double bending_rigidity) : num_points(num_points), bending_rigidity(bending_rigidity) {
-        x = Eigen::MatrixXd::Zero(3, num_points);
-        x.row(0) = Eigen::VectorXd::LinSpaced(num_points, 0, 1.0).transpose();
-        xs.resize(3, num_points);
-        xss.resize(3, num_points);
-        xsss.resize(3, num_points);
-        xssss.resize(3, num_points);
+    Fiber(int num_points, double bending_rigidity, double eta)
+        : num_points_(num_points), bending_rigidity_(bending_rigidity) {
+        x_ = Eigen::MatrixXd::Zero(3, num_points);
+        x_.row(0) = Eigen::VectorXd::LinSpaced(num_points, 0, 1.0).transpose();
+        xs_.resize(3, num_points);
+        xss_.resize(3, num_points);
+        xsss_.resize(3, num_points);
+        xssss_.resize(3, num_points);
+
+        c_0_ = -log(M_E * std::pow(epsilon_, 2)) / (8 * M_PI * eta);
+        c_1_ = 2.0 / (8.0 * M_PI * eta);
     };
 
+    void compute_RHS(double dt, Eigen::Ref<Eigen::MatrixXd> flow, Eigen::Ref<Eigen::MatrixXd> f_external);
     void form_linear_operator(double dt, double eta = 1.0);
-    void translate(const Eigen::Vector3d &r) { x.colwise() += r; };
+    void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
     void update_stokeslet(double);
 };
@@ -54,10 +67,10 @@ class FiberContainer {
     std::vector<Fiber> fibers;
     double slenderness_ratio;
 
-    FiberContainer(int num_fibers, int num_points, double bending_rigidity) {
+    FiberContainer(int num_fibers, int num_points, double bending_rigidity, double eta) {
         fibers.reserve(num_fibers);
         for (int i = 0; i < num_fibers; ++i) {
-            fibers.push_back(Fiber(num_points, bending_rigidity));
+            fibers.push_back(Fiber(num_points, bending_rigidity, eta));
         }
     }
 
