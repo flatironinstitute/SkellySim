@@ -217,6 +217,8 @@ void Fiber::form_force_operator() {
     }
 }
 
+void Fiber::build_preconditioner() { A_LU_.compute(A_); }
+
 void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<Eigen::MatrixXd> &v_on_fiber,
                                  const Eigen::Ref<Eigen::MatrixXd> &f_on_fiber) {
     const int np = num_points_;

@@ -1,6 +1,7 @@
 #ifndef FIBER_HPP
 #define FIBER_HPP
 #include <Eigen/Dense>
+#include <Eigen/LU>
 #include <unordered_map>
 #include <vector>
 
@@ -31,6 +32,7 @@ class Fiber {
     matrix_t stokeslet_;
 
     matrix_t A_;
+    Eigen::PartialPivLU<matrix_t> A_LU_;
     matrix_t force_operator_;
     Eigen::VectorXd RHS_;
 
@@ -62,6 +64,7 @@ class Fiber {
         c_1_ = 2.0 / (8.0 * M_PI * eta);
     };
 
+    void build_preconditioner();
     void form_force_operator();
     void compute_RHS(double dt, const Eigen::Ref<Eigen::MatrixXd> flow, const Eigen::Ref<Eigen::MatrixXd> f_external);
     void form_linear_operator(double dt, double eta = 1.0);
