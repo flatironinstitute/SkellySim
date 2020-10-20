@@ -197,6 +197,26 @@ void Fiber::compute_RHS(double dt, const Eigen::Ref<Eigen::MatrixXd> flow,
     }
 }
 
+void Fiber::form_force_operator() {
+    const int np = num_points_;
+    const auto &mats = matrices_.at(np);
+
+    Eigen::MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
+    Eigen::MatrixXd D_4 = mats.D_4_0 * std::pow(2.0 / length_, 4);
+
+    force_operator_.resize(3 * np, 4 * np);
+    force_operator_.setZero();
+
+    for (int i = 0; i < 3; ++i) {
+        force_operator_.block(i * np, i * np, np, np) = -bending_rigidity_ * D_4.transpose();
+
+        force_operator_.block(i * np, 3 * np, np, np).diagonal() = xss_.row(i);
+
+        force_operator_.block(i * np, 3 * np, np, np) +=
+            (D_1.array().colwise() * xs_.row(i).transpose().array()).matrix().transpose();
+    }
+}
+
 void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<Eigen::MatrixXd> &v_on_fiber,
                                  const Eigen::Ref<Eigen::MatrixXd> &f_on_fiber) {
     const int np = num_points_;

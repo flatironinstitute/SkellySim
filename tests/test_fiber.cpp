@@ -60,6 +60,8 @@ int main(int argc, char *argv[]) {
     VectorXd RHSBC = load_vec(np_fib, "RHSBC");
     auto &mat = Fiber::matrices_.at(x.cols());
 
+    MatrixXd force_operator = load_mat(np_fib, "force_operator").transpose();
+
     assert(allclose(mat.D_1_0, D_1_0, 0, 1E-9));
     assert(allclose(mat.D_2_0, D_2_0, 0, 1E-9));
     assert(allclose(mat.D_3_0, D_3_0, 0, 1E-9));
@@ -116,6 +118,9 @@ int main(int argc, char *argv[]) {
             assert(allclose(Apy, Acpp, 0, 1E-7));
         }
     }
+
+    fib.form_force_operator();
+    assert(allclose(force_operator, fib.force_operator_, 0, 1E-7));
 
     // Check translation operator
     Eigen::Vector3d pt1 = fib.x_.col(1);

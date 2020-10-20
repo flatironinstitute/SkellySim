@@ -29,7 +29,9 @@ class Fiber {
     matrix_t xsss_;
     matrix_t xssss_;
     matrix_t stokeslet_;
+
     matrix_t A_;
+    matrix_t force_operator_;
     Eigen::VectorXd RHS_;
 
     typedef struct {
@@ -60,6 +62,7 @@ class Fiber {
         c_1_ = 2.0 / (8.0 * M_PI * eta);
     };
 
+    void form_force_operator();
     void compute_RHS(double dt, const Eigen::Ref<Eigen::MatrixXd> flow, const Eigen::Ref<Eigen::MatrixXd> f_external);
     void form_linear_operator(double dt, double eta = 1.0);
     void apply_bc_rectangular(double dt, const Eigen::Ref<Eigen::MatrixXd> &v_on_fiber,
