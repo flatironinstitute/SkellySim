@@ -378,7 +378,7 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
     std::unordered_map<int, Fiber::fib_mat_t> res;
     typedef Fiber::array_t array_t;
 
-    for (auto num_points : {16, 24, 32, 48, 64, 96}) {
+    for (auto num_points : {8, 16, 24, 32, 48, 64, 96}) {
         auto &mats = res[num_points];
         mats.alpha = array_t::LinSpaced(num_points, -1.0, 1.0);
 
@@ -435,7 +435,47 @@ void FiberContainer::form_linear_operators(double dt, double eta) {
         fib.form_linear_operator(dt, eta);
 }
 
-Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) {
+Eigen::VectorXd FiberContainer::matvec(const Eigen::Ref<Eigen::VectorXd> &x_all,
+                                       const Eigen::Ref<Eigen::MatrixXd> &v_fib) const {
+    int num_points_tot = 0;
+    for (auto &fib : fibers)
+        num_points_tot += fib.num_points_;
+
+    Eigen::VectorXd res = Eigen::VectorXd::Zero(num_points_tot * 4);
+
+    size_t offset = 0;
+    for (auto &fib : fibers) {
+        auto &mats = fib.matrices_.at(fib.num_points_);
+        const int np = fib.num_points_;
+        Eigen::MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / fib.length_, 1);
+        Eigen::MatrixXd xsDs = D_1.array().colwise() * fib.xs_.row(0).transpose().array();
+        Eigen::MatrixXd ysDs = D_1.array().colwise() * fib.xs_.row(1).transpose().array();
+        Eigen::MatrixXd zsDs = D_1.array().colwise() * fib.xs_.row(2).transpose().array();
+        Eigen::VectorXd vT = Eigen::VectorXd::Zero(np * 4);
+
+        auto v_fib_x = v_fib.row(0).segment(offset, np).transpose();
+        auto v_fib_y = v_fib.row(1).segment(offset, np).transpose();
+        auto v_fib_z = v_fib.row(2).segment(offset, np).transpose();
+        vT.segment(0 * np, np) = v_fib_x;
+        vT.segment(1 * np, np) = v_fib_y;
+        vT.segment(2 * np, np) = v_fib_z;
+
+        vT.segment(3 * np, np) = xsDs * v_fib_x + ysDs * v_fib_y + zsDs * v_fib_z;
+
+        Eigen::VectorXd vT_in = Eigen::VectorXd::Zero(4 * np);
+        vT_in.segment(0, 4 * np - 14) = mats.P_downsample_bc * vT;
+
+        Eigen::VectorXd xs_vT = Eigen::VectorXd::Zero(4 * np); // from body attachments
+        Eigen::VectorXd y_BC = Eigen::VectorXd::Zero(4 * np);  // from bodies
+        res.segment(4 * offset, 4 * np) = fib.A_ * x_all.segment(offset, 4 * np) - vT_in + xs_vT + y_BC;
+
+        offset += np;
+    }
+
+    return res;
+}
+
+Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) const {
     // FIXME: Move fmm object and make more flexible
     static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 500, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes,
                                               kernels::stokes_vel_fmm);
@@ -474,4 +514,22 @@ Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) 
     }
 
     return vel;
+}
+
+Eigen::MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<Eigen::VectorXd> &x_all) const {
+    Eigen::MatrixXd fw(3, x_all.size() / 4);
+
+    size_t offset = 0;
+    for (size_t ifib = 0; ifib < fibers.size(); ++ifib) {
+        auto &fib = fibers[ifib];
+        const int np = fib.num_points_;
+        auto force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
+        fw.block(0, offset, 1, np) = force_fibers.segment(0 * np, np).transpose();
+        fw.block(1, offset, 1, np) = force_fibers.segment(1 * np, np).transpose();
+        fw.block(2, offset, 1, np) = force_fibers.segment(2 * np, np).transpose();
+
+        offset += np;
+    }
+
+    return fw;
 }

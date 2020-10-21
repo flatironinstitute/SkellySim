@@ -32,20 +32,16 @@ find_package(pvfmm REQUIRED)
 find_package(Kokkos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Tpetra REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
-# find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
-# find_package(Ifpack REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
+find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 
 add_library(skelly STATIC src/fiber.cpp src/kernels.cpp src/utils.cpp)
 target_include_directories(skelly PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
-target_link_libraries(skelly PRIVATE  Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX
-  ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES}
-  libSTKFMM_STATIC.a ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB})
+target_link_libraries(skelly PRIVATE libSTKFMM_STATIC.a ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB})
 
 add_executable(skelly_sim src/skelly_sim.cpp)
 target_include_directories(skelly_sim PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
 target_link_libraries(skelly_sim PRIVATE skelly Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX
-  ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES}
-  libSTKFMM_STATIC.a ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB})
+  ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
 include(CTest)
 add_subdirectory(tests)

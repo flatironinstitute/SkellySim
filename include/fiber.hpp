@@ -90,7 +90,9 @@ class FiberContainer {
     void update_derivatives();
     void update_stokeslets(double eta = 1.0);
     void form_linear_operators(double dt, double eta = 1.0);
-    Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixXd> &forces);
+    Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixXd> &forces) const;
+    Eigen::VectorXd matvec(const Eigen::Ref<Eigen::VectorXd> &x_all, const Eigen::Ref<Eigen::MatrixXd> &v_fib) const;
+    Eigen::MatrixXd apply_fiber_force(const Eigen::Ref<Eigen::VectorXd> &x_all) const;
 };
 
 #endif

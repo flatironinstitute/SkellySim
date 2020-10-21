@@ -1,5 +1,3 @@
-#include <Teuchos_RCP.hpp>
-#include <Tpetra_Core.hpp>
 #include <kernels.hpp>
 
 #include <STKFMM/STKFMM.hpp>
