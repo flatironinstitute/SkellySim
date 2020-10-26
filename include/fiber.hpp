@@ -20,7 +20,7 @@ class Fiber {
     double c_0_, c_1_;
 
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
-    std::pair<BC, BC> bc_plus_ = {BC::Velocity, BC::AngularVelocity};
+    std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
 
     typedef Eigen::MatrixXd matrix_t;
     typedef Eigen::ArrayXd array_t;
@@ -67,7 +67,7 @@ class Fiber {
     void build_preconditioner();
     void form_force_operator();
     void compute_RHS(double dt, const Eigen::Ref<Eigen::MatrixXd> flow, const Eigen::Ref<Eigen::MatrixXd> f_external);
-    void form_linear_operator(double dt, double eta = 1.0);
+    void form_linear_operator(double dt, double eta);
     void apply_bc_rectangular(double dt, const Eigen::Ref<Eigen::MatrixXd> &v_on_fiber,
                               const Eigen::Ref<Eigen::MatrixXd> &f_on_fiber);
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
@@ -88,11 +88,12 @@ class FiberContainer {
     }
 
     void update_derivatives();
-    void update_stokeslets(double eta = 1.0);
-    void form_linear_operators(double dt, double eta = 1.0);
-    Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixXd> &forces) const;
+    void update_stokeslets(double eta);
+    void form_linear_operators(double dt, double eta);
+    Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixXd> &forces, double eta) const;
     Eigen::VectorXd matvec(const Eigen::Ref<Eigen::VectorXd> &x_all, const Eigen::Ref<Eigen::MatrixXd> &v_fib) const;
     Eigen::MatrixXd apply_fiber_force(const Eigen::Ref<Eigen::VectorXd> &x_all) const;
+    Eigen::VectorXd apply_preconditioner(const Eigen::Ref<Eigen::VectorXd> &x_all) const;
 };
 
 #endif

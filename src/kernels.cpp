@@ -85,10 +85,11 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<Eigen::MatrixXd> &
             double dy = r_src(1, i_src) - r_trg(1, i_trg);
             double dz = r_src(2, i_src) - r_trg(2, i_trg);
             double dr2 = dx * dx + dy * dy + dz * dz;
-            double dr = sqrt(dr2);
 
-            if (dr == 0.0)
+            if (dr2 == 0.0)
                 continue;
+
+            double dr = sqrt(dr2);
 
             if (dr > epsilon_distance) {
                 fr = factor / dr;
@@ -120,6 +121,7 @@ Eigen::MatrixXd kernels::stokes_vel_fmm(const Eigen::Ref<Eigen::MatrixXd> &r_src
                                         const Eigen::Ref<Eigen::MatrixXd> &r_trg,
                                         const Eigen::Ref<Eigen::MatrixXd> &f_src, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, r_trg.size() / 3);
+    fmmPtr->clearFMM(stkfmm::KERNEL::Stokes);
     fmmPtr->evaluateFMM(stkfmm::KERNEL::Stokes, f_src.size() / 3, f_src.data(), r_trg.size() / 3, res.data());
     return res;
 }

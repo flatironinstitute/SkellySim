@@ -30,8 +30,8 @@ class FMM {
         if (r_src_old_.size() != r_src.size() || r_trg_old_.size() != r_trg.size() || r_src_old_ != r_src ||
             r_trg_old_ != r_trg) {
             // FIXME: Origin/size shouldn't be so fixed
-            double origin[3] = {0.0};
-            fmmPtr_->setBox(origin, 100.);
+            double origin[3] = {-5.0, -5.0, -5.0};
+            fmmPtr_->setBox(origin, 10.);
 
             fmmPtr_->setPoints(r_src.size() / 3, r_src.data(), r_trg.size() / 3, r_trg.data());
             fmmPtr_->setupTree(stkfmm::KERNEL::Stokes);

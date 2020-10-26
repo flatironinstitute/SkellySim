@@ -435,6 +435,16 @@ void FiberContainer::form_linear_operators(double dt, double eta) {
         fib.form_linear_operator(dt, eta);
 }
 
+Eigen::VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<Eigen::VectorXd> &x_all) const {
+    Eigen::VectorXd y(x_all.size());
+    size_t offset = 0;
+    for (auto &fib : fibers) {
+        y.segment(offset, 4 * fib.num_points_) = fib.A_LU_.solve(x_all.segment(offset, 4 * fib.num_points_));
+        offset += 4 * fib.num_points_;
+    }
+    return y;
+}
+
 Eigen::VectorXd FiberContainer::matvec(const Eigen::Ref<Eigen::VectorXd> &x_all,
                                        const Eigen::Ref<Eigen::MatrixXd> &v_fib) const {
     int num_points_tot = 0;
@@ -448,9 +458,9 @@ Eigen::VectorXd FiberContainer::matvec(const Eigen::Ref<Eigen::VectorXd> &x_all,
         auto &mats = fib.matrices_.at(fib.num_points_);
         const int np = fib.num_points_;
         Eigen::MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / fib.length_, 1);
-        Eigen::MatrixXd xsDs = D_1.array().colwise() * fib.xs_.row(0).transpose().array();
-        Eigen::MatrixXd ysDs = D_1.array().colwise() * fib.xs_.row(1).transpose().array();
-        Eigen::MatrixXd zsDs = D_1.array().colwise() * fib.xs_.row(2).transpose().array();
+        Eigen::MatrixXd xsDs = (D_1.array().colwise() * fib.xs_.row(0).transpose().array()).transpose();
+        Eigen::MatrixXd ysDs = (D_1.array().colwise() * fib.xs_.row(1).transpose().array()).transpose();
+        Eigen::MatrixXd zsDs = (D_1.array().colwise() * fib.xs_.row(2).transpose().array()).transpose();
         Eigen::VectorXd vT = Eigen::VectorXd::Zero(np * 4);
 
         auto v_fib_x = v_fib.row(0).segment(offset, np).transpose();
@@ -466,8 +476,11 @@ Eigen::VectorXd FiberContainer::matvec(const Eigen::Ref<Eigen::VectorXd> &x_all,
         vT_in.segment(0, 4 * np - 14) = mats.P_downsample_bc * vT;
 
         Eigen::VectorXd xs_vT = Eigen::VectorXd::Zero(4 * np); // from body attachments
+        // FIXME: Flow assumes no bodies, only gets BC from minus end magically
+        xs_vT(4 * np - 11) = v_fib_x(0) * fib.xs_(0, 0) + v_fib_y(0) * fib.xs_(1, 0) + v_fib_z(0) * fib.xs_(2, 0);
         Eigen::VectorXd y_BC = Eigen::VectorXd::Zero(4 * np);  // from bodies
-        res.segment(4 * offset, 4 * np) = fib.A_ * x_all.segment(offset, 4 * np) - vT_in + xs_vT + y_BC;
+
+        res.segment(4 * offset, 4 * np) = fib.A_ * x_all.segment(4 * offset, 4 * np) - vT_in + xs_vT + y_BC;
 
         offset += np;
     }
@@ -475,9 +488,9 @@ Eigen::VectorXd FiberContainer::matvec(const Eigen::Ref<Eigen::VectorXd> &x_all,
     return res;
 }
 
-Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) const {
+Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces, double eta) const {
     // FIXME: Move fmm object and make more flexible
-    static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 500, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes,
+    static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes,
                                               kernels::stokes_vel_fmm);
     const size_t n_pts_tot = forces.cols();
 
@@ -490,7 +503,7 @@ Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) 
 
         for (int i_pt = 0; i_pt < fib.num_points_; ++i_pt) {
             for (int i = 0; i < 3; ++i) {
-                weighted_forces(i, i_pt + offset) = weights[i] * forces(i, i_pt + offset);
+                weighted_forces(i, i_pt + offset) = weights(i_pt) * forces(i, i_pt + offset);
                 r_src(i, i_pt + offset) = fib.x_(i, i_pt);
             }
         }
@@ -501,7 +514,7 @@ Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces) 
     // FIXME: MPI not compatible with direct calculation
     Eigen::MatrixXd r_trg = r_src;
     // Eigen::MatrixXd vel = kernels::oseen_tensor_contract_direct(r_src, r_trg, weighted_forces);
-    Eigen::MatrixXd vel = fmm(r_src, r_trg, weighted_forces);
+    Eigen::MatrixXd vel = fmm(r_src, r_trg, weighted_forces) / eta;
 
     // Subtract self term
     // FIXME: Subtracting self flow only works when system has only fibers
@@ -521,7 +534,7 @@ Eigen::MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<Eigen::Vector
 
     size_t offset = 0;
     for (size_t ifib = 0; ifib < fibers.size(); ++ifib) {
-        auto &fib = fibers[ifib];
+        const auto &fib = fibers[ifib];
         const int np = fib.num_points_;
         auto force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
         fw.block(0, offset, 1, np) = force_fibers.segment(0 * np, np).transpose();
