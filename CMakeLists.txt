@@ -4,6 +4,8 @@ project(
   VERSION 0.0.1
   LANGUAGES CXX)
 
+option(USE_EIGEN_MKL_ALL "Use MKL as the backend for various Eigen calls" ON)
+
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 99)
@@ -20,6 +22,10 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
+if(EIGEN_USE_MKL_ALL)
+  add_compile_definitions("EIGEN_USE_MKL_ALL")
+  message("Using MKL backend for Eigen")
+endif()
 
 set(MPI_CXX_SKIP_MPICXX
     true

@@ -335,6 +335,7 @@ int main(int argc, char *argv[]) {
             cout << solver.getNumIters() << " " << omp_get_wtime() - st << endl;
 
         success = true;
+        cout << "Test passed\n";
     }
     // TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
 
