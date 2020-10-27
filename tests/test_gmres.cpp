@@ -15,11 +15,6 @@
 using namespace Teuchos;
 using std::cout;
 using std::endl;
-using std::vector;
-using Teuchos::tuple;
-using Tpetra::CrsMatrix;
-using Tpetra::MultiVector;
-using Tpetra::Operator;
 
 class P_inv_hydro : public Tpetra::Operator<> {
   public:
@@ -74,7 +69,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
         RCP<const Teuchos::Comm<int>> comm = opMap_->getComm();
         const int myRank = comm->getRank();
         if (myRank == 0) {
-            std::cout << "P_inv_hydro::apply" << std::endl;
+            cout << "P_inv_hydro::apply" << endl;
         }
 
         const size_t numVecs = X.getNumVectors();
@@ -157,7 +152,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         RCP<const Teuchos::Comm<int>> comm = opMap_->getComm();
         const int myRank = comm->getRank();
         if (myRank == 0) {
-            std::cout << "A_fiber_hydro::apply" << std::endl;
+            cout << "A_fiber_hydro::apply" << endl;
         }
 
         const size_t numVecs = X.getNumVectors();
@@ -221,7 +216,7 @@ int main(int argc, char *argv[]) {
         FiberContainer fibs(nfibs_per_rank, n_pts, bending_rigidity, eta);
 
         if (rank == 0)
-            std::cout << "Reading in " << nfibs_tot << " fibers.\n";
+            cout << "Reading in " << nfibs_tot << " fibers.\n";
 
         for (int ifib = 0; ifib < nfibs_tot; ++ifib) {
             std::string line;
@@ -256,7 +251,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (ifib >= ifib_low && ifib < ifib_high) {
-                std::cout << "Fiber " << ifib << ": " << npts << " " << E << " " << L << std::endl;
+                cout << "Fiber " << ifib << ": " << npts << " " << E << " " << L << endl;
                 Eigen::MatrixXd v_on_fiber;
                 Eigen::MatrixXd f_on_fiber;
                 auto &fib = fibs.fibers[ifib - ifib_low];
@@ -323,7 +318,7 @@ int main(int argc, char *argv[]) {
 
         bool set = problem.setProblem();
         if (set == false) {
-            std::cout << std::endl << "ERROR:  Belos::LinearProblem failed to set up correctly!" << std::endl;
+            cout << endl << "ERROR:  Belos::LinearProblem failed to set up correctly!" << endl;
             return -1;
         }
 
@@ -337,7 +332,7 @@ int main(int argc, char *argv[]) {
         double st = omp_get_wtime();
         Belos::ReturnType ret = solver.solve();
         if (rank == 0)
-            std::cout << solver.getNumIters() << " " << omp_get_wtime() - st << std::endl;
+            cout << solver.getNumIters() << " " << omp_get_wtime() - st << endl;
 
         success = true;
     }
