@@ -2,6 +2,7 @@ import numpy as np
 import scipy.linalg as scla
 from scipy.spatial import ConvexHull
 import sys
+import argparse
 
 import lib.shape_gallery as shape_gallery
 import lib.Smooth_Closed_Surface_Quadrature_RBF as quadlib
@@ -9,15 +10,29 @@ import lib.periphery as periphery
 import lib.quaternion as quaternion
 import lib.kernels as kernels
 
-# TODO: Add input parser for shell precompute generator
+parser = argparse.ArgumentParser(description='Set periphery options')
+parser.add_argument('--periphery_type', '-t', type=str, default='sphere',
+                    help="Type of periphery, 'sphere' and 'ellipsoid' accepted")
+parser.add_argument('-a', default=1.0, type=float, help="'a' axis of ellipsoid")
+parser.add_argument('-b', default=1.0, type=float, help="'b' axis of ellipsoid")
+parser.add_argument('-c', default=1.0, type=float, help="'c' axis of ellipsoid")
+parser.add_argument('-r', default=1.0, type=float, help="radius of sphere")
+parser.add_argument('--eta', '-e', type=float, default=1.0, help="viscosity eta")
+parser.add_argument('--n_periphery', '-N', type=int, default=100, help="Number of nodes on periphery")
+parser.add_argument('--precompute_file', '-f', type=str, default='test_periphery.npz',
+                    help="Output file for precompute data")
+
+args = parser.parse_args()
+
 shell_precompute_file = "test_periphery.npz"
-periphery_type = 'sphere'
-n_periphery = 100
-periphery_a = 1.0
-periphery_b = 1.0
-periphery_c = 1.0
-periphery_radius = 5.0
-eta = 1.0
+periphery_type = args.periphery_type
+n_periphery = args.n_periphery
+periphery_a = args.a
+periphery_b = args.b
+periphery_c = args.c
+periphery_radius = args.r
+eta = args.eta
+
 
 # Build shape
 if periphery_type == 'sphere':
