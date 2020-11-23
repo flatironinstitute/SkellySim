@@ -5,12 +5,11 @@ file(GLOB files "test_*.cpp")
 
 configure_file("np_fib.npz" "np_fib.npz" COPYONLY)
 configure_file("2K_MTs_onCortex_R5_L1.fibers" "2K_MTs_onCortex_R5_L1.fibers" COPYONLY)
-add_library(cnpy STATIC cnpy.cpp)
 
 foreach(file ${files})
 	string(REGEX REPLACE "(^.*/|\\.[^.]*$)" "" file_without_ext ${file})
 	add_executable(${file_without_ext} ${file})
-	target_link_libraries(${file_without_ext} skelly z OpenMP::OpenMP_CXX MPI::MPI_CXX cnpy
+	target_link_libraries(${file_without_ext} skelly z OpenMP::OpenMP_CXX MPI::MPI_CXX
       ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
     target_include_directories(${file_without_ext} PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
 	add_test(${file_without_ext} ${file_without_ext})

@@ -1,5 +1,3 @@
-#include "cnpy.hpp"
-#include <Eigen/Core>
 #include <iostream>
 
 #ifdef NDEBUG
@@ -10,32 +8,24 @@
 #include <cassert>
 #endif
 
+#include <Teuchos_Comm.hpp>
 #include <periphery.hpp>
 
-using Eigen::Map;
-using Eigen::MatrixXd;
-using Eigen::VectorXd;
-
-MatrixXd load_mat(cnpy::npz_t &npz, const char *var) {
-    return Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0]).matrix();
-}
-
-VectorXd load_vec(cnpy::npz_t &npz, const char *var) {
-    return Map<Eigen::VectorXd>(npz[var].data<double>(), npz[var].shape[0]);
-}
-
-template <typename DerivedA, typename DerivedB>
-bool allclose(
-    const Eigen::DenseBase<DerivedA> &a, const Eigen::DenseBase<DerivedB> &b,
-    const typename DerivedA::RealScalar &rtol = Eigen::NumTraits<typename DerivedA::RealScalar>::dummy_precision(),
-    const typename DerivedA::RealScalar &atol = Eigen::NumTraits<typename DerivedA::RealScalar>::epsilon()) {
-    return ((a.derived() - b.derived()).array().abs() <= (atol + rtol * b.derived().array().abs())).all();
-}
-
 int main(int argc, char *argv[]) {
+    Tpetra::ScopeGuard tpetraScope(&argc, &argv);
+    Teuchos::RCP<const Teuchos::Comm<int>> comm = Tpetra::getDefaultComm();
+    const int rank = comm->getRank();
 
-    SphericalPeriphery(6, 5.0);
+    try {
+        Periphery sphere("test_periphery.npz");
+    } catch (std::runtime_error e) {
+        std::cout << e.what() << std::endl;
+        std::cout << "Test failed" << std::endl;
+        return 1;
+    }
+    if (rank == 0) {
+        std::cout << "Test passed\n";
+    }
 
-    std::cout << "Test passed\n";
     return 0;
 }
