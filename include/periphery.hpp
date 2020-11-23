@@ -12,7 +12,7 @@ class Periphery {
   public:
     Periphery(const std::string &precompute_file);
     Teuchos::RCP<distributed_matrix_t> M_inv_;
-    Teuchos::RCP<distributed_matrix_t> stresslet_;
+    Teuchos::RCP<distributed_matrix_t> stresslet_plus_complementary_;
 };
 
 #endif

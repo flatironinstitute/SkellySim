@@ -33,14 +33,16 @@ Periphery::Periphery(const std::string &precompute_file) {
     const size_t numLocalIndices = (rank == 0) ? nrows : 0;
     rank_0_map = rcp(new map_type(nrows, numLocalIndices, indexBase, comm));
     RCP<matrix_type> rank_0_M_inv(new matrix_type(rank_0_map, nrows));
-    RCP<matrix_type> rank_0_stresslet(new matrix_type(rank_0_map, nrows));
+    RCP<matrix_type> rank_0_stresslet_plus_complementary(new matrix_type(rank_0_map, nrows));
     const int ncols = nrows;
     for (auto i_row : rank_0_map->getNodeElementList()) {
         double *M_inv_row = all_data.at("M_inv_periphery").data<double>() + i_row * ncols;
-        double *stresslet_row = all_data.at("shell_stresslet").data<double>() + i_row * ncols;
+        double *stresslet_plus_complementary_row =
+            all_data.at("shell_stresslet_plus_complementary").data<double>() + i_row * ncols;
         for (int i_col = 0; i_col < ncols; ++i_col) {
             rank_0_M_inv->replaceLocalValue(i_col, i_row, M_inv_row[i_col]);
-            rank_0_stresslet->replaceLocalValue(i_col, i_row, stresslet_row[i_col]);
+            rank_0_stresslet_plus_complementary->replaceLocalValue(i_col, i_row,
+                                                                   stresslet_plus_complementary_row[i_col]);
         }
     }
     all_data.clear();
@@ -55,8 +57,8 @@ Periphery::Periphery(const std::string &precompute_file) {
     // to distributed versions (which are distributed evenly over the processes).
     M_inv_ = rcp(new matrix_type(global_map, ncols));
     M_inv_->doExport(*rank_0_M_inv, exporter, Tpetra::INSERT);
-    stresslet_ = rcp(new matrix_type(global_map, ncols));
-    stresslet_->doExport(*rank_0_stresslet, exporter, Tpetra::INSERT);
+    stresslet_plus_complementary_ = rcp(new matrix_type(global_map, ncols));
+    stresslet_plus_complementary_->doExport(*rank_0_stresslet_plus_complementary, exporter, Tpetra::INSERT);
 
     if (rank == 0)
         std::cout << "Done initializing periphery\n";
