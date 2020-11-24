@@ -4,62 +4,57 @@
 #include <mpi.h>
 
 Periphery::Periphery(const std::string &precompute_file) {
-    using Teuchos::RCP;
-    using Teuchos::rcp;
-    typedef Tpetra::Map<> map_type;
-    typedef Tpetra::MultiVector<> matrix_type;
-
-    const Tpetra::Map<>::global_ordinal_type indexBase = 0;
-
-    RCP<const Teuchos::Comm<int>> comm = Tpetra::getDefaultComm();
-    const int rank = comm->getRank();
+    int world_rank, world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
     cnpy::npz_t all_data;
 
-    if (rank == 0)
+    if (world_rank == 0)
         std::cout << "Loading raw precomputation data from file " << precompute_file << " for periphery into rank 0\n";
     int nrows;
-    if (rank == 0) {
+    if (world_rank == 0) {
         all_data = cnpy::npz_load(precompute_file);
-        nrows = all_data.at("quadrature_weights_periphery").shape[0] * 3;
+        nrows = all_data.at("quadrature_weights").shape[0] * 3;
     }
 
     MPI_Bcast((void *)&nrows, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    if (rank == 0)
-        std::cout << "Copying raw data into Tpetra object on rank 0\n";
-
-    RCP<const map_type> rank_0_map;
-    const size_t numLocalIndices = (rank == 0) ? nrows : 0;
-    rank_0_map = rcp(new map_type(nrows, numLocalIndices, indexBase, comm));
-    RCP<matrix_type> rank_0_M_inv(new matrix_type(rank_0_map, nrows));
-    RCP<matrix_type> rank_0_stresslet_plus_complementary(new matrix_type(rank_0_map, nrows));
     const int ncols = nrows;
-    for (auto i_row : rank_0_map->getNodeElementList()) {
-        double *M_inv_row = all_data.at("M_inv_periphery").data<double>() + i_row * ncols;
-        double *stresslet_plus_complementary_row =
-            all_data.at("shell_stresslet_plus_complementary").data<double>() + i_row * ncols;
-        for (int i_col = 0; i_col < ncols; ++i_col) {
-            rank_0_M_inv->replaceLocalValue(i_col, i_row, M_inv_row[i_col]);
-            rank_0_stresslet_plus_complementary->replaceLocalValue(i_col, i_row,
-                                                                   stresslet_plus_complementary_row[i_col]);
-        }
+    const int row_size_big = nrows / world_size + 1;
+    const int row_size_small = nrows / world_size;
+    const int nrows_local = (nrows % world_size > world_rank) ? row_size_big : row_size_small;
+
+    // TODO: prevent overflow for large matrices in periphery import
+    std::vector<int> counts(world_size);
+    std::vector<int> displs(world_size);
+    if (world_rank == 0) {
+        int n_rows_big = nrows % world_size;
+        for (int i = 0; i < world_size; ++i)
+            counts[i] = ncols * ((i < n_rows_big) ? row_size_big : row_size_small);
+
+        for (int i = 1; i < world_size; ++i)
+            displs[i] = displs[i - 1] + counts[i - 1];
     }
+    const double *M_inv_raw = (world_rank == 0) ? all_data["M_inv"].data<double>() : NULL;
+    const double *stresslet_plus_complementary_raw =
+        (world_rank == 0) ? all_data["stresslet_plus_complementary"].data<double>() : NULL;
+
+    M_inv_.resize(ncols, nrows_local);
+    MPI_Scatterv(M_inv_raw, counts.data(), displs.data(), MPI_DOUBLE, M_inv_.data(), nrows_local * ncols, MPI_DOUBLE, 0,
+                 MPI_COMM_WORLD);
+
+    stresslet_plus_complementary_.resize(ncols, nrows_local);
+    MPI_Scatterv(M_inv_raw, counts.data(), displs.data(), MPI_DOUBLE, stresslet_plus_complementary_.data(),
+                 nrows_local * ncols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
     all_data.clear();
 
-    if (rank == 0)
-        std::cout << "Distributing precomputation data throughout ranks\n";
+    M_inv_ = M_inv_.transpose();
+    stresslet_plus_complementary_ = stresslet_plus_complementary_.transpose();
 
-    // Make a new matrix with rows distributed among MPI ranks evenly
-    RCP<const map_type> global_map = rcp(new map_type(nrows, indexBase, comm, Tpetra::GloballyDistributed));
-    Tpetra::Export<> exporter(rank_0_map, global_map);
-    // Redistribute the data, NOT in place, from matrices on rank 0
-    // to distributed versions (which are distributed evenly over the processes).
-    M_inv_ = rcp(new matrix_type(global_map, ncols));
-    M_inv_->doExport(*rank_0_M_inv, exporter, Tpetra::INSERT);
-    stresslet_plus_complementary_ = rcp(new matrix_type(global_map, ncols));
-    stresslet_plus_complementary_->doExport(*rank_0_stresslet_plus_complementary, exporter, Tpetra::INSERT);
+    std::cout << world_rank << " " << M_inv_.size() << std::endl;
 
-    if (rank == 0)
+    if (world_rank == 0)
         std::cout << "Done initializing periphery\n";
 }

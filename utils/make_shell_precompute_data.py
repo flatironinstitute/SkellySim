@@ -113,6 +113,6 @@ print("Finished periphery init.")
 
 with open(shell_precompute_file, 'wb') as f:
     np.savez(f,
-             quadrature_weights_periphery=quadrature_weights_periphery,
-             shell_stresslet_plus_complementary=shell_stresslet_plus_complementary,
-             M_inv_periphery=M_inv_periphery)
+             quadrature_weights=quadrature_weights_periphery,
+             stresslet_plus_complementary=shell_stresslet_plus_complementary,
+             M_inv=M_inv_periphery)

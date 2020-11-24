@@ -8,6 +8,7 @@
 #include <cassert>
 #endif
 
+#include <Tpetra_Core.hpp>
 #include <Teuchos_Comm.hpp>
 #include <periphery.hpp>
 
