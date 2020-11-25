@@ -37,9 +37,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    P_inv_hydro(const global_ordinal_type n, const Teuchos::RCP<const Teuchos::Comm<int>> comm,
-                const FiberContainer &fc)
-        : fc_(fc) {
+    P_inv_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm, const FiberContainer &fc) : fc_(fc) {
         using Teuchos::rcp;
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "P_inv_hydro constructor: The input Comm object must be nonnull.");
@@ -48,8 +46,11 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
+        int nfib_pts_local = fc_.get_total_fib_points();
+
         // Construct a map for our block row distribution
-        opMap_ = rcp(new map_type(n, indexBase, comm));
+        opMap_ = rcp(
+            new map_type(Teuchos::OrdinalTraits<Tpetra::global_size_t>::invalid(), nfib_pts_local, indexBase, comm));
     };
     //
     // These functions are required since we inherit from Tpetra::Operator
@@ -119,8 +120,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    A_fiber_hydro(const global_ordinal_type n, const Teuchos::RCP<const Teuchos::Comm<int>> comm,
-                  const FiberContainer &fc, const double eta)
+    A_fiber_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm, const FiberContainer &fc, const double eta)
         : fc_(fc), eta_(eta) {
         using Teuchos::rcp;
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
@@ -130,8 +130,11 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
+        const int nfib_pts_local = fc_.get_total_fib_points() * 4;
+
         // Construct a map for our block row distribution
-        opMap_ = rcp(new map_type(n, indexBase, comm));
+        opMap_ = rcp(
+            new map_type(Teuchos::OrdinalTraits<Tpetra::global_size_t>::invalid(), nfib_pts_local, indexBase, comm));
     };
     //
     // These functions are required since we inherit from Tpetra::Operator
@@ -202,23 +205,30 @@ int main(int argc, char *argv[]) {
         std::string token;
         getline(ifs, token);
         const int nfibs_tot = atoi(token.c_str());
-        const int nfibs_per_rank = nfibs_tot / size;
+        const int nfibs_extra = nfibs_tot % size;
         const int n_pts = 32;
         const int n_time = 10;
         const double eta = 10.0;
         const double bending_rigidity = 0.1;
         const double length = 1.0;
         double dt = 1E-4;
-        const int ifib_low = rank * nfibs_per_rank;
-        const int ifib_high = (rank + 1) * nfibs_per_rank;
+        std::vector<int> displs(size + 1);
+        for (int i = 1; i < size + 1; ++i) {
+            displs[i] = displs[i - 1] + nfibs_tot / size;
+            if (i <= nfibs_extra)
+                displs[i]++;
+        }
 
         assert(nfibs_tot % size == 0);
-        FiberContainer fibs(nfibs_per_rank, n_pts, bending_rigidity, eta);
+        const int n_fibs_local = displs[rank + 1] - displs[rank];
+        FiberContainer fibs(n_fibs_local, n_pts, bending_rigidity, eta);
 
         if (rank == 0)
             cout << "Reading in " << nfibs_tot << " fibers.\n";
 
         for (int ifib = 0; ifib < nfibs_tot; ++ifib) {
+            const int ifib_low = displs[rank];
+            const int ifib_high = displs[rank + 1];
             std::string line;
             getline(ifs, line);
             std::stringstream linestream(line);
@@ -268,9 +278,8 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        A_fiber_hydro::global_ordinal_type n = comm->getSize() * nfibs_per_rank * n_pts * 4;
-        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(n, comm, fibs, eta));
-        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(n, comm, fibs));
+        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, fibs, eta));
+        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm, fibs));
         RCP<const Tpetra::Map<>> map = A_sim->getDomainMap();
         typedef Tpetra::Vector<A_fiber_hydro::scalar_type, A_fiber_hydro::local_ordinal_type,
                                A_fiber_hydro::global_ordinal_type, A_fiber_hydro::node_type>
@@ -335,7 +344,8 @@ int main(int argc, char *argv[]) {
             cout << solver.getNumIters() << " " << omp_get_wtime() - st << endl;
 
         success = true;
-        cout << "Test passed\n";
+        if (rank == 0)
+            cout << "Test passed\n";
     }
     // TEUCHOS_STANDARD_CATCH_STATEMENTS(verbose, std::cerr, success);
 
