@@ -9,8 +9,9 @@
 #include <Tpetra_Core.hpp>
 #include <Tpetra_CrsMatrix.hpp>
 
-#include "cnpy.hpp"
+#include <cnpy.hpp>
 #include <fiber.hpp>
+#include <periphery.hpp>
 
 using namespace Teuchos;
 using std::cout;
@@ -37,7 +38,8 @@ class P_inv_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    P_inv_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm, const FiberContainer &fc) : fc_(fc) {
+    P_inv_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm, const FiberContainer &fc, const Periphery &shell)
+        : fc_(fc), shell_(shell) {
         using Teuchos::rcp;
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "P_inv_hydro constructor: The input Comm object must be nonnull.");
@@ -46,11 +48,13 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        int nfib_pts_local = fc_.get_total_fib_points();
+        const int nfib_pts_local = fc_.get_total_fib_points() * 4;
+        const int n_shell_rows_local = shell_.M_inv_.rows();
+        const int local_size = nfib_pts_local + n_shell_rows_local;
 
         // Construct a map for our block row distribution
-        opMap_ = rcp(
-            new map_type(Teuchos::OrdinalTraits<Tpetra::global_size_t>::invalid(), nfib_pts_local, indexBase, comm));
+        opMap_ =
+            rcp(new map_type(Teuchos::OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
     };
     //
     // These functions are required since we inherit from Tpetra::Operator
@@ -68,8 +72,9 @@ class P_inv_hydro : public Tpetra::Operator<> {
                scalar_type alpha = Teuchos::ScalarTraits<scalar_type>::one(),
                scalar_type beta = Teuchos::ScalarTraits<scalar_type>::zero()) const {
         RCP<const Teuchos::Comm<int>> comm = opMap_->getComm();
-        const int myRank = comm->getRank();
-        if (myRank == 0) {
+        const int rank = comm->getRank();
+        const int size = comm->getSize();
+        if (rank == 0) {
             cout << "P_inv_hydro::apply" << endl;
         }
 
@@ -78,11 +83,16 @@ class P_inv_hydro : public Tpetra::Operator<> {
         // TEUCHOS_TEST_FOR_EXCEPTION(fc_.fibers.size() == nlocRows, std::logic_error, "")
         const size_t nglobCols = opMap_->getGlobalNumElements();
         const size_t baseRow = opMap_->getMinGlobalIndex();
+        const int n_fib_pts = fc_.get_total_fib_points() * 4;
+        const int n_shell_pts = shell_.M_inv_.rows();
         for (size_t c = 0; c < numVecs; ++c) {
+            using Eigen::Map;
+            using Eigen::VectorXd;
+
             // Get a view of the desired column
             local_ordinal_type offset = 0;
             for (auto &fib : fc_.fibers) {
-                Eigen::Map<const Eigen::VectorXd> XView(X.getData(c).getRawPtr() + offset, fib.num_points_ * 4);
+                Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, fib.num_points_ * 4);
                 auto res = fib.A_LU_.solve(XView);
 
                 for (local_ordinal_type i = 0; i < fib.num_points_ * 4; ++i) {
@@ -91,12 +101,31 @@ class P_inv_hydro : public Tpetra::Operator<> {
 
                 offset += fib.num_points_ * 4;
             }
+
+            std::vector<int> displs(size + 1);
+            std::vector<int> counts(size);
+            const int ncols = shell_.M_inv_.cols();
+            const int nrows_local = shell_.M_inv_.rows();
+            const int nrows_extra = ncols % size;
+            const int nrows_base = ncols / size;
+            for (int i = 0; i < size; ++i) {
+                counts[i] = nrows_base + (i < nrows_extra);
+                displs[i + 1] = counts[i] + displs[i];
+            }
+
+            Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, nrows_local);
+            VectorXd x_shell(ncols);
+            MPI_Allgatherv(X.getData(c).getRawPtr() + offset, nrows_local, MPI_DOUBLE, x_shell.data(), counts.data(),
+                           displs.data(), MPI_DOUBLE, MPI_COMM_WORLD);
+
+            res_view_shell = shell_.M_inv_ * x_shell;
         }
     }
 
   private:
     Teuchos::RCP<const map_type> opMap_;
     const FiberContainer &fc_;
+    const Periphery &shell_;
 };
 
 class A_fiber_hydro : public Tpetra::Operator<> {
@@ -120,8 +149,9 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    A_fiber_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm, const FiberContainer &fc, const double eta)
-        : fc_(fc), eta_(eta) {
+    A_fiber_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm, const FiberContainer &fc, const Periphery &shell,
+                  const double eta)
+        : fc_(fc), shell_(shell), eta_(eta) {
         using Teuchos::rcp;
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "A_fiber_hydro constructor: The input Comm object must be nonnull.");
@@ -131,10 +161,12 @@ class A_fiber_hydro : public Tpetra::Operator<> {
 
         const global_ordinal_type indexBase = 0;
         const int nfib_pts_local = fc_.get_total_fib_points() * 4;
+        const int n_shell_pts_local = shell_.M_inv_.rows();
+        const int local_size = nfib_pts_local + n_shell_pts_local;
 
         // Construct a map for our block row distribution
-        opMap_ = rcp(
-            new map_type(Teuchos::OrdinalTraits<Tpetra::global_size_t>::invalid(), nfib_pts_local, indexBase, comm));
+        opMap_ =
+            rcp(new map_type(Teuchos::OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
     };
     //
     // These functions are required since we inherit from Tpetra::Operator
@@ -153,30 +185,51 @@ class A_fiber_hydro : public Tpetra::Operator<> {
                scalar_type alpha = Teuchos::ScalarTraits<scalar_type>::one(),
                scalar_type beta = Teuchos::ScalarTraits<scalar_type>::zero()) const {
         RCP<const Teuchos::Comm<int>> comm = opMap_->getComm();
-        const int myRank = comm->getRank();
-        if (myRank == 0) {
+        const int rank = comm->getRank();
+        const int size = comm->getSize();
+        if (rank == 0) {
             cout << "A_fiber_hydro::apply" << endl;
         }
 
-        const size_t numVecs = X.getNumVectors();
-        const local_ordinal_type nlocRows = static_cast<local_ordinal_type>(X.getLocalLength());
-        // TEUCHOS_TEST_FOR_EXCEPTION(fc_.fibers.size() == nlocRows, std::logic_error, "")
-        const size_t nglobCols = opMap_->getGlobalNumElements();
-        const size_t baseRow = opMap_->getMinGlobalIndex();
-        for (size_t c = 0; c < numVecs; ++c) {
-            // Get a view of the desired column
+        const int nfib_pts_local = 4 * fc_.get_total_fib_points();
+        const int nshell_pts_local = shell_.M_inv_.rows();
+        for (size_t c = 0; c < X.getNumVectors(); ++c) {
             local_ordinal_type offset = 0;
-            Eigen::Map<Eigen::VectorXd> YView(Y.getDataNonConst(c).getRawPtr(), Y.getLocalLength());
-            Eigen::VectorXd XEigen = Eigen::Map<const Eigen::VectorXd>(X.getData(0).getRawPtr(), X.getLocalLength());
-            Eigen::MatrixXd fw = fc_.apply_fiber_force(XEigen);
-            Eigen::MatrixXd v_fib = fc_.flow(fw, eta_);
-            YView = fc_.matvec(XEigen, v_fib);
+            using Eigen::Map;
+            using Eigen::MatrixXd;
+            using Eigen::VectorXd;
+            // Get a view of the desired column
+            Map<VectorXd> y_view_fib(Y.getDataNonConst(c).getRawPtr(), nfib_pts_local);
+            VectorXd x_view_fib = Map<const VectorXd>(X.getData(0).getRawPtr(), nfib_pts_local);
+            MatrixXd fw = fc_.apply_fiber_force(x_view_fib);
+            MatrixXd v_fib = fc_.flow(fw, eta_);
+            y_view_fib = fc_.matvec(x_view_fib, v_fib);
+
+            std::vector<int> displs(size + 1);
+            std::vector<int> counts(size);
+            const int ncols = shell_.M_inv_.cols();
+            const int nrows_local = shell_.M_inv_.rows();
+            const int nrows_extra = ncols % size;
+            const int nrows_base = ncols / size;
+            for (int i = 0; i < size; ++i) {
+                counts[i] = nrows_base + (i < nrows_extra);
+                displs[i + 1] = counts[i] + displs[i];
+            }
+
+            offset += nfib_pts_local;
+            Map<VectorXd> res_view_shell(&Y.getDataNonConst(c).getRawPtr()[offset], nshell_pts_local);
+            VectorXd x_shell(ncols);
+            MPI_Allgatherv(X.getData(c).getRawPtr() + offset, nrows_local, MPI_DOUBLE, x_shell.data(), counts.data(),
+                           displs.data(), MPI_DOUBLE, MPI_COMM_WORLD);
+
+            res_view_shell = shell_.stresslet_plus_complementary_ * x_shell;
         }
     }
 
   private:
     Teuchos::RCP<const map_type> opMap_;
     const FiberContainer &fc_;
+    const Periphery &shell_;
     const double eta_;
 };
 
@@ -221,11 +274,13 @@ int main(int argc, char *argv[]) {
 
         assert(nfibs_tot % size == 0);
         const int n_fibs_local = displs[rank + 1] - displs[rank];
+        Periphery shell("test_periphery.npz");
         FiberContainer fibs(n_fibs_local, n_pts, bending_rigidity, eta);
 
         if (rank == 0)
             cout << "Reading in " << nfibs_tot << " fibers.\n";
 
+        // FIXME: Fiber import ludicrously slow to compile
         for (int ifib = 0; ifib < nfibs_tot; ++ifib) {
             const int ifib_low = displs[rank];
             const int ifib_high = displs[rank + 1];
@@ -278,35 +333,45 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, fibs, eta));
-        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm, fibs));
+        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, fibs, shell, eta));
+        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm, fibs, shell));
+
         RCP<const Tpetra::Map<>> map = A_sim->getDomainMap();
         typedef Tpetra::Vector<A_fiber_hydro::scalar_type, A_fiber_hydro::local_ordinal_type,
                                A_fiber_hydro::global_ordinal_type, A_fiber_hydro::node_type>
             vec_type;
 
         // Create initial vectors
-        RCP<vec_type> X, B;
+        RCP<vec_type> X, RHS;
         X = rcp(new vec_type(map));
-        B = rcp(new vec_type(map));
+        RHS = rcp(new vec_type(map));
         X->putScalar(0.0);
 
         { // Initialize FMM for reliable benchmarks
             double tmp = fibs.fibers[0].x_(0, 0);
             fibs.fibers[0].x_(0, 0) = 1.0;
-            A_sim->apply(*X, *B);
+            A_sim->apply(*X, *RHS);
             fibs.fibers[0].x_(0, 0) = tmp;
         }
 
+        RHS->putScalar(0.0);
         { // Initialize RHS
             int offset = 0;
             for (auto &fib : fibs.fibers) {
-                std::memcpy(B->getDataNonConst(0).getRawPtr() + offset, fib.RHS_.data(), fib.RHS_.size());
+                std::memcpy(RHS->getDataNonConst(0).getRawPtr() + offset, fib.RHS_.data(), fib.RHS_.size());
                 offset += fib.RHS_.size();
             }
+
+            // Initialize RHS for shell
+            // Just the velocity, which should be zero on first pass
+            // So.. do nothing
+            offset += shell.M_inv_.rows();
+            std::cout << offset << " " << map->getLocalMap().getNodeNumElements() << std::endl;
         }
 
-        Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, B);
+        Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, RHS);
+        if (rank == 0)
+            std::cout << "Initialized linear problem\n";
 
         int blocksize = 1;         // blocksize used by solver
         std::string ortho("DGKS"); // orthogonalization type
@@ -322,14 +387,20 @@ int main(int argc, char *argv[]) {
             return -1;
         }
 
-        if (prec_flag)
+        // TODO: right preconditioner is correct?
+        if (prec_flag) {
             problem.setRightPrec(preconditioner);
+            if (rank == 0)
+                std::cout << "Set preconditioner\n";
+        }
 
         bool set = problem.setProblem();
         if (set == false) {
             cout << endl << "ERROR:  Belos::LinearProblem failed to set up correctly!" << endl;
             return -1;
         }
+        if (rank == 0)
+            std::cout << "Set Belos problem\n";
 
         ParameterList belosList;
         belosList.set("Block Size", blocksize);      // Blocksize to be used by iterative solver
@@ -338,6 +409,13 @@ int main(int argc, char *argv[]) {
         belosList.set("Orthogonalization", ortho);   // Orthogonalization type
 
         Belos::BlockGmresSolMgr<ST, MV, OP> solver(rcpFromRef(problem), rcpFromRef(belosList));
+        if (rank == 0)
+            std::cout << "Initialized GMRES solver\n";
+
+        // RCP<Teuchos::FancyOStream> fos = rcp(new Teuchos::FancyOStream(rcpFromRef(std::cout)));
+        // X->describe(*fos, Teuchos::VERB_EXTREME);
+        // RHS->describe(*fos, Teuchos::VERB_EXTREME);
+
         double st = omp_get_wtime();
         Belos::ReturnType ret = solver.solve();
         if (rank == 0)

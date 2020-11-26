@@ -7,8 +7,8 @@
 class Periphery {
   public:
     Periphery(const std::string &precompute_file);
-    Eigen::MatrixXd M_inv_;
-    Eigen::MatrixXd stresslet_plus_complementary_;
+    Eigen::MatrixXd M_inv_; // Process local elements of inverse matrix
+    Eigen::MatrixXd stresslet_plus_complementary_; // Process local elements of stresslet tensor
 };
 
 #endif

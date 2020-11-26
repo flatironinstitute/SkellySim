@@ -8,14 +8,14 @@ Periphery::Periphery(const std::string &precompute_file) {
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 
-    cnpy::npz_t all_data;
+    cnpy::npz_t precompute_data;
 
     if (world_rank == 0)
         std::cout << "Loading raw precomputation data from file " << precompute_file << " for periphery into rank 0\n";
     int nrows;
     if (world_rank == 0) {
-        all_data = cnpy::npz_load(precompute_file);
-        nrows = all_data.at("quadrature_weights").shape[0] * 3;
+        precompute_data = cnpy::npz_load(precompute_file);
+        nrows = precompute_data.at("quadrature_weights").shape[0] * 3;
     }
 
     MPI_Bcast((void *)&nrows, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -36,10 +36,12 @@ Periphery::Periphery(const std::string &precompute_file) {
         for (int i = 1; i < world_size; ++i)
             displs[i] = displs[i - 1] + counts[i - 1];
     }
-    const double *M_inv_raw = (world_rank == 0) ? all_data["M_inv"].data<double>() : NULL;
+    const double *M_inv_raw = (world_rank == 0) ? precompute_data["M_inv"].data<double>() : NULL;
     const double *stresslet_plus_complementary_raw =
-        (world_rank == 0) ? all_data["stresslet_plus_complementary"].data<double>() : NULL;
+        (world_rank == 0) ? precompute_data["stresslet_plus_complementary"].data<double>() : NULL;
 
+    // Numpy data is row-major, while eigen is column-major. Easiest way to rectify this is to
+    // load in matrix as its transpose, then transpose back
     M_inv_.resize(ncols, nrows_local);
     MPI_Scatterv(M_inv_raw, counts.data(), displs.data(), MPI_DOUBLE, M_inv_.data(), nrows_local * ncols, MPI_DOUBLE, 0,
                  MPI_COMM_WORLD);
@@ -48,12 +50,8 @@ Periphery::Periphery(const std::string &precompute_file) {
     MPI_Scatterv(M_inv_raw, counts.data(), displs.data(), MPI_DOUBLE, stresslet_plus_complementary_.data(),
                  nrows_local * ncols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    all_data.clear();
-
     M_inv_ = M_inv_.transpose();
     stresslet_plus_complementary_ = stresslet_plus_complementary_.transpose();
-
-    std::cout << world_rank << " " << M_inv_.size() << std::endl;
 
     if (world_rank == 0)
         std::cout << "Done initializing periphery\n";
