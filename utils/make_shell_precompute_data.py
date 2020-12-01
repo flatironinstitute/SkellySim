@@ -10,6 +10,7 @@ import lib.periphery as periphery
 import lib.quaternion as quaternion
 import lib.kernels as kernels
 
+# TODO: Remove eta as parameter to precompute? Scale on simulation side from eta=1.0
 parser = argparse.ArgumentParser(description='Set periphery options')
 parser.add_argument('--periphery_type', '-t', type=str, default='sphere',
                     help="Type of periphery, 'sphere' and 'ellipsoid' accepted")
@@ -115,4 +116,6 @@ with open(shell_precompute_file, 'wb') as f:
     np.savez(f,
              quadrature_weights=quadrature_weights_periphery,
              stresslet_plus_complementary=shell_stresslet_plus_complementary,
-             M_inv=M_inv_periphery)
+             M_inv=M_inv_periphery,
+             normals=normals_periphery,
+             nodes=nodes_periphery)

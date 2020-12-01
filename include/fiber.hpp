@@ -96,6 +96,7 @@ class FiberContainer {
             tot += fib.num_points_;
         return tot;
     };
+    Eigen::MatrixXd get_r_vectors() const;
     Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixXd> &forces, double eta) const;
     Eigen::VectorXd matvec(const Eigen::Ref<Eigen::VectorXd> &x_all, const Eigen::Ref<Eigen::MatrixXd> &v_fib) const;
     Eigen::MatrixXd apply_fiber_force(const Eigen::Ref<Eigen::VectorXd> &x_all) const;

@@ -102,21 +102,11 @@ class P_inv_hydro : public Tpetra::Operator<> {
                 offset += fib.num_points_ * 4;
             }
 
-            std::vector<int> displs(size + 1);
-            std::vector<int> counts(size);
-            const int ncols = shell_.M_inv_.cols();
-            const int nrows_local = shell_.M_inv_.rows();
-            const int nrows_extra = ncols % size;
-            const int nrows_base = ncols / size;
-            for (int i = 0; i < size; ++i) {
-                counts[i] = nrows_base + (i < nrows_extra);
-                displs[i + 1] = counts[i] + displs[i];
-            }
+            Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_.node_counts_[rank]);
+            VectorXd x_shell(3 * shell_.n_nodes_global_);
 
-            Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, nrows_local);
-            VectorXd x_shell(ncols);
-            MPI_Allgatherv(X.getData(c).getRawPtr() + offset, nrows_local, MPI_DOUBLE, x_shell.data(), counts.data(),
-                           displs.data(), MPI_DOUBLE, MPI_COMM_WORLD);
+            MPI_Allgatherv(X.getData(c).getRawPtr() + offset, shell_.node_counts_[rank], MPI_DOUBLE, x_shell.data(),
+                           shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
             res_view_shell = shell_.M_inv_ * x_shell;
         }
@@ -162,6 +152,8 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         const global_ordinal_type indexBase = 0;
         const int nfib_pts_local = fc_.get_total_fib_points() * 4;
         const int n_shell_pts_local = shell_.M_inv_.rows();
+        std::cout << "initializing a_fiber " << comm->getRank() << " " << nfib_pts_local << " " << n_shell_pts_local
+                  << std::endl;
         const int local_size = nfib_pts_local + n_shell_pts_local;
 
         // Construct a map for our block row distribution
@@ -192,37 +184,39 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         }
 
         const int nfib_pts_local = 4 * fc_.get_total_fib_points();
-        const int nshell_pts_local = shell_.M_inv_.rows();
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
             local_ordinal_type offset = 0;
             using Eigen::Map;
             using Eigen::MatrixXd;
             using Eigen::VectorXd;
-            // Get a view of the desired column
-            Map<VectorXd> y_view_fib(Y.getDataNonConst(c).getRawPtr(), nfib_pts_local);
-            VectorXd x_view_fib = Map<const VectorXd>(X.getData(0).getRawPtr(), nfib_pts_local);
-            MatrixXd fw = fc_.apply_fiber_force(x_view_fib);
+
+            // Get views and temporary arrays
+            double *res_ptr = Y.getDataNonConst(c).getRawPtr();
+            const double *x_ptr = X.getData(c).getRawPtr();
+            Map<const VectorXd> x_fib_local(x_ptr, nfib_pts_local);
+            Map<const VectorXd> x_shell_local(x_ptr + offset, shell_.node_counts_[rank]);
+            Map<VectorXd> res_fib(res_ptr, nfib_pts_local);
+            MatrixXd r_fib = fc_.get_r_vectors();
+
+            // calculate fiber-fiber velocity
+            MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
             MatrixXd v_fib = fc_.flow(fw, eta_);
-            y_view_fib = fc_.matvec(x_view_fib, v_fib);
 
-            std::vector<int> displs(size + 1);
-            std::vector<int> counts(size);
-            const int ncols = shell_.M_inv_.cols();
-            const int nrows_local = shell_.M_inv_.rows();
-            const int nrows_extra = ncols % size;
-            const int nrows_base = ncols / size;
-            for (int i = 0; i < size; ++i) {
-                counts[i] = nrows_base + (i < nrows_extra);
-                displs[i + 1] = counts[i] + displs[i];
-            }
+            Map<VectorXd> res_view_shell(res_ptr + offset, shell_.node_counts_[rank]);
+            VectorXd x_shell_global(3 * shell_.n_nodes_global_);
 
+            // TODO: encapsulate all-to-all, or handle it via overlapping Tpetra::Map
             offset += nfib_pts_local;
-            Map<VectorXd> res_view_shell(&Y.getDataNonConst(c).getRawPtr()[offset], nshell_pts_local);
-            VectorXd x_shell(ncols);
-            MPI_Allgatherv(X.getData(c).getRawPtr() + offset, nrows_local, MPI_DOUBLE, x_shell.data(), counts.data(),
-                           displs.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
-            res_view_shell = shell_.stresslet_plus_complementary_ * x_shell;
+            MPI_Allgatherv(x_ptr + offset, shell_.node_counts_[rank], MPI_DOUBLE, x_shell_global.data(),
+                           shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
+
+            res_view_shell = shell_.stresslet_plus_complementary_ * x_shell_global;
+
+            Eigen::MatrixXd vshell2fib = shell_.flow(r_fib, x_shell_local, eta_);
+
+            v_fib += vshell2fib;
+            res_fib = fc_.matvec(x_fib_local, v_fib);
         }
     }
 
@@ -366,7 +360,7 @@ int main(int argc, char *argv[]) {
             // Just the velocity, which should be zero on first pass
             // So.. do nothing
             offset += shell.M_inv_.rows();
-            std::cout << offset << " " << map->getLocalMap().getNodeNumElements() << std::endl;
+            // std::cout << offset << " " << map->getLocalMap().getNodeNumElements() << std::endl;
         }
 
         Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, RHS);
