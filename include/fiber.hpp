@@ -22,39 +22,37 @@ class Fiber {
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
     std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
 
-    typedef Eigen::MatrixXd matrix_t;
-    typedef Eigen::ArrayXd array_t;
-    matrix_t x_;
-    matrix_t xs_;
-    matrix_t xss_;
-    matrix_t xsss_;
-    matrix_t xssss_;
-    matrix_t stokeslet_;
+    Eigen::MatrixXd x_;
+    Eigen::MatrixXd xs_;
+    Eigen::MatrixXd xss_;
+    Eigen::MatrixXd xsss_;
+    Eigen::MatrixXd xssss_;
+    Eigen::MatrixXd stokeslet_;
 
-    matrix_t A_;
-    Eigen::PartialPivLU<matrix_t> A_LU_;
-    matrix_t force_operator_;
+    Eigen::MatrixXd A_;
+    Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_;
+    Eigen::MatrixXd force_operator_;
     Eigen::VectorXd RHS_;
 
     typedef struct {
-        array_t alpha;
-        array_t alpha_roots;
-        array_t alpha_tension;
-        array_t weights_0;
-        matrix_t D_1_0;
-        matrix_t D_2_0;
-        matrix_t D_3_0;
-        matrix_t D_4_0;
-        matrix_t P_X;
-        matrix_t P_T;
-        matrix_t P_downsample_bc;
+        Eigen::ArrayXd alpha;
+        Eigen::ArrayXd alpha_roots;
+        Eigen::ArrayXd alpha_tension;
+        Eigen::ArrayXd weights_0;
+        Eigen::MatrixXd D_1_0;
+        Eigen::MatrixXd D_2_0;
+        Eigen::MatrixXd D_3_0;
+        Eigen::MatrixXd D_4_0;
+        Eigen::MatrixXd P_X;
+        Eigen::MatrixXd P_T;
+        Eigen::MatrixXd P_downsample_bc;
     } fib_mat_t;
     const static std::unordered_map<int, fib_mat_t> matrices_;
 
     Fiber(int num_points, double bending_rigidity, double eta)
         : num_points_(num_points), bending_rigidity_(bending_rigidity) {
         x_ = Eigen::MatrixXd::Zero(3, num_points);
-        x_.row(0) = Eigen::VectorXd::LinSpaced(num_points, 0, 1.0).transpose();
+        x_.row(0) = Eigen::ArrayXd::LinSpaced(num_points, 0, 1.0).transpose();
         xs_.resize(3, num_points);
         xss_.resize(3, num_points);
         xsss_.resize(3, num_points);
