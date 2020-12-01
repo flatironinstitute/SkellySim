@@ -185,7 +185,6 @@ class A_fiber_hydro : public Tpetra::Operator<> {
 
         const int nfib_pts_local = 4 * fc_.get_total_fib_points();
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
-            local_ordinal_type offset = 0;
             using Eigen::Map;
             using Eigen::MatrixXd;
             using Eigen::VectorXd;
@@ -193,30 +192,23 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             // Get views and temporary arrays
             double *res_ptr = Y.getDataNonConst(c).getRawPtr();
             const double *x_ptr = X.getData(c).getRawPtr();
-            Map<const VectorXd> x_fib_local(x_ptr, nfib_pts_local);
-            Map<const VectorXd> x_shell_local(x_ptr + offset, shell_.node_counts_[rank]);
+            VectorXd x_fib_local = Map<const VectorXd>(x_ptr, nfib_pts_local);
+            VectorXd x_shell_local = Map<const VectorXd>(x_ptr + nfib_pts_local, shell_.node_counts_[rank]);
             Map<VectorXd> res_fib(res_ptr, nfib_pts_local);
+            Map<VectorXd> res_shell(res_ptr + nfib_pts_local, shell_.node_counts_[rank]);
             MatrixXd r_fib = fc_.get_r_vectors();
+            VectorXd x_shell_global(3 * shell_.n_nodes_global_);
+            MPI_Allgatherv(x_shell_local.data(), shell_.node_counts_[rank], MPI_DOUBLE, x_shell_global.data(),
+                           shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
             // calculate fiber-fiber velocity
             MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
             MatrixXd v_fib = fc_.flow(fw, eta_);
-
-            Map<VectorXd> res_view_shell(res_ptr + offset, shell_.node_counts_[rank]);
-            VectorXd x_shell_global(3 * shell_.n_nodes_global_);
-
-            // TODO: encapsulate all-to-all, or handle it via overlapping Tpetra::Map
-            offset += nfib_pts_local;
-
-            MPI_Allgatherv(x_ptr + offset, shell_.node_counts_[rank], MPI_DOUBLE, x_shell_global.data(),
-                           shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
-
-            res_view_shell = shell_.stresslet_plus_complementary_ * x_shell_global;
-
-            Eigen::MatrixXd vshell2fib = shell_.flow(r_fib, x_shell_local, eta_);
-
+            MatrixXd vshell2fib = shell_.flow(r_fib, x_shell_local, eta_);
             v_fib += vshell2fib;
+
             res_fib = fc_.matvec(x_fib_local, v_fib);
+            res_shell = shell_.stresslet_plus_complementary_ * x_shell_global;
         }
     }
 
