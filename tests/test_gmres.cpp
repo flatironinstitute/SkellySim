@@ -324,7 +324,7 @@ int main(int argc, char *argv[]) {
         { // Initialize RHS
             int offset = 0;
             for (auto &fib : fibs.fibers) {
-                std::memcpy(RHS->getDataNonConst(0).getRawPtr() + offset, fib.RHS_.data(), fib.RHS_.size());
+                Eigen::Map<Eigen::VectorXd>(RHS->getDataNonConst(0).getRawPtr() + offset, fib.RHS_.size()) = fib.RHS_;
                 offset += fib.RHS_.size();
             }
 
@@ -340,7 +340,7 @@ int main(int argc, char *argv[]) {
 
         int blocksize = 1;         // blocksize used by solver
         std::string ortho("DGKS"); // orthogonalization type
-        double tol = 1.0E-7;       // relative residual tolerance
+        double tol = 1.0E-12;      // relative residual tolerance
         int prec_flag = true;
 
         CommandLineProcessor cmdp(false, true);
