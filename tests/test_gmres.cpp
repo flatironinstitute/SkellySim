@@ -77,20 +77,15 @@ class P_inv_hydro : public Tpetra::Operator<> {
             cout << "P_inv_hydro::apply" << endl;
         }
 
-        const size_t numVecs = X.getNumVectors();
-        // TEUCHOS_TEST_FOR_EXCEPTION(fc_.fibers.size() == nlocRows, std::logic_error, "")
-        for (size_t c = 0; c < numVecs; ++c) {
+        for (size_t c = 0; c < X.getNumVectors(); ++c) {
             using Eigen::Map;
 
             // Get a view of the desired column
             local_ordinal_type offset = 0;
             for (auto &fib : fc_.fibers) {
                 Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, fib.num_points_ * 4);
-                auto res = fib.A_LU_.solve(XView);
-
-                for (local_ordinal_type i = 0; i < fib.num_points_ * 4; ++i) {
-                    Y.replaceLocalValue(i + offset, c, res(i));
-                }
+                Map<VectorXd> res_fib(Y.getDataNonConst(c).getRawPtr() + offset, fib.num_points_ * 4);
+                res_fib = fib.A_LU_.solve(XView);
 
                 offset += fib.num_points_ * 4;
             }
