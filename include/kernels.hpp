@@ -4,22 +4,23 @@
 #include <STKFMM/STKFMM.hpp>
 
 namespace kernels {
-typedef Eigen::MatrixXd (*fmm_kernel_func_t)(const int n_trg, const Eigen::Ref<Eigen::MatrixXd> &f_sl,
-                                             const Eigen::Ref<Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *);
+typedef Eigen::MatrixXd (*fmm_kernel_func_t)(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
+                                             const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *);
 
-Eigen::MatrixXd oseen_tensor_contract_direct(const Eigen::Ref<Eigen::MatrixXd> &r_src,
-                                             const Eigen::Ref<Eigen::MatrixXd> &r_trg,
-                                             const Eigen::Ref<Eigen::MatrixXd> &density, double eta = 1.0,
+Eigen::MatrixXd oseen_tensor_contract_direct(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
+                                             const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
+                                             const Eigen::Ref<const Eigen::MatrixXd> &density, double eta = 1.0,
                                              double reg = 5E-3, double epsilon_distance = 1E-5);
 
-Eigen::MatrixXd stokes_vel_fmm(const int n_trg, const Eigen::Ref<Eigen::MatrixXd> &f_sl,
-                               const Eigen::Ref<Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr);
+Eigen::MatrixXd stokes_vel_fmm(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
+                               const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr);
 
-Eigen::MatrixXd stokes_pvel_fmm(const int n_trg, const Eigen::Ref<Eigen::MatrixXd> &f_sl,
-                                const Eigen::Ref<Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr);
+Eigen::MatrixXd stokes_pvel_fmm(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
+                                const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr);
 
-Eigen::MatrixXd oseen_tensor_direct(const Eigen::Ref<Eigen::MatrixXd> &r_src, const Eigen::Ref<Eigen::MatrixXd> &r_trg,
-                                    double eta = 1.0, double reg = 5E-3, double epsilon_distance = 1E-5);
+Eigen::MatrixXd oseen_tensor_direct(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
+                                    const Eigen::Ref<const Eigen::MatrixXd> &r_trg, double eta = 1.0, double reg = 5E-3,
+                                    double epsilon_distance = 1E-5);
 
 template <typename stkfmm_type>
 class FMM {
@@ -29,9 +30,11 @@ class FMM {
         : fmmPtr_(new stkfmm_type(order, maxPoints, paxis, static_cast<unsigned>(k))), k_(k),
           kernel_func_(kernel_func){};
 
-    Eigen::MatrixXd operator()(const Eigen::Ref<Eigen::MatrixXd> &r_sl, const Eigen::Ref<Eigen::MatrixXd> &r_dl,
-                               const Eigen::Ref<Eigen::MatrixXd> &r_trg, const Eigen::Ref<Eigen::MatrixXd> &f_sl,
-                               const Eigen::Ref<Eigen::MatrixXd> &f_dl) {
+    Eigen::MatrixXd operator()(const Eigen::Ref<const Eigen::MatrixXd> &r_sl,
+                               const Eigen::Ref<const Eigen::MatrixXd> &r_dl,
+                               const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
+                               const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
+                               const Eigen::Ref<const Eigen::MatrixXd> &f_dl) {
         // Check if LOCAL source/target points have changed, and then broadcast that for a GLOBAL update
         char setup_flag_local =
             (r_sl_old_.size() != r_sl.size() || r_dl_old_.size() != r_dl.size() || r_trg_old_.size() != r_trg.size() ||

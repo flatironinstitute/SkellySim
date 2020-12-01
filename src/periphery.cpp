@@ -4,8 +4,8 @@
 
 #include <mpi.h>
 
-Eigen::MatrixXd Periphery::flow(const Eigen::Ref<Eigen::MatrixXd> &r_trg, const Eigen::Ref<Eigen::MatrixXd> &density,
-                                double eta) const {
+Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
+                                const Eigen::Ref<const Eigen::MatrixXd> &density, double eta) const {
     // FIXME: Move fmm object and make more flexible
     static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel,
                                               kernels::stokes_pvel_fmm);

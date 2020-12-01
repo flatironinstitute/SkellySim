@@ -2,9 +2,9 @@
 
 #include <STKFMM/STKFMM.hpp>
 
-Eigen::MatrixXd kernels::oseen_tensor_contract_direct(const Eigen::Ref<Eigen::MatrixXd> &r_src,
-                                                      const Eigen::Ref<Eigen::MatrixXd> &r_trg,
-                                                      const Eigen::Ref<Eigen::MatrixXd> &density, double eta,
+Eigen::MatrixXd kernels::oseen_tensor_contract_direct(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
+                                                      const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
+                                                      const Eigen::Ref<const Eigen::MatrixXd> &density, double eta,
                                                       double reg, double epsilon_distance) {
     using namespace Eigen;
     const int N_src = r_src.size() / 3;
@@ -65,8 +65,8 @@ Eigen::MatrixXd kernels::oseen_tensor_contract_direct(const Eigen::Ref<Eigen::Ma
 //
 // Output:
 //   G = Oseen tensor with dimensions (3*num_points) x (3*num_points).
-Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<Eigen::MatrixXd> &r_src,
-                                             const Eigen::Ref<Eigen::MatrixXd> &r_trg, double eta, double reg,
+Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
+                                             const Eigen::Ref<const Eigen::MatrixXd> &r_trg, double eta, double reg,
                                              double epsilon_distance) {
 
     using namespace Eigen;
@@ -117,8 +117,8 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<Eigen::MatrixXd> &
     return G;
 }
 
-Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, const Eigen::Ref<Eigen::MatrixXd> &f_sl,
-                                        const Eigen::Ref<Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr) {
+Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
+                                        const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, n_trg);
     fmmPtr->clearFMM(stkfmm::KERNEL::Stokes);
     fmmPtr->evaluateFMM(stkfmm::KERNEL::Stokes, f_sl.size() / 3, f_sl.data(), n_trg, res.data(), f_dl.size() / 3,
@@ -126,8 +126,8 @@ Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, const Eigen::Ref<Eigen:
     return res;
 }
 
-Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, const Eigen::Ref<Eigen::MatrixXd> &f_sl,
-                                         const Eigen::Ref<Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr) {
+Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
+                                         const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(4, n_trg);
     fmmPtr->clearFMM(stkfmm::KERNEL::PVel);
     fmmPtr->evaluateFMM(stkfmm::KERNEL::PVel, f_sl.size() / 4, f_sl.data(), n_trg, res.data(), f_dl.size() / 9,

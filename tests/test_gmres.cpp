@@ -173,8 +173,8 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             // Get views and temporary arrays
             double *res_ptr = Y.getDataNonConst(c).getRawPtr();
             const double *x_ptr = X.getData(c).getRawPtr();
-            VectorXd x_fib_local = Map<const VectorXd>(x_ptr, n_fib_pts_local);
-            VectorXd x_shell_local = Map<const VectorXd>(x_ptr + n_fib_pts_local, n_shell_pts_local);
+            Map<const VectorXd> x_fib_local(x_ptr, n_fib_pts_local);
+            Map<const VectorXd> x_shell_local(x_ptr + n_fib_pts_local, n_shell_pts_local);
             Map<VectorXd> res_fib(res_ptr, n_fib_pts_local);
             Map<VectorXd> res_shell(res_ptr + n_fib_pts_local, n_shell_pts_local);
             MatrixXd r_fib = fc_.get_r_vectors();

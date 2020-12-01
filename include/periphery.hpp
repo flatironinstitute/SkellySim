@@ -9,7 +9,7 @@ class Periphery {
   public:
     Periphery(const std::string &precompute_file);
 
-    Eigen::MatrixXd flow(const Eigen::Ref<Eigen::MatrixXd> &trg, const Eigen::Ref<Eigen::MatrixXd> &density,
+    Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &trg, const Eigen::Ref<const Eigen::MatrixXd> &density,
                          double eta) const;
     Eigen::MatrixXd M_inv_;                        // Process local elements of inverse matrix
     Eigen::MatrixXd stresslet_plus_complementary_; // Process local elements of stresslet tensor
