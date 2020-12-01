@@ -531,7 +531,6 @@ Eigen::MatrixXd FiberContainer::flow(const Eigen::Ref<Eigen::MatrixXd> &forces, 
     // FIXME: MPI not compatible with direct calculation
     Eigen::MatrixXd r_trg = r_src;
     Eigen::MatrixXd r_dl_dummy, f_dl_dummy;
-    // Eigen::MatrixXd vel = kernels::oseen_tensor_contract_direct(r_src, r_trg, weighted_forces);
     Eigen::MatrixXd vel = fmm(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
 
     // Subtract self term

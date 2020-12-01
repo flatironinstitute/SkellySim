@@ -16,6 +16,8 @@
 using namespace Teuchos;
 using std::cout;
 using std::endl;
+using Eigen::VectorXd;
+using Eigen::MatrixXd;
 
 class P_inv_hydro : public Tpetra::Operator<> {
   public:
@@ -38,9 +40,8 @@ class P_inv_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    P_inv_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm, const FiberContainer &fc, const Periphery &shell)
+    P_inv_hydro(const RCP<const Comm<int>> comm, const FiberContainer &fc, const Periphery &shell)
         : fc_(fc), shell_(shell) {
-        using Teuchos::rcp;
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "P_inv_hydro constructor: The input Comm object must be nonnull.");
         if (comm->getRank() == 0) {
@@ -54,7 +55,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
 
         // Construct a map for our block row distribution
         opMap_ =
-            rcp(new map_type(Teuchos::OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
+            rcp(new map_type(OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
     };
     //
     // These functions are required since we inherit from Tpetra::Operator
@@ -62,16 +63,16 @@ class P_inv_hydro : public Tpetra::Operator<> {
     // Destructor
     virtual ~P_inv_hydro() {}
     // Get the domain Map of this Operator subclass.
-    Teuchos::RCP<const map_type> getDomainMap() const { return opMap_; }
+    RCP<const map_type> getDomainMap() const { return opMap_; }
     // Get the range Map of this Operator subclass.
-    Teuchos::RCP<const map_type> getRangeMap() const { return opMap_; }
+    RCP<const map_type> getRangeMap() const { return opMap_; }
     // Compute Y := alpha Op X + beta Y.
     //
     // We ignore the cases alpha != 1 and beta != 0 for simplicity.
-    void apply(const MV &X, MV &Y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
-               scalar_type alpha = Teuchos::ScalarTraits<scalar_type>::one(),
-               scalar_type beta = Teuchos::ScalarTraits<scalar_type>::zero()) const {
-        RCP<const Teuchos::Comm<int>> comm = opMap_->getComm();
+    void apply(const MV &X, MV &Y, ETransp mode = NO_TRANS,
+               scalar_type alpha = ScalarTraits<scalar_type>::one(),
+               scalar_type beta = ScalarTraits<scalar_type>::zero()) const {
+        RCP<const Comm<int>> comm = opMap_->getComm();
         const int rank = comm->getRank();
         const int size = comm->getSize();
         if (rank == 0) {
@@ -79,15 +80,9 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         const size_t numVecs = X.getNumVectors();
-        const local_ordinal_type nlocRows = static_cast<local_ordinal_type>(X.getLocalLength());
         // TEUCHOS_TEST_FOR_EXCEPTION(fc_.fibers.size() == nlocRows, std::logic_error, "")
-        const size_t nglobCols = opMap_->getGlobalNumElements();
-        const size_t baseRow = opMap_->getMinGlobalIndex();
-        const int n_fib_pts = fc_.get_total_fib_points() * 4;
-        const int n_shell_pts = shell_.M_inv_.rows();
         for (size_t c = 0; c < numVecs; ++c) {
             using Eigen::Map;
-            using Eigen::VectorXd;
 
             // Get a view of the desired column
             local_ordinal_type offset = 0;
@@ -113,7 +108,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
     }
 
   private:
-    Teuchos::RCP<const map_type> opMap_;
+    RCP<const map_type> opMap_;
     const FiberContainer &fc_;
     const Periphery &shell_;
 };
@@ -139,10 +134,9 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    A_fiber_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm, const FiberContainer &fc, const Periphery &shell,
+    A_fiber_hydro(const RCP<const Comm<int>> comm, const FiberContainer &fc, const Periphery &shell,
                   const double eta)
         : fc_(fc), shell_(shell), eta_(eta) {
-        using Teuchos::rcp;
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "A_fiber_hydro constructor: The input Comm object must be nonnull.");
         if (comm->getRank() == 0) {
@@ -152,13 +146,12 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         const global_ordinal_type indexBase = 0;
         const int nfib_pts_local = fc_.get_total_fib_points() * 4;
         const int n_shell_pts_local = shell_.M_inv_.rows();
-        std::cout << "initializing a_fiber " << comm->getRank() << " " << nfib_pts_local << " " << n_shell_pts_local
-                  << std::endl;
+        cout << "initializing a_fiber " << comm->getRank() << " " << nfib_pts_local << " " << n_shell_pts_local << endl;
         const int local_size = nfib_pts_local + n_shell_pts_local;
 
         // Construct a map for our block row distribution
         opMap_ =
-            rcp(new map_type(Teuchos::OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
+            rcp(new map_type(OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
     };
     //
     // These functions are required since we inherit from Tpetra::Operator
@@ -166,17 +159,17 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     // Destructor
     virtual ~A_fiber_hydro() {}
     // Get the domain Map of this Operator subclass.
-    Teuchos::RCP<const map_type> getDomainMap() const { return opMap_; }
+    RCP<const map_type> getDomainMap() const { return opMap_; }
     // Get the range Map of this Operator subclass.
-    Teuchos::RCP<const map_type> getRangeMap() const { return opMap_; }
+    RCP<const map_type> getRangeMap() const { return opMap_; }
 
     //     | -0.5*I + T   -K   {G,R}Cbf + Gf         | |w*mu|   |   - G*F - R*L|
     //     |     -K^T      I        0                | | U  | = |      0       |
     //     |    -QoT      Cfb    A_ff - Qo{G,R} Cbf  | | Xf |   |     RHSf     |
-    void apply(const MV &X, MV &Y, Teuchos::ETransp mode = Teuchos::NO_TRANS,
-               scalar_type alpha = Teuchos::ScalarTraits<scalar_type>::one(),
-               scalar_type beta = Teuchos::ScalarTraits<scalar_type>::zero()) const {
-        RCP<const Teuchos::Comm<int>> comm = opMap_->getComm();
+    void apply(const MV &X, MV &Y, ETransp mode = NO_TRANS,
+               scalar_type alpha = ScalarTraits<scalar_type>::one(),
+               scalar_type beta = ScalarTraits<scalar_type>::zero()) const {
+        RCP<const Comm<int>> comm = opMap_->getComm();
         const int rank = comm->getRank();
         const int size = comm->getSize();
         if (rank == 0) {
@@ -186,8 +179,6 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         const int nfib_pts_local = 4 * fc_.get_total_fib_points();
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
             using Eigen::Map;
-            using Eigen::MatrixXd;
-            using Eigen::VectorXd;
 
             // Get views and temporary arrays
             double *res_ptr = Y.getDataNonConst(c).getRawPtr();
@@ -213,14 +204,14 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     }
 
   private:
-    Teuchos::RCP<const map_type> opMap_;
+    RCP<const map_type> opMap_;
     const FiberContainer &fc_;
     const Periphery &shell_;
     const double eta_;
 };
 
-Eigen::VectorXd load_vec(cnpy::npz_t &npz, const char *var) {
-    return Eigen::Map<Eigen::VectorXd>(npz[var].data<double>(), npz[var].shape[0]);
+VectorXd load_vec(cnpy::npz_t &npz, const char *var) {
+    return Eigen::Map<VectorXd>(npz[var].data<double>(), npz[var].shape[0]);
 }
 
 int main(int argc, char *argv[]) {
@@ -234,7 +225,6 @@ int main(int argc, char *argv[]) {
     bool success = false;
     // try
     {
-
         RCP<const Comm<int>> comm = Tpetra::getDefaultComm();
 
         const int rank = comm->getRank();
@@ -287,7 +277,7 @@ int main(int argc, char *argv[]) {
             assert(E == bending_rigidity);
             assert(L == length);
 
-            Eigen::MatrixXd x(3, n_pts);
+            MatrixXd x(3, n_pts);
             for (int ipt = 0; ipt < npts; ++ipt) {
                 getline(ifs, line);
                 std::stringstream linestream(line);
@@ -303,8 +293,8 @@ int main(int argc, char *argv[]) {
 
             if (ifib >= ifib_low && ifib < ifib_high) {
                 cout << "Fiber " << ifib << ": " << npts << " " << E << " " << L << endl;
-                Eigen::MatrixXd v_on_fiber;
-                Eigen::MatrixXd f_on_fiber;
+                MatrixXd v_on_fiber;
+                MatrixXd f_on_fiber;
                 auto &fib = fibs.fibers[ifib - ifib_low];
 
                 fib.x_ = x;
@@ -352,12 +342,11 @@ int main(int argc, char *argv[]) {
             // Just the velocity, which should be zero on first pass
             // So.. do nothing
             offset += shell.M_inv_.rows();
-            // std::cout << offset << " " << map->getLocalMap().getNodeNumElements() << std::endl;
         }
 
         Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, RHS);
         if (rank == 0)
-            std::cout << "Initialized linear problem\n";
+            cout << "Initialized linear problem\n";
 
         int blocksize = 1;         // blocksize used by solver
         std::string ortho("DGKS"); // orthogonalization type
@@ -377,7 +366,7 @@ int main(int argc, char *argv[]) {
         if (prec_flag) {
             problem.setRightPrec(preconditioner);
             if (rank == 0)
-                std::cout << "Set preconditioner\n";
+                cout << "Set preconditioner\n";
         }
 
         bool set = problem.setProblem();
@@ -386,7 +375,7 @@ int main(int argc, char *argv[]) {
             return -1;
         }
         if (rank == 0)
-            std::cout << "Set Belos problem\n";
+            cout << "Set Belos problem\n";
 
         ParameterList belosList;
         belosList.set("Block Size", blocksize);      // Blocksize to be used by iterative solver
@@ -396,11 +385,11 @@ int main(int argc, char *argv[]) {
 
         Belos::BlockGmresSolMgr<ST, MV, OP> solver(rcpFromRef(problem), rcpFromRef(belosList));
         if (rank == 0)
-            std::cout << "Initialized GMRES solver\n";
+            cout << "Initialized GMRES solver\n";
 
-        // RCP<Teuchos::FancyOStream> fos = rcp(new Teuchos::FancyOStream(rcpFromRef(std::cout)));
-        // X->describe(*fos, Teuchos::VERB_EXTREME);
-        // RHS->describe(*fos, Teuchos::VERB_EXTREME);
+        // RCP<FancyOStream> fos = rcp(new FancyOStream(rcpFromRef(cout)));
+        // X->describe(*fos, VERB_EXTREME);
+        // RHS->describe(*fos, VERB_EXTREME);
 
         double st = omp_get_wtime();
         Belos::ReturnType ret = solver.solve();
