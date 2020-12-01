@@ -14,10 +14,10 @@
 #include <periphery.hpp>
 
 using namespace Teuchos;
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
 using std::cout;
 using std::endl;
-using Eigen::VectorXd;
-using Eigen::MatrixXd;
 
 class P_inv_hydro : public Tpetra::Operator<> {
   public:
@@ -54,8 +54,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
         const int local_size = nfib_pts_local + n_shell_rows_local;
 
         // Construct a map for our block row distribution
-        opMap_ =
-            rcp(new map_type(OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
+        opMap_ = rcp(new map_type(OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
     };
     //
     // These functions are required since we inherit from Tpetra::Operator
@@ -69,8 +68,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
     // Compute Y := alpha Op X + beta Y.
     //
     // We ignore the cases alpha != 1 and beta != 0 for simplicity.
-    void apply(const MV &X, MV &Y, ETransp mode = NO_TRANS,
-               scalar_type alpha = ScalarTraits<scalar_type>::one(),
+    void apply(const MV &X, MV &Y, ETransp mode = NO_TRANS, scalar_type alpha = ScalarTraits<scalar_type>::one(),
                scalar_type beta = ScalarTraits<scalar_type>::zero()) const {
         RCP<const Comm<int>> comm = opMap_->getComm();
         const int rank = comm->getRank();
@@ -134,8 +132,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    A_fiber_hydro(const RCP<const Comm<int>> comm, const FiberContainer &fc, const Periphery &shell,
-                  const double eta)
+    A_fiber_hydro(const RCP<const Comm<int>> comm, const FiberContainer &fc, const Periphery &shell, const double eta)
         : fc_(fc), shell_(shell), eta_(eta) {
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "A_fiber_hydro constructor: The input Comm object must be nonnull.");
@@ -146,12 +143,10 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         const global_ordinal_type indexBase = 0;
         const int nfib_pts_local = fc_.get_total_fib_points() * 4;
         const int n_shell_pts_local = shell_.M_inv_.rows();
-        cout << "initializing a_fiber " << comm->getRank() << " " << nfib_pts_local << " " << n_shell_pts_local << endl;
         const int local_size = nfib_pts_local + n_shell_pts_local;
 
         // Construct a map for our block row distribution
-        opMap_ =
-            rcp(new map_type(OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
+        opMap_ = rcp(new map_type(OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
     };
     //
     // These functions are required since we inherit from Tpetra::Operator
@@ -166,8 +161,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     //     | -0.5*I + T   -K   {G,R}Cbf + Gf         | |w*mu|   |   - G*F - R*L|
     //     |     -K^T      I        0                | | U  | = |      0       |
     //     |    -QoT      Cfb    A_ff - Qo{G,R} Cbf  | | Xf |   |     RHSf     |
-    void apply(const MV &X, MV &Y, ETransp mode = NO_TRANS,
-               scalar_type alpha = ScalarTraits<scalar_type>::one(),
+    void apply(const MV &X, MV &Y, ETransp mode = NO_TRANS, scalar_type alpha = ScalarTraits<scalar_type>::one(),
                scalar_type beta = ScalarTraits<scalar_type>::zero()) const {
         RCP<const Comm<int>> comm = opMap_->getComm();
         const int rank = comm->getRank();
@@ -176,20 +170,21 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             cout << "A_fiber_hydro::apply" << endl;
         }
 
-        const int nfib_pts_local = 4 * fc_.get_total_fib_points();
+        const int n_fib_pts_local = 4 * fc_.get_total_fib_points();
+        const int n_shell_pts_local = shell_.node_counts_[rank];
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
             using Eigen::Map;
 
             // Get views and temporary arrays
             double *res_ptr = Y.getDataNonConst(c).getRawPtr();
             const double *x_ptr = X.getData(c).getRawPtr();
-            VectorXd x_fib_local = Map<const VectorXd>(x_ptr, nfib_pts_local);
-            VectorXd x_shell_local = Map<const VectorXd>(x_ptr + nfib_pts_local, shell_.node_counts_[rank]);
-            Map<VectorXd> res_fib(res_ptr, nfib_pts_local);
-            Map<VectorXd> res_shell(res_ptr + nfib_pts_local, shell_.node_counts_[rank]);
+            VectorXd x_fib_local = Map<const VectorXd>(x_ptr, n_fib_pts_local);
+            VectorXd x_shell_local = Map<const VectorXd>(x_ptr + n_fib_pts_local, n_shell_pts_local);
+            Map<VectorXd> res_fib(res_ptr, n_fib_pts_local);
+            Map<VectorXd> res_shell(res_ptr + n_fib_pts_local, n_shell_pts_local);
             MatrixXd r_fib = fc_.get_r_vectors();
             VectorXd x_shell_global(3 * shell_.n_nodes_global_);
-            MPI_Allgatherv(x_shell_local.data(), shell_.node_counts_[rank], MPI_DOUBLE, x_shell_global.data(),
+            MPI_Allgatherv(x_shell_local.data(), n_shell_pts_local, MPI_DOUBLE, x_shell_global.data(),
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
             // calculate fiber-fiber velocity
