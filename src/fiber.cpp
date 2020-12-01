@@ -121,7 +121,7 @@ void Fiber::form_linear_operator(double dt, double eta) {
 // A * (X^{n+1}, T^{n+1}) = RHS
 // with
 // RHS = (X^n / dt + flow + Mobility * force_external, ...)
-void Fiber::compute_RHS(double dt, const Eigen::Ref<MatrixXd> flow, const Eigen::Ref<MatrixXd> f_external) {
+void Fiber::compute_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const Eigen::Ref<const MatrixXd> f_external) {
     const int np = num_points_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
@@ -224,8 +224,8 @@ void Fiber::form_force_operator() {
 
 void Fiber::build_preconditioner() { A_LU_.compute(A_); }
 
-void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<MatrixXd> &v_on_fiber,
-                                 const Eigen::Ref<MatrixXd> &f_on_fiber) {
+void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_on_fiber,
+                                 const Eigen::Ref<const MatrixXd> &f_on_fiber) {
     const int np = num_points_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);
@@ -351,7 +351,7 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<MatrixXd> &v_on_fib
 // Inputs:
 //   x = Eigen array, N points x_k.
 //   y = Eigen array, N-m points.
-MatrixXd barycentric_matrix(const Eigen::Ref<ArrayXd> &x, const Eigen::Ref<ArrayXd> &y) {
+MatrixXd barycentric_matrix(const Eigen::Ref<const ArrayXd> &x, const Eigen::Ref<const ArrayXd> &y) {
     int N = x.size();
     int M = y.size();
     int m = N - M;
@@ -439,7 +439,7 @@ void FiberContainer::form_linear_operators(double dt, double eta) {
         fib.form_linear_operator(dt, eta);
 }
 
-VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<VectorXd> &x_all) const {
+VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<const VectorXd> &x_all) const {
     VectorXd y(x_all.size());
     size_t offset = 0;
     for (auto &fib : fibers) {
@@ -449,7 +449,8 @@ VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<VectorXd> &x_all)
     return y;
 }
 
-VectorXd FiberContainer::matvec(const Eigen::Ref<VectorXd> &x_all, const Eigen::Ref<MatrixXd> &v_fib) const {
+VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all,
+                                const Eigen::Ref<const MatrixXd> &v_fib) const {
     int num_points_tot = 0;
     for (auto &fib : fibers)
         num_points_tot += fib.num_points_;
@@ -508,7 +509,7 @@ MatrixXd FiberContainer::get_r_vectors() const {
     return r;
 }
 
-MatrixXd FiberContainer::flow(const Eigen::Ref<MatrixXd> &forces, double eta) const {
+MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &forces, double eta) const {
     // FIXME: Move fmm object and make more flexible
     static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes,
                                               kernels::stokes_vel_fmm);
@@ -549,7 +550,7 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<MatrixXd> &forces, double eta) co
     return vel;
 }
 
-MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<VectorXd> &x_all) const {
+MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<const VectorXd> &x_all) const {
     MatrixXd fw(3, x_all.size() / 4);
 
     size_t offset = 0;
