@@ -322,9 +322,12 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
         B.block(10, 2 * np, 1, np) = bending_rigidity_ * D_2.row(D_2.rows() - 1) * xss_(2, xss_.rows() - 1);
         B(10, 4 * np - 1) = 1.0;
 
-        Vector3d BC_end_vec_0 = {0.0, 0.0, 0.0};
-        B_RHS.segment(7, 3) = BC_end_vec_0;
-        B_RHS(10) = BC_end_vec_0.dot(xs_.col(xs_.cols() - 1));
+        Vector3d BC_plus_vec_0 = {0.0, 0.0, 0.0};
+        if (f_on_fiber.size())
+            BC_plus_vec_0 = f_on_fiber.col(f_on_fiber.cols() - 1);
+
+        B_RHS.segment(7, 3) = BC_plus_vec_0;
+        B_RHS(10) = BC_plus_vec_0.dot(xs_.col(xs_.cols() - 1));
         break;
     default:
         std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
