@@ -87,8 +87,10 @@ Periphery::Periphery(const std::string &precompute_file) {
     MPI_Scatterv(M_inv_raw, row_counts_.data(), row_displs_.data(), MPI_DOUBLE, stresslet_plus_complementary_.data(),
                  row_counts_[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    M_inv_ = M_inv_.transpose();
-    stresslet_plus_complementary_ = stresslet_plus_complementary_.transpose();
+    M_inv_.transposeInPlace();
+    M_inv_ *= eta;
+    stresslet_plus_complementary_.transposeInPlace();
+    stresslet_plus_complementary_ /= eta;
 
     node_normal_.resize(3, node_size_local / 3);
     MPI_Scatterv(normals_raw, node_counts_.data(), node_displs_.data(), MPI_DOUBLE, node_normal_.data(),
