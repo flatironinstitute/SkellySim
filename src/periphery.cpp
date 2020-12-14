@@ -23,12 +23,14 @@ Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                 f_dl(i * 3 + j, node) = 2.0 * node_normal_(i, node) * density_reshaped(j, node);
 
     Eigen::MatrixXd r_sl, f_sl; // dummy SL positions/values
-    // FIXME: Why is this line necessary?
-    Eigen::MatrixXd r_dl = node_pos_; // Double layer coordinates are node positions
-    Eigen::MatrixXd pvel = fmm(r_sl, r_dl, r_trg, f_sl, f_dl);
+    Eigen::MatrixXd pvel = fmm(r_sl, node_pos_, r_trg, f_sl, f_dl);
     Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg) / eta;
 
     return vel;
+}
+
+void Periphery::compute_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell) {
+    RHS_ = -Eigen::Map<const Eigen::VectorXd>(v_on_shell.data(), v_on_shell.size());
 }
 
 Periphery::Periphery(const std::string &precompute_file) {
@@ -84,13 +86,11 @@ Periphery::Periphery(const std::string &precompute_file) {
                  MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     stresslet_plus_complementary_.resize(n_cols, nrows_local);
-    MPI_Scatterv(M_inv_raw, row_counts_.data(), row_displs_.data(), MPI_DOUBLE, stresslet_plus_complementary_.data(),
-                 row_counts_[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(stresslet_plus_complementary_raw, row_counts_.data(), row_displs_.data(), MPI_DOUBLE,
+                 stresslet_plus_complementary_.data(), row_counts_[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     M_inv_.transposeInPlace();
-    M_inv_ *= eta;
     stresslet_plus_complementary_.transposeInPlace();
-    stresslet_plus_complementary_ /= eta;
 
     node_normal_.resize(3, node_size_local / 3);
     MPI_Scatterv(normals_raw, node_counts_.data(), node_displs_.data(), MPI_DOUBLE, node_normal_.data(),

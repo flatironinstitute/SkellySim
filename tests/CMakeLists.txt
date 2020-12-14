@@ -5,6 +5,7 @@ file(GLOB files "test_*.cpp")
 
 configure_file("np_fib.npz" "np_fib.npz" COPYONLY)
 configure_file("2K_MTs_onCortex_R5_L1.fibers" "2K_MTs_onCortex_R5_L1.fibers" COPYONLY)
+configure_file("2_MTs_onCortex_R5_L1.fibers" "2_MTs_onCortex_R5_L1.fibers" COPYONLY)
 
 foreach(file ${files})
 	string(REGEX REPLACE "(^.*/|\\.[^.]*$)" "" file_without_ext ${file})

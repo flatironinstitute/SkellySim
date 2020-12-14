@@ -184,12 +184,13 @@ class A_fiber_hydro : public Tpetra::Operator<> {
 
             // calculate fiber-fiber velocity
             MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
-            MatrixXd v_fib = fc_.flow(fw, eta_);
+            MatrixXd v_all = fc_.flow(fw, shell_.node_pos_, eta_);
             MatrixXd vshell2fib = shell_.flow(r_fib, x_shell_local, eta_);
-            v_fib += vshell2fib;
+            v_all.block(0, 0, 3, r_fib.cols()) += vshell2fib;
 
-            res_fib = fc_.matvec(x_fib_local, v_fib);
+            res_fib = fc_.matvec(x_fib_local, v_all.block(0, 0, 3, r_fib.cols()));
             res_shell = shell_.stresslet_plus_complementary_ * x_shell_global;
+            res_shell += Map<VectorXd>(v_all.data() + 3 * r_fib.cols(), n_shell_pts_local);
         }
     }
 
@@ -205,7 +206,6 @@ VectorXd load_vec(cnpy::npz_t &npz, const char *var) {
 }
 
 int main(int argc, char *argv[]) {
-
     typedef double ST;
     typedef Tpetra::Operator<ST> OP;
     typedef Tpetra::MultiVector<ST> MV;
@@ -216,91 +216,62 @@ int main(int argc, char *argv[]) {
     // try
     {
         RCP<const Comm<int>> comm = Tpetra::getDefaultComm();
+        RCP<FancyOStream> fos = fancyOStream(rcpFromRef(cout));
 
         const int rank = comm->getRank();
         const int size = comm->getSize();
 
-        std::ifstream ifs("2K_MTs_onCortex_R5_L1.fibers");
-        std::string token;
-        getline(ifs, token);
-        const int nfibs_tot = atoi(token.c_str());
-        const int nfibs_extra = nfibs_tot % size;
-        const int n_pts = 32;
-        const int n_time = 10;
-        const double eta = 10.0;
-        const double bending_rigidity = 0.1;
-        const double length = 1.0;
+        std::string fiber_file("2K_MTs_onCortex_R5_L1.fibers");
+        int blocksize = 1;         // blocksize used by solver
+        std::string ortho("DGKS"); // orthogonalization type
+        double tol = 1.0E-12;      // relative residual tolerance
+        int prec_flag = true;
+        double eta = 10.0;
         double dt = 1E-4;
-        std::vector<int> displs(size + 1);
-        for (int i = 1; i < size + 1; ++i) {
-            displs[i] = displs[i - 1] + nfibs_tot / size;
-            if (i <= nfibs_extra)
-                displs[i]++;
+        double stall_force = 4.0;
+
+        CommandLineProcessor cmdp(false, true);
+        cmdp.setOption("fiber-file", &fiber_file, "Fiber file. Duh.");
+        cmdp.setOption("eta", &eta, "Fluid viscosity");
+        cmdp.setOption("dt", &dt, "Timestep");
+        cmdp.setOption("stall-force", &stall_force, "Timestep");
+        cmdp.setOption("prec-flag", &prec_flag, "Enable preconditioner.");
+        cmdp.setOption("tol", &tol, "Relative residual tolerance used by Gmres solver.");
+        cmdp.setOption("block-size", &blocksize, "Block size to be used by the Gmres solver.");
+        cmdp.setOption("ortho-type", &ortho, "Orthogonalization type, either DGKS, ICGS or IMGS (or TSQR if enabled)");
+        if (cmdp.parse(argc, argv) != CommandLineProcessor::PARSE_SUCCESSFUL) {
+            return -1;
         }
 
-        assert(nfibs_tot % size == 0);
-        const int n_fibs_local = displs[rank + 1] - displs[rank];
         Periphery shell("test_periphery.npz");
-        FiberContainer fibs(n_fibs_local, n_pts, bending_rigidity, eta);
+        FiberContainer fc(fiber_file, stall_force, eta);
 
-        if (rank == 0)
-            cout << "Reading in " << nfibs_tot << " fibers.\n";
+        for (auto &fib : fc.fibers) {
+            fib.update_derivatives();
+            fib.update_stokeslet(eta);
+            fib.form_linear_operator(dt, eta);
+        }
 
-        // FIXME: Fiber import ludicrously slow to compile
-        for (int ifib = 0; ifib < nfibs_tot; ++ifib) {
-            const int ifib_low = displs[rank];
-            const int ifib_high = displs[rank + 1];
-            std::string line;
-            getline(ifs, line);
-            std::stringstream linestream(line);
-
-            getline(linestream, token, ' ');
-            int npts = atoi(token.c_str());
-
-            getline(linestream, token, ' ');
-            double E = bending_rigidity; // atof(token.c_str());
-
-            getline(linestream, token, ' ');
-            double L = atof(token.c_str());
-
-            assert(npts == n_pts);
-            assert(E == bending_rigidity);
-            assert(L == length);
-
-            MatrixXd x(3, n_pts);
-            for (int ipt = 0; ipt < npts; ++ipt) {
-                getline(ifs, line);
-                std::stringstream linestream(line);
-
-                if (ifib >= ifib_low && ifib < ifib_high) {
-                    for (int i = 0; i < 3; ++i) {
-                        getline(linestream, token, ' ');
-
-                        x(i, ipt) = atof(token.c_str());
-                    }
-                }
-            }
-
-            if (ifib >= ifib_low && ifib < ifib_high) {
-                cout << "Fiber " << ifib << ": " << npts << " " << E << " " << L << endl;
-                MatrixXd v_on_fiber;
-                MatrixXd f_on_fiber;
-                auto &fib = fibs.fibers[ifib - ifib_low];
-
-                fib.x_ = x;
-                fib.length_ = length;
-                fib.update_derivatives();
-                fib.update_stokeslet(eta);
-                fib.form_linear_operator(dt, eta);
-                fib.compute_RHS(dt, v_on_fiber, f_on_fiber);
-                fib.apply_bc_rectangular(dt, v_on_fiber, f_on_fiber);
+        {
+            MatrixXd r_trg_external = shell.node_pos_;
+            MatrixXd f_on_fibers = fc.generate_constant_force(stall_force);
+            MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
+            size_t offset = 0;
+            for (auto &fib : fc.fibers) {
+                fib.compute_RHS(dt, v_fib2all.block(0, offset, 3, fib.num_points_),
+                                f_on_fibers.block(0, offset, 3, fib.num_points_));
+                fib.apply_bc_rectangular(dt, v_fib2all.block(0, offset, 3, fib.num_points_),
+                                         f_on_fibers.block(0, offset, 3, fib.num_points_));
                 fib.build_preconditioner();
                 fib.form_force_operator();
+                offset += fib.num_points_;
             }
+
+            shell.compute_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));
         }
 
-        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, fibs, shell, eta));
-        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm, fibs, shell));
+        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, fc, shell, eta));
+        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm, fc, shell));
 
         RCP<const Tpetra::Map<>> map = A_sim->getDomainMap();
         typedef Tpetra::Vector<A_fiber_hydro::scalar_type, A_fiber_hydro::local_ordinal_type,
@@ -311,19 +282,23 @@ int main(int argc, char *argv[]) {
         RCP<vec_type> X, RHS;
         X = rcp(new vec_type(map));
         RHS = rcp(new vec_type(map));
-        X->putScalar(0.0);
+        X->putScalar(1.0);
 
+        A_sim->apply(*X, *RHS);
+
+        cnpy::npy_save("Y.npy", RHS->getData().getRawPtr(), {RHS->getLocalLength()});
+        X->putScalar(0.0);
         { // Initialize FMM for reliable benchmarks
-            double tmp = fibs.fibers[0].x_(0, 0);
-            fibs.fibers[0].x_(0, 0) = 1.0;
+            double tmp = fc.fibers[0].x_(0, 0);
+            fc.fibers[0].x_(0, 0) = 1.0;
             A_sim->apply(*X, *RHS);
-            fibs.fibers[0].x_(0, 0) = tmp;
+            fc.fibers[0].x_(0, 0) = tmp;
         }
 
         RHS->putScalar(0.0);
         { // Initialize RHS
             int offset = 0;
-            for (auto &fib : fibs.fibers) {
+            for (auto &fib : fc.fibers) {
                 Eigen::Map<Eigen::VectorXd>(RHS->getDataNonConst(0).getRawPtr() + offset, fib.RHS_.size()) = fib.RHS_;
                 offset += fib.RHS_.size();
             }
@@ -331,26 +306,14 @@ int main(int argc, char *argv[]) {
             // Initialize RHS for shell
             // Just the velocity, which should be zero on first pass
             // So.. do nothing
-            offset += shell.M_inv_.rows();
+            Eigen::Map<Eigen::VectorXd>(RHS->getDataNonConst(0).getRawPtr() + offset, shell.RHS_.size()) = shell.RHS_;
+            offset += shell.RHS_.size();
         }
+        cnpy::npy_save("RHS.npy", RHS->getData().getRawPtr(), {RHS->getLocalLength()});
 
         Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, RHS);
         if (rank == 0)
             cout << "Initialized linear problem\n";
-
-        int blocksize = 1;         // blocksize used by solver
-        std::string ortho("DGKS"); // orthogonalization type
-        double tol = 1.0E-12;      // relative residual tolerance
-        int prec_flag = true;
-
-        CommandLineProcessor cmdp(false, true);
-        cmdp.setOption("prec-flag", &prec_flag, "Enable preconditioner.");
-        cmdp.setOption("tol", &tol, "Relative residual tolerance used by Gmres solver.");
-        cmdp.setOption("block-size", &blocksize, "Block size to be used by the Gmres solver.");
-        cmdp.setOption("ortho-type", &ortho, "Orthogonalization type, either DGKS, ICGS or IMGS (or TSQR if enabled)");
-        if (cmdp.parse(argc, argv) != CommandLineProcessor::PARSE_SUCCESSFUL) {
-            return -1;
-        }
 
         // TODO: right preconditioner is correct?
         if (prec_flag) {
@@ -377,14 +340,33 @@ int main(int argc, char *argv[]) {
         if (rank == 0)
             cout << "Initialized GMRES solver\n";
 
-        // RCP<FancyOStream> fos = rcp(new FancyOStream(rcpFromRef(cout)));
-        // X->describe(*fos, VERB_EXTREME);
-        // RHS->describe(*fos, VERB_EXTREME);
-
         double st = omp_get_wtime();
         Belos::ReturnType ret = solver.solve();
-        if (rank == 0)
-            cout << solver.getNumIters() << " " << omp_get_wtime() - st << endl;
+        RCP<Tpetra::Map<>> proc_zero_map =
+            rcp(new Tpetra::Map<>(X->getGlobalLength(), rank == 0 ? X->getGlobalLength() : 0, 0, comm));
+        RCP<Tpetra::Vector<>> res = rcp(new Tpetra::Vector<>(proc_zero_map));
+        Tpetra::Export<> exporter(map, proc_zero_map);
+        res->doExport(*problem.getLHS(), exporter, Tpetra::INSERT);
+
+        if (rank == 0) {
+            if (ret == Belos::Converged)
+                cout << "Solver converged\n";
+            cout << solver.getNumIters() << " " << omp_get_wtime() - st << " " << solver.achievedTol() << endl;
+
+            // FIXME: calculate residual even when size != 1
+            if (size == 1) {
+                RCP<vec_type> RHS_sol = rcp(new vec_type(map));
+                A_sim->apply(*problem.getLHS(), *RHS_sol);
+
+                double residual = 0.0;
+                for (int i = 0; i < RHS_sol->getLocalLength(); ++i) {
+                    residual += pow(RHS_sol->getData().getRawPtr()[i] - RHS->getData().getRawPtr()[i], 2);
+                }
+                std::cout << std::sqrt(residual) << std::endl;
+
+                cnpy::npy_save("res.npy", res->getData().getRawPtr(), {res->getLocalLength()});
+            }
+        }
 
         success = true;
         if (rank == 0)

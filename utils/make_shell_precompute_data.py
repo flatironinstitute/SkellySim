@@ -18,7 +18,7 @@ parser.add_argument('-a', default=1.0, type=float, help="'a' axis of ellipsoid")
 parser.add_argument('-b', default=1.0, type=float, help="'b' axis of ellipsoid")
 parser.add_argument('-c', default=1.0, type=float, help="'c' axis of ellipsoid")
 parser.add_argument('-r', default=1.0, type=float, help="radius of sphere")
-parser.add_argument('--eta', '-e', type=float, default=1.0, help="viscosity eta")
+parser.add_argument('-e', default=1.0, type=float, help="viscosity eta")
 parser.add_argument('--n_periphery', '-N', type=int, default=100, help="Number of nodes on periphery")
 parser.add_argument('--precompute_file', '-f', type=str, default='test_periphery.npz',
                     help="Output file for precompute data")
@@ -32,7 +32,7 @@ periphery_a = args.a
 periphery_b = args.b
 periphery_c = args.c
 periphery_radius = args.r
-eta = args.eta
+eta = args.e
 
 
 # Build shape
@@ -85,6 +85,7 @@ normals_shell = shell.get_normals()
 N = shell.Nblobs
 weights = shell.quadrature_weights
 shell_stresslet = kernels.stresslet_kernel_times_normal_numba(trg_shell_surf, normals_shell, eta=eta)
+
 I = np.zeros(shape=(3 * N, 3 * N))
 for i in range(N):
     I[3 * i:3 * (i + 1), 3 * i + 0] = shell.ex[3 * i:3 * (i + 1)] / weights[i]
@@ -96,7 +97,6 @@ I_vec[1::3] /= (1.0 * weights)
 I_vec[2::3] /= (1.0 * weights)
 shell_stresslet += -I - np.diag(I_vec)
 
-
 # Similarly, save shell's complementary matrix
 shell_complementary = kernels.complementary_kernel(trg_shell_surf, normals_shell)
 
@@ -105,6 +105,7 @@ shell_stresslet_plus_complementary = shell_stresslet + shell_complementary
 
 # Preconditioner:
 M_inv_periphery = scla.inv(shell_stresslet_plus_complementary)
+print(M_inv_periphery)
 
 # Singularity subtraction vectors, reshaped again
 shell.ex = shell.ex.reshape((N, 3))

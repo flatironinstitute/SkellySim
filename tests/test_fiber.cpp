@@ -74,8 +74,9 @@ int main(int argc, char *argv[]) {
     double length = *np_fib["length"].data<double>();
     double eta = *np_fib["eta"].data<double>();
     double dt = *np_fib["dt"].data<double>();
+    double stall_force = 1.0;
 
-    Fiber fib(x.cols(), bending_rigidity, eta);
+    Fiber fib(x.cols(), bending_rigidity, stall_force, eta);
     fib.length_ = length;
     fib.x_ = x;
     fib.update_derivatives();
@@ -123,16 +124,6 @@ int main(int argc, char *argv[]) {
 
     fib.form_force_operator();
     assert(allclose(force_operator, fib.force_operator_, 0, 1E-7));
-
-    FiberContainer fibers(1, np, bending_rigidity, eta);
-    fibers.fibers[0] = fib;
-
-    // Check translation operator
-    Eigen::Vector3d pt1 = fib.x_.col(1);
-    fib.translate({1.0, 0.0, 0.0});
-    assert(fib.x_(0, 1) == pt1(0) + 1.0);
-    assert(fib.x_(1, 1) == pt1(1));
-    assert(fib.x_(2, 1) == pt1(2));
 
     std::cout << "Test passed\n";
     return 0;

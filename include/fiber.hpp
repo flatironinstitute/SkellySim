@@ -17,6 +17,7 @@ class Fiber {
     double beta_tstep_ = 1.0;
     double epsilon_ = 1E-3;
     double v_length_ = 0.0;
+    double stall_force_;
     double c_0_, c_1_;
 
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
@@ -49,8 +50,8 @@ class Fiber {
     } fib_mat_t;
     const static std::unordered_map<int, fib_mat_t> matrices_;
 
-    Fiber(int num_points, double bending_rigidity, double eta)
-        : num_points_(num_points), bending_rigidity_(bending_rigidity) {
+    Fiber(int num_points, double bending_rigidity, double stall_force, double eta)
+        : num_points_(num_points), bending_rigidity_(bending_rigidity), stall_force_(stall_force) {
         x_ = Eigen::MatrixXd::Zero(3, num_points);
         x_.row(0) = Eigen::ArrayXd::LinSpaced(num_points, 0, 1.0).transpose();
         xs_.resize(3, num_points);
@@ -79,12 +80,7 @@ class FiberContainer {
     std::vector<Fiber> fibers;
     double slenderness_ratio;
 
-    FiberContainer(int num_fibers, int num_points, double bending_rigidity, double eta) {
-        fibers.reserve(num_fibers);
-        for (int i = 0; i < num_fibers; ++i) {
-            fibers.push_back(Fiber(num_points, bending_rigidity, eta));
-        }
-    }
+    FiberContainer(std::string fiber_file, double stall_force, double eta);
 
     void update_derivatives();
     void update_stokeslets(double eta);
@@ -95,8 +91,11 @@ class FiberContainer {
             tot += fib.num_points_;
         return tot;
     };
+
+    Eigen::MatrixXd generate_constant_force(double force_scale) const;
     Eigen::MatrixXd get_r_vectors() const;
-    Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &forces, double eta) const;
+    Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &forces,
+                         const Eigen::Ref<const Eigen::MatrixXd> &r_trg_external, double eta) const;
     Eigen::VectorXd matvec(const Eigen::Ref<const Eigen::VectorXd> &x_all,
                            const Eigen::Ref<const Eigen::MatrixXd> &v_fib) const;
     Eigen::MatrixXd apply_fiber_force(const Eigen::Ref<const Eigen::VectorXd> &x_all) const;

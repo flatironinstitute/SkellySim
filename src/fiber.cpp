@@ -512,14 +512,16 @@ MatrixXd FiberContainer::get_r_vectors() const {
     return r;
 }
 
-MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &forces, double eta) const {
+MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
+                              const Eigen::Ref<const MatrixXd> &r_trg_external, double eta) const {
     // FIXME: Move fmm object and make more flexible
     static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes,
                                               kernels::stokes_vel_fmm);
-    const size_t n_pts_tot = forces.cols();
+    const size_t n_src = fib_forces.cols();
+    const size_t n_trg_external = r_trg_external.cols();
 
-    MatrixXd weighted_forces(3, n_pts_tot);
-    MatrixXd r_src(3, n_pts_tot);
+    MatrixXd weighted_forces(3, n_src);
+    MatrixXd r_src(3, n_src);
     size_t offset = 0;
 
     for (const Fiber &fib : fibers) {
@@ -527,7 +529,7 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &forces, double e
 
         for (int i_pt = 0; i_pt < fib.num_points_; ++i_pt) {
             for (int i = 0; i < 3; ++i) {
-                weighted_forces(i, i_pt + offset) = weights(i_pt) * forces(i, i_pt + offset);
+                weighted_forces(i, i_pt + offset) = weights(i_pt) * fib_forces(i, i_pt + offset);
                 r_src(i, i_pt + offset) = fib.x_(i, i_pt);
             }
         }
@@ -536,7 +538,10 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &forces, double e
 
     // All-to-all
     // FIXME: MPI not compatible with direct calculation
-    MatrixXd r_trg = r_src;
+    MatrixXd r_trg(3, n_src + n_trg_external);
+    r_trg.block(0, 0, 3, n_src) = r_src;
+    if (n_trg_external)
+        r_trg.block(0, n_src, 3, n_trg_external) = r_trg_external;
     MatrixXd r_dl_dummy, f_dl_dummy;
     MatrixXd vel = fmm(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
 
@@ -551,6 +556,17 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &forces, double e
     }
 
     return vel;
+}
+
+MatrixXd FiberContainer::generate_constant_force(double force_scale) const {
+    const int n_fib_pts = this->get_total_fib_points();
+    MatrixXd f(3, n_fib_pts);
+    size_t offset = 0;
+    for (const auto &fib : fibers) {
+        f.block(0, offset, 3, fib.num_points_) = force_scale * fib.xs_;
+        offset += fib.num_points_;
+    }
+    return f;
 }
 
 MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<const VectorXd> &x_all) const {
@@ -569,4 +585,65 @@ MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<const VectorXd> &x_a
     }
 
     return fw;
+}
+
+FiberContainer::FiberContainer(std::string fiber_file, double stall_force, double eta) {
+    int rank, world_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    std::ifstream ifs(fiber_file);
+    std::string token;
+    getline(ifs, token);
+    const int n_fibs_tot = atoi(token.c_str());
+    const int n_fibs_extra = n_fibs_tot % world_size;
+    if (rank == 0)
+        std::cout << "Reading in " << n_fibs_tot << " fibers.\n";
+
+
+    std::vector<int> displs(world_size + 1);
+    for (int i = 1; i < world_size + 1; ++i) {
+        displs[i] = displs[i - 1] + n_fibs_tot / world_size;
+        if (i <= n_fibs_extra)
+            displs[i]++;
+    }
+
+    for (int i_fib = 0; i_fib < n_fibs_tot; ++i_fib) {
+        const int i_fib_low = displs[rank];
+        const int i_fib_high = displs[rank + 1];
+        std::string line;
+        getline(ifs, line);
+        std::stringstream linestream(line);
+
+        getline(linestream, token, ' ');
+        int n_pts = atoi(token.c_str());
+
+        getline(linestream, token, ' ');
+        double E = atof(token.c_str());
+
+        getline(linestream, token, ' ');
+        double L = atof(token.c_str());
+
+        MatrixXd x(3, n_pts);
+        for (int i_pnt = 0; i_pnt < n_pts; ++i_pnt) {
+            getline(ifs, line);
+            std::stringstream linestream(line);
+
+            if (i_fib >= i_fib_low && i_fib < i_fib_high) {
+                for (int i = 0; i < 3; ++i) {
+                    getline(linestream, token, ' ');
+                    x(i, i_pnt) = atof(token.c_str());
+                }
+            }
+        }
+
+        if (i_fib >= i_fib_low && i_fib < i_fib_high) {
+            std::cout << "Fiber " << i_fib << ": " << n_pts << " " << E << " " << L << std::endl;
+            fibers.push_back(Fiber(n_pts, E, stall_force, eta));
+            auto &fib = fibers.back();
+
+            fib.x_ = x;
+            fib.length_ = L;
+        }
+    }
 }

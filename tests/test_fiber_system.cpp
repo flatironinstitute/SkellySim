@@ -19,22 +19,22 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    const int n_pts = 48;
-    const int n_fib_per_rank = 3000 / size;
+    const int n_pts = 32;
     const int n_time = 1;
     const double eta = 1.0;
     const double length = 1.0;
     const double bending_rigidity = 0.1;
     const double dt = 0.005;
+    const double f_stall = 1.0;
+    const std::string fiber_file = "2K_MTs_onCortex_R5_L1.fibers";
 
-    FiberContainer fibs(n_fib_per_rank, n_pts, bending_rigidity, length);
-    Eigen::MatrixXd f_fib = Eigen::MatrixXd::Zero(3, n_pts * n_fib_per_rank);
+    FiberContainer fibs(fiber_file, f_stall, eta);
+    Eigen::MatrixXd f_fib = Eigen::MatrixXd::Zero(3, fibs.get_total_fib_points());
 
-    for (int i = 0; i < n_fib_per_rank; ++i) {
-        fibs.fibers[i].translate({10 * drand48() - 5, 10 * drand48() - 5, 10 * drand48() - 5});
-        for (int j = 0; j < n_pts; ++j)
-            f_fib(2, i * n_pts + j) = 1.0;
-        fibs.fibers[i].length_ = 1.0;
+    for (auto &fib : fibs.fibers) {
+        assert(fib.length_ == 1.0);
+        assert(fib.bending_rigidity_ == 10.0);
+        assert(fib.num_points_ == 32);
     }
 
     double st = omp_get_wtime();
@@ -43,10 +43,11 @@ int main(int argc, char *argv[]) {
     if (rank == 0)
         std::cout << omp_get_wtime() - st << std::endl;
 
-    auto vel = fibs.flow(f_fib, eta);
+    Eigen::MatrixXd r_trg_external;
+    auto vel = fibs.flow(f_fib, r_trg_external, eta);
     st = omp_get_wtime();
     for (int i = 0; i < n_time; ++i)
-        vel = fibs.flow(f_fib, eta);
+        vel = fibs.flow(f_fib, r_trg_external, eta);
     if (rank == 0)
         std::cout << omp_get_wtime() - st << std::endl;
 

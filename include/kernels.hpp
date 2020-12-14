@@ -59,8 +59,8 @@ class FMM {
             MPI_Allreduce(&local_max, &global_max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
             // Scale box coordinates so that no source/target lies on the box boundary
-            local_min *= 1.01;
-            local_max *= 1.01;
+            global_min *= 1.01;
+            global_max *= 1.01;
             const double L = global_max - global_min;
 
             // Update FMM tree and cache coordinates

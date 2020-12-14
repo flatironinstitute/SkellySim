@@ -11,11 +11,14 @@ class Periphery {
 
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &trg, const Eigen::Ref<const Eigen::MatrixXd> &density,
                          double eta) const;
+    void compute_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell);
+
     Eigen::MatrixXd M_inv_;                        // Process local elements of inverse matrix
     Eigen::MatrixXd stresslet_plus_complementary_; // Process local elements of stresslet tensor
     Eigen::MatrixXd node_pos_;
     Eigen::MatrixXd node_normal_;
     Eigen::VectorXd quadrature_weights_;
+    Eigen::VectorXd RHS_;
 
     Eigen::VectorXi node_counts_;
     Eigen::VectorXi node_displs_;
