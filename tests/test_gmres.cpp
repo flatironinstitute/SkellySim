@@ -10,6 +10,7 @@
 #include <Tpetra_CrsMatrix.hpp>
 
 #include <cnpy.hpp>
+#include <system.hpp>
 #include <fiber.hpp>
 #include <periphery.hpp>
 
@@ -72,7 +73,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
                scalar_type beta = ScalarTraits<scalar_type>::zero()) const {
         RCP<const Comm<int>> comm = opMap_->getComm();
         const int rank = comm->getRank();
-        const int size = comm->getSize();
+
         if (rank == 0) {
             cout << "P_inv_hydro::apply" << endl;
         }
@@ -160,7 +161,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
                scalar_type beta = ScalarTraits<scalar_type>::zero()) const {
         RCP<const Comm<int>> comm = opMap_->getComm();
         const int rank = comm->getRank();
-        const int size = comm->getSize();
+
         if (rank == 0) {
             cout << "A_fiber_hydro::apply" << endl;
         }
@@ -221,30 +222,28 @@ int main(int argc, char *argv[]) {
         const int rank = comm->getRank();
         const int size = comm->getSize();
 
-        std::string fiber_file("2K_MTs_onCortex_R5_L1.fibers");
+        std::string config_file = "test_gmres.toml";
         int blocksize = 1;         // blocksize used by solver
         std::string ortho("DGKS"); // orthogonalization type
-        double tol = 1.0E-12;      // relative residual tolerance
         int prec_flag = true;
-        double eta = 10.0;
-        double dt = 1E-4;
-        double stall_force = 4.0;
 
         CommandLineProcessor cmdp(false, true);
-        cmdp.setOption("fiber-file", &fiber_file, "Fiber file. Duh.");
-        cmdp.setOption("eta", &eta, "Fluid viscosity");
-        cmdp.setOption("dt", &dt, "Timestep");
-        cmdp.setOption("stall-force", &stall_force, "Timestep");
+        cmdp.setOption("config-file", &config_file, "TOML input file.");
         cmdp.setOption("prec-flag", &prec_flag, "Enable preconditioner.");
-        cmdp.setOption("tol", &tol, "Relative residual tolerance used by Gmres solver.");
         cmdp.setOption("block-size", &blocksize, "Block size to be used by the Gmres solver.");
         cmdp.setOption("ortho-type", &ortho, "Orthogonalization type, either DGKS, ICGS or IMGS (or TSQR if enabled)");
         if (cmdp.parse(argc, argv) != CommandLineProcessor::PARSE_SUCCESSFUL) {
             return -1;
         }
 
-        Periphery shell("test_periphery.npz");
-        FiberContainer fc(fiber_file, stall_force, eta);
+        System system(config_file);
+
+        Params &params = system.params_;
+        Periphery &shell = system.shell_;
+        FiberContainer &fc = system.fc_;
+        const double eta = params.eta;
+        const double dt = params.dt;
+        const double tol = params.gmres_tol;
 
         for (auto &fib : fc.fibers) {
             fib.update_derivatives();
@@ -254,7 +253,7 @@ int main(int argc, char *argv[]) {
 
         {
             MatrixXd r_trg_external = shell.node_pos_;
-            MatrixXd f_on_fibers = fc.generate_constant_force(stall_force);
+            MatrixXd f_on_fibers = fc.generate_constant_force();
             MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
             size_t offset = 0;
             for (auto &fib : fc.fibers) {
@@ -359,7 +358,7 @@ int main(int argc, char *argv[]) {
                 A_sim->apply(*problem.getLHS(), *RHS_sol);
 
                 double residual = 0.0;
-                for (int i = 0; i < RHS_sol->getLocalLength(); ++i) {
+                for (size_t i = 0; i < RHS_sol->getLocalLength(); ++i) {
                     residual += pow(RHS_sol->getData().getRawPtr()[i] - RHS->getData().getRawPtr()[i], 2);
                 }
                 std::cout << std::sqrt(residual) << std::endl;

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <mpi.h>
 
 #ifdef NDEBUG
@@ -10,6 +11,7 @@
 #endif
 
 #include <fiber.hpp>
+
 
 #include <omp.h>
 
@@ -23,18 +25,21 @@ int main(int argc, char *argv[]) {
     const int n_time = 1;
     const double eta = 1.0;
     const double length = 1.0;
-    const double bending_rigidity = 0.1;
+    const double bending_rigidity = 10.0;
     const double dt = 0.005;
     const double f_stall = 1.0;
-    const std::string fiber_file = "2K_MTs_onCortex_R5_L1.fibers";
+    const std::string input_file = "2K_MTs_onCortex_R5_L1.toml";
 
-    FiberContainer fibs(fiber_file, f_stall, eta);
+    toml::table config = toml::parse_file(input_file);
+    Params params(config.get_as<toml::table>("params"));
+    FiberContainer fibs(config.get_as<toml::array>("fibers"), params);
+
     Eigen::MatrixXd f_fib = Eigen::MatrixXd::Zero(3, fibs.get_total_fib_points());
 
     for (auto &fib : fibs.fibers) {
-        assert(fib.length_ == 1.0);
-        assert(fib.bending_rigidity_ == 10.0);
-        assert(fib.num_points_ == 32);
+        assert(fib.length_ == length);
+        assert(fib.bending_rigidity_ == bending_rigidity);
+        assert(fib.num_points_ == n_pts);
     }
 
     double st = omp_get_wtime();

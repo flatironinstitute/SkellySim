@@ -74,9 +74,8 @@ int main(int argc, char *argv[]) {
     double length = *np_fib["length"].data<double>();
     double eta = *np_fib["eta"].data<double>();
     double dt = *np_fib["dt"].data<double>();
-    double stall_force = 1.0;
 
-    Fiber fib(x.cols(), bending_rigidity, stall_force, eta);
+    Fiber fib(x.cols(), bending_rigidity, eta);
     fib.length_ = length;
     fib.x_ = x;
     fib.update_derivatives();
@@ -98,7 +97,7 @@ int main(int argc, char *argv[]) {
         for (int j = 0; j < 4; ++j) {
             Eigen::MatrixXd Apy = A.block(i * np, j * np, np, np);
             Eigen::MatrixXd Acpp = fib.A_.block(i * np, j * np, np, np);
-            std::cout << i << " " << j << std::endl;
+            // std::cout << i << " " << j << std::endl;
             // assert(allclose(Apy, Acpp, 0, 1E-7));
         }
     }
@@ -111,6 +110,7 @@ int main(int argc, char *argv[]) {
     fib.bc_minus_ = {Fiber::BC::Velocity, Fiber::BC::AngularVelocity};
     fib.bc_plus_ = {Fiber::BC::Force, Fiber::BC::Torque};
     fib.apply_bc_rectangular(dt, flow_on, force_external);
+    // FIXME: Test fails. issues with force/torque BC or input data
     assert(allclose(RHSBC, fib.RHS_));
 
     for (int i = 0; i < 4; ++i) {

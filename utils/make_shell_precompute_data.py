@@ -2,7 +2,7 @@ import numpy as np
 import scipy.linalg as scla
 from scipy.spatial import ConvexHull
 import sys
-import argparse
+import toml
 
 import lib.shape_gallery as shape_gallery
 import lib.Smooth_Closed_Surface_Quadrature_RBF as quadlib
@@ -10,33 +10,20 @@ import lib.periphery as periphery
 import lib.quaternion as quaternion
 import lib.kernels as kernels
 
-# TODO: Remove eta as parameter to precompute? Scale on simulation side from eta=1.0
-parser = argparse.ArgumentParser(description='Set periphery options')
-parser.add_argument('--periphery_type', '-t', type=str, default='sphere',
-                    help="Type of periphery, 'sphere' and 'ellipsoid' accepted")
-parser.add_argument('-a', default=1.0, type=float, help="'a' axis of ellipsoid")
-parser.add_argument('-b', default=1.0, type=float, help="'b' axis of ellipsoid")
-parser.add_argument('-c', default=1.0, type=float, help="'c' axis of ellipsoid")
-parser.add_argument('-r', default=1.0, type=float, help="radius of sphere")
-parser.add_argument('-e', default=1.0, type=float, help="viscosity eta")
-parser.add_argument('--n_periphery', '-N', type=int, default=100, help="Number of nodes on periphery")
-parser.add_argument('--precompute_file', '-f', type=str, default='test_periphery.npz',
-                    help="Output file for precompute data")
+if len(sys.argv) != 2:
+    print("No input file supplied. Please supply input 'toml' file.")
+    sys.exit()
 
-args = parser.parse_args()
+config = toml.load(sys.argv[1])
 
-shell_precompute_file = "test_periphery.npz"
-periphery_type = args.periphery_type
-n_periphery = args.n_periphery
-periphery_a = args.a
-periphery_b = args.b
-periphery_c = args.c
-periphery_radius = args.r
-eta = args.e
-
+shell_precompute_file = config['params']['shell_precompute_file']
+periphery_type = config['periphery']['shape']
+n_periphery = config['periphery']['n_nodes']
+eta = config['params']['eta']
 
 # Build shape
 if periphery_type == 'sphere':
+    periphery_radius = config['periphery']['radius']
     nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
         shape_gallery.shape_gallery(
             periphery_type,
@@ -44,6 +31,10 @@ if periphery_type == 'sphere':
             radius=periphery_radius,
         )
 elif periphery_type == 'ellipsoid':
+    periphery_a = config['periphery']['a']
+    periphery_b = config['periphery']['b']
+    periphery_c = config['periphery']['c']
+
     nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
         shape_gallery.shape_gallery(
             periphery_type,

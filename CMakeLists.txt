@@ -6,7 +6,7 @@ project(
 
 option(USE_EIGEN_MKL_ALL "Use MKL as the backend for various Eigen calls" ON)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -41,7 +41,7 @@ find_package(Tpetra REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 
-add_library(skelly STATIC src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp)
+add_library(skelly STATIC src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp src/system.cpp)
 target_include_directories(skelly PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
 target_link_libraries(skelly PRIVATE libSTKFMM_STATIC.a ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
 

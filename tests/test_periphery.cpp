@@ -11,6 +11,9 @@
 #include <Tpetra_Core.hpp>
 #include <Teuchos_Comm.hpp>
 #include <periphery.hpp>
+#include <toml.hpp>
+#include <iostream>
+#include <fstream>
 
 int main(int argc, char *argv[]) {
     Tpetra::ScopeGuard tpetraScope(&argc, &argv);

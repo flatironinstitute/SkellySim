@@ -7,6 +7,7 @@
 
 class Periphery {
   public:
+    Periphery() {};
     Periphery(const std::string &precompute_file);
 
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &trg, const Eigen::Ref<const Eigen::MatrixXd> &density,
@@ -26,7 +27,7 @@ class Periphery {
     Eigen::VectorXi quad_displs_;
     Eigen::VectorXi row_counts_;
     Eigen::VectorXi row_displs_;
-    int n_nodes_global_;
+    int n_nodes_global_ = 0;
 };
 
 #endif

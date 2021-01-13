@@ -5,6 +5,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include <params.hpp>
+
+#include <toml.hpp>
+
 class Fiber {
   public:
     enum BC { Force, Torque, Velocity, AngularVelocity, Position, Angle };
@@ -13,11 +17,11 @@ class Fiber {
     double length_;
     double bending_rigidity_;
     double penalty_param_ = 500.0;
+    double force_scale_ = 4.0; // scale of external force on node, f_ext = force_scale_ * xs_
     // FIXME: Magic numbers in linear operator calculation
     double beta_tstep_ = 1.0;
     double epsilon_ = 1E-3;
     double v_length_ = 0.0;
-    double stall_force_;
     double c_0_, c_1_;
 
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
@@ -50,14 +54,20 @@ class Fiber {
     } fib_mat_t;
     const static std::unordered_map<int, fib_mat_t> matrices_;
 
-    Fiber(int num_points, double bending_rigidity, double stall_force, double eta)
-        : num_points_(num_points), bending_rigidity_(bending_rigidity), stall_force_(stall_force) {
-        x_ = Eigen::MatrixXd::Zero(3, num_points);
-        x_.row(0) = Eigen::ArrayXd::LinSpaced(num_points, 0, 1.0).transpose();
-        xs_.resize(3, num_points);
-        xss_.resize(3, num_points);
-        xsss_.resize(3, num_points);
-        xssss_.resize(3, num_points);
+    Fiber(toml::table *fiber_table, double eta);
+
+    Fiber(int num_points, double bending_rigidity, double eta)
+        : num_points_(num_points), bending_rigidity_(bending_rigidity) {
+        init(eta);
+    };
+
+    void init(double eta) {
+        x_ = Eigen::MatrixXd::Zero(3, num_points_);
+        x_.row(0) = Eigen::ArrayXd::LinSpaced(num_points_, 0, 1.0).transpose();
+        xs_.resize(3, num_points_);
+        xss_.resize(3, num_points_);
+        xsss_.resize(3, num_points_);
+        xssss_.resize(3, num_points_);
 
         c_0_ = -log(M_E * std::pow(epsilon_, 2)) / (8 * M_PI * eta);
         c_1_ = 2.0 / (8.0 * M_PI * eta);
@@ -80,7 +90,8 @@ class FiberContainer {
     std::vector<Fiber> fibers;
     double slenderness_ratio;
 
-    FiberContainer(std::string fiber_file, double stall_force, double eta);
+    FiberContainer() {};
+    FiberContainer(toml::array *fiber_tables, Params &params);
 
     void update_derivatives();
     void update_stokeslets(double eta);
@@ -92,7 +103,7 @@ class FiberContainer {
         return tot;
     };
 
-    Eigen::MatrixXd generate_constant_force(double force_scale) const;
+    Eigen::MatrixXd generate_constant_force() const;
     Eigen::MatrixXd get_r_vectors() const;
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &forces,
                          const Eigen::Ref<const Eigen::MatrixXd> &r_trg_external, double eta) const;

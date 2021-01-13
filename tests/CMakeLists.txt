@@ -4,8 +4,10 @@ set(CTEST_BINARY_DIRECTORY ${PROJECT_BINARY_DIR}/tests)
 file(GLOB files "test_*.cpp")
 
 configure_file("np_fib.npz" "np_fib.npz" COPYONLY)
-configure_file("2K_MTs_onCortex_R5_L1.fibers" "2K_MTs_onCortex_R5_L1.fibers" COPYONLY)
-configure_file("2_MTs_onCortex_R5_L1.fibers" "2_MTs_onCortex_R5_L1.fibers" COPYONLY)
+configure_file("2K_MTs_onCortex_R5_L1.toml" "2K_MTs_onCortex_R5_L1.toml" COPYONLY)
+configure_file("test_periphery.toml" "test_periphery.toml" COPYONLY)
+
+add_test(NAME "make_shell_precompute_data" COMMAND "python3" "${CMAKE_SOURCE_DIR}/utils/make_shell_precompute_data.py" "test_periphery.toml")
 
 foreach(file ${files})
 	string(REGEX REPLACE "(^.*/|\\.[^.]*$)" "" file_without_ext ${file})

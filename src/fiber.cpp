@@ -4,12 +4,51 @@
 #include <kernels.hpp>
 #include <unordered_map>
 #include <utils.hpp>
+#include <parse_util.hpp>
 
 using Eigen::ArrayXd;
 using Eigen::ArrayXXd;
 using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
+
+Fiber::Fiber(toml::table *fiber_table, double eta) {
+    using namespace parse_util;
+
+    num_points_ = parse_val_key<int64_t>(fiber_table, "num_points", -1);
+    bending_rigidity_ = parse_val_key<double>(fiber_table, "bending_rigidity");
+    length_ = parse_val_key<double>(fiber_table, "length");
+    force_scale_ = parse_val_key<double>(fiber_table, "force_scale", 0.0);
+
+    toml::array *x_array = fiber_table->get_as<toml::array>("x");
+    toml::array *x_0 = fiber_table->get_as<toml::array>("base_position");
+    toml::array *u = fiber_table->get_as<toml::array>("orientation");
+
+    if (num_points_ == -1) {
+        num_points_ = x_array->size() / 3;
+        if (num_points_ == 0)
+            throw std::runtime_error("Attempt to initialize fiber without point count or positions.");
+    }
+
+    init(eta);
+
+    if ((!!x_array && !!x_0) || (!!x_array && !!u))
+        throw std::runtime_error(
+            "Fiber supplied 'base_position' or 'orientation' with node positions 'x', ambiguous initialization.");
+
+    if (!!x_array) {
+        x_ = convert_array(x_array);
+        x_.resize(3, num_points_);
+    }
+
+    // FIXME: Make test for this case
+    if (!!x_0 && !!u && x_0->size() == 3 && u->size() == 3) {
+        Vector3d origin = convert_array(x_0);
+        Vector3d orientation = convert_array(u);
+        for (int i = 0; i < 3; ++i)
+            x_.row(i) = origin(i) + orientation(i) * Eigen::ArrayXd::LinSpaced(num_points_, 0, length_).transpose();
+    }
+}
 
 void Fiber::update_stokeslet(double eta) {
     // FIXME: Remove arguments for stokeslet?
@@ -232,8 +271,6 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
     MatrixXd D_2 = mats.D_2_0.transpose() * std::pow(2.0 / length_, 2);
     MatrixXd D_3 = mats.D_3_0.transpose() * std::pow(2.0 / length_, 3);
     MatrixXd D_4 = mats.D_4_0.transpose() * std::pow(2.0 / length_, 4);
-    auto &x_rhs = x_;
-    auto &xs_rhs = xs_;
 
     // Downsample A, leaving last 14 rows untouched
     A_.block(0, 0, 4 * np - 14, 4 * np) = mats.P_downsample_bc * A_;
@@ -246,7 +283,7 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
     B.setZero();
 
     switch (bc_minus_.first) {
-    case BC::Velocity:
+    case BC::Velocity: {
         B(0, 0 * np) = beta_tstep_ / dt;
         B(1, 1 * np) = beta_tstep_ / dt;
         B(2, 2 * np) = beta_tstep_ / dt;
@@ -266,13 +303,15 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
             B_RHS(3) -= 2 * c_0_ * xs_.col(0).dot(f_on_fiber.col(0));
 
         break;
-    default:
+    }
+    default: {
         std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
         exit(1);
     }
+    }
 
     switch (bc_minus_.second) {
-    case BC::AngularVelocity:
+    case BC::AngularVelocity: {
         B.block(4, 0, 1, np) = (beta_tstep_ / dt) * D_1.row(0);
         B.block(5, np, 1, np) = (beta_tstep_ / dt) * D_1.row(0);
         B.block(6, 2 * np, 1, np) = (beta_tstep_ / dt) * D_1.row(0);
@@ -282,9 +321,11 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
         B_RHS.segment(4, 3) = xs_.col(0) / dt + BC_minus_vec_1;
 
         break;
-    default:
+    }
+    default: {
         std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
         exit(1);
+    }
     }
 
     switch (bc_plus_.first) {
@@ -310,7 +351,7 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
     //     if (f_on_fiber.size())
     //         B_RHS(10) -= 2 * c_0_ * xs_.col(xs_.cols() - 1).dot(f_on_fiber.col(f_on_fiber.cols() - 1));
     //     break;
-    case BC::Force:
+    case BC::Force: {
         B.block(7, 0, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
         B(7, 4 * np - 1) = xs_(0, xs_.cols() - 1);
         B.block(8, np, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
@@ -329,13 +370,15 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
         B_RHS.segment(7, 3) = BC_plus_vec_0;
         B_RHS(10) = BC_plus_vec_0.dot(xs_.col(xs_.cols() - 1));
         break;
-    default:
+    }
+    default: {
         std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
         exit(1);
     }
+    }
 
     switch (bc_plus_.second) {
-    case BC::Torque:
+    case BC::Torque: {
         B.block(11, 0 * np, 1, np) = D_2.row(D_2.rows() - 1);
         B.block(12, 1 * np, 1, np) = D_2.row(D_2.rows() - 1);
         B.block(13, 2 * np, 1, np) = D_2.row(D_2.rows() - 1);
@@ -344,9 +387,11 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
         Vector3d BC_plus_vec_1({0.0, 0.0, 0.0});
         B_RHS.segment(11, 3) = BC_plus_vec_1;
         break;
-    default:
+    }
+    default: {
         std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
         exit(1);
+    }
     }
 }
 
@@ -357,7 +402,6 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
 MatrixXd barycentric_matrix(const Eigen::Ref<const ArrayXd> &x, const Eigen::Ref<const ArrayXd> &y) {
     int N = x.size();
     int M = y.size();
-    int m = N - M;
 
     ArrayXd w = ArrayXd::Ones(N);
     for (int i = 1; i < N; i += 2)
@@ -558,12 +602,12 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
     return vel;
 }
 
-MatrixXd FiberContainer::generate_constant_force(double force_scale) const {
+MatrixXd FiberContainer::generate_constant_force() const {
     const int n_fib_pts = this->get_total_fib_points();
     MatrixXd f(3, n_fib_pts);
     size_t offset = 0;
     for (const auto &fib : fibers) {
-        f.block(0, offset, 3, fib.num_points_) = force_scale * fib.xs_;
+        f.block(0, offset, 3, fib.num_points_) = fib.force_scale_ * fib.xs_;
         offset += fib.num_points_;
     }
     return f;
@@ -587,19 +631,20 @@ MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<const VectorXd> &x_a
     return fw;
 }
 
-FiberContainer::FiberContainer(std::string fiber_file, double stall_force, double eta) {
+
+FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
+    if (!fiber_tables) {
+        return;
+    }
+
     int rank, world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    std::ifstream ifs(fiber_file);
-    std::string token;
-    getline(ifs, token);
-    const int n_fibs_tot = atoi(token.c_str());
+    const int n_fibs_tot = fiber_tables->size();
     const int n_fibs_extra = n_fibs_tot % world_size;
     if (rank == 0)
         std::cout << "Reading in " << n_fibs_tot << " fibers.\n";
-
 
     std::vector<int> displs(world_size + 1);
     for (int i = 1; i < world_size + 1; ++i) {
@@ -611,39 +656,14 @@ FiberContainer::FiberContainer(std::string fiber_file, double stall_force, doubl
     for (int i_fib = 0; i_fib < n_fibs_tot; ++i_fib) {
         const int i_fib_low = displs[rank];
         const int i_fib_high = displs[rank + 1];
-        std::string line;
-        getline(ifs, line);
-        std::stringstream linestream(line);
-
-        getline(linestream, token, ' ');
-        int n_pts = atoi(token.c_str());
-
-        getline(linestream, token, ' ');
-        double E = atof(token.c_str());
-
-        getline(linestream, token, ' ');
-        double L = atof(token.c_str());
-
-        MatrixXd x(3, n_pts);
-        for (int i_pnt = 0; i_pnt < n_pts; ++i_pnt) {
-            getline(ifs, line);
-            std::stringstream linestream(line);
-
-            if (i_fib >= i_fib_low && i_fib < i_fib_high) {
-                for (int i = 0; i < 3; ++i) {
-                    getline(linestream, token, ' ');
-                    x(i, i_pnt) = atof(token.c_str());
-                }
-            }
-        }
 
         if (i_fib >= i_fib_low && i_fib < i_fib_high) {
-            std::cout << "Fiber " << i_fib << ": " << n_pts << " " << E << " " << L << std::endl;
-            fibers.push_back(Fiber(n_pts, E, stall_force, eta));
-            auto &fib = fibers.back();
+            toml::table *fiber_table = fiber_tables->get_as<toml::table>(i_fib);
+            fibers.emplace_back(Fiber(fiber_table, params.eta));
 
-            fib.x_ = x;
-            fib.length_ = L;
+            auto &fib = fibers.back();
+            std::cout << "Fiber " << i_fib << ": " << fib.num_points_ << " " << fib.bending_rigidity_ << " "
+                      << fib.length_ << std::endl;
         }
     }
 }
