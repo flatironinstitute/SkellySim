@@ -1,0 +1,20 @@
+[params]
+eta = 10.0
+
+[[bodies]]
+nucleation_type = 'auto'
+num_nucleation_sites = 100
+position = [-1.0, 0.0, 0.0]
+shape = 'sphere'
+radius = 0.5
+num_nodes = 200
+precompute_file = 'test_body.npz'
+
+[[bodies]]
+nucleation_type = 'auto'
+num_nucleation_sites = 100
+position = [1.0, 0.0, 0.0]
+shape = 'sphere'
+radius = 0.5
+num_nodes = 200
+precompute_file = 'test_body2.npz'

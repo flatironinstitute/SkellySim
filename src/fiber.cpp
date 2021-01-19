@@ -37,14 +37,14 @@ Fiber::Fiber(toml::table *fiber_table, double eta) {
             "Fiber supplied 'base_position' or 'orientation' with node positions 'x', ambiguous initialization.");
 
     if (!!x_array) {
-        x_ = convert_array(x_array);
+        x_ = convert_array<>(x_array);
         x_.resize(3, num_points_);
     }
 
     // FIXME: Make test for this case
     if (!!x_0 && !!u && x_0->size() == 3 && u->size() == 3) {
-        Vector3d origin = convert_array(x_0);
-        Vector3d orientation = convert_array(u);
+        Vector3d origin = convert_array<>(x_0);
+        Vector3d orientation = convert_array<>(u);
         for (int i = 0; i < 3; ++i)
             x_.row(i) = origin(i) + orientation(i) * Eigen::ArrayXd::LinSpaced(num_points_, 0, length_).transpose();
     }

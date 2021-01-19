@@ -3,23 +3,35 @@
 
 #include <toml.hpp>
 #include <Eigen/Core>
+#include <Eigen/Geometry>
+
 namespace parse_util {
 
-inline Eigen::VectorXd convert_array(const toml::array *src) {
-    Eigen::VectorXd trg(src->size());
-    for (size_t i = 0; i < src->size(); ++i)
-        trg[i] = src->get_as<double>(i)->get();
+template <typename T = Eigen::VectorXd>
+inline T convert_array(const toml::array *src) {
+    if constexpr (std::is_same_v<T, Eigen::Quaterniond>) {
+        double tmp[4];
+        for (size_t i = 0; i < src->size(); ++i)
+            tmp[i] = src->get_as<double>(i)->get();
 
-    return trg;
+        return Eigen::Quaterniond(tmp);
+    } else {
+        T trg(src->size());
+        for (size_t i = 0; i < src->size(); ++i)
+            trg[i] = src->get_as<double>(i)->get();
+
+        return trg;
+    }
 }
 
-inline Eigen::VectorXd parse_array_key(const toml::table *tbl, const std::string &key) {
+template <typename T = Eigen::VectorXd>
+inline T parse_array_key(const toml::table *tbl, const std::string &key) {
     const toml::node *src_node = tbl->get(key);
     if (!src_node)
         throw std::runtime_error("Key not found \"" + key + "\"");
     const toml::array *src = src_node->as_array();
 
-    return convert_array(src);
+    return convert_array<T>(src);
 }
 
 template <typename T>

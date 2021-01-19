@@ -117,6 +117,92 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<const Eigen::Matri
     return G;
 }
 
+// Build the Stresslet tensor contracted with a vector for N points (sources and targets).
+// Set to zero diagonal terms.
+//
+// S_ij = sum_k -(3/(4*pi)) * r_i * r_j * r_k
+//
+// Input:
+//    r_vectors = coordinates.
+//    normal = vector used to contract the Stresslet (in general this will be the normal vector of a surface).
+//    eta = (default 1.0) viscosity
+//    reg = (default 5e-3) regularization term
+//    epsilon_distance = (default 1e-10) set elements to zero for distances < epsilon_distance.
+//
+// Output:
+//    S_normal = Stresslet tensor contracted with a vector with dimensions (3*num_points) x (3*num_points).
+// Output with format
+//               | S_normal11 S_normal12 ...|
+//    S_normal = | S_normal21 S_normal22 ...|
+//               | ...                      |
+//     with S_normal12 the stresslet between points r_1 and r_2.
+//     S_normal12 has dimensions 3 x 3.
+Eigen::MatrixXd kernels::stresslet_times_normal(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
+                                                const Eigen::Ref<const Eigen::MatrixXd> &normals, double eta,
+                                                double reg, double epsilon_distance) {
+    const double factor = -3.0 / (4.0 * M_PI * eta);
+    const double reg2 = reg * reg;
+    const int N = r_src.cols();
+    Eigen::MatrixXd Snormal = Eigen::MatrixXd::Zero(3 * N, 3 * N);
+
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            if (i == j)
+                continue;
+
+            const Eigen::Vector3d dr = r_src.col(i) - r_src.col(j);
+            double r_norm = dr.norm();
+            if (r_norm < epsilon_distance)
+                r_norm = sqrt(r_norm * r_norm + reg2);
+
+            const double r_inv5 = 1.0 / std::pow(r_norm, 5);
+            Snormal.block(3 * i, 3 * j, 3, 3) = (factor * dr.dot(normals.col(j)) * r_inv5) * dr * dr.transpose();
+        }
+    }
+
+    return Snormal;
+}
+
+// Build the Stresslet tensor contracted with two vectors for N points (sources and targets).
+// Set to diagonal terms to zero.
+// S_i = sum_jk -(3/(4*pi)) * r_i * r_j * r_k * density_j * normal_k / r**5
+// Input:
+//   r_vectors = coordinates.
+//   normal = vector used to contract the Stresslet (in general this will be the normal vector of a surface).
+//   density = vector used to contract the Stresslet (in general this will be a double layer potential).
+//   eta = (default 1.0) viscosity
+//   reg = (default 5e-3) regularization term
+//   epsilon_distance = (default 1e-10) set elements to zero for distances < epsilon_distance.
+// Output:
+//   S_normal = Stresslet tensor contracted with two vectors with dimensions (3, num_points).
+Eigen::MatrixXd kernels::stresslet_times_normal_times_density(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
+                                                              const Eigen::Ref<const Eigen::MatrixXd> &normals,
+                                                              const Eigen::Ref<const Eigen::MatrixXd> &density,
+                                                              double eta, double reg, double epsilon_distance) {
+    const int N = r_src.size() / 3;
+    const double factor = -3.0 / (4.0 * M_PI * eta);
+    const double reg2 = reg * reg;
+    Eigen::MatrixXd Sdn = Eigen::MatrixXd::Zero(3, r_src.cols());
+
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            if (i == j)
+                continue;
+
+            const Eigen::Vector3d dr = r_src.col(i) - r_src.col(j);
+            double r_norm = dr.norm();
+            if (r_norm < epsilon_distance)
+                r_norm = sqrt(r_norm * r_norm + reg2);
+
+            const double r_inv5 = 1.0 / std::pow(r_norm, 5);
+            const double f0 = factor * dr.dot(density.col(j)) * dr.dot(normals.col(j)) * r_inv5;
+            Sdn.col(i) += f0 * dr;
+        }
+    }
+
+    return Sdn;
+}
+
 Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
                                         const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, n_trg);
