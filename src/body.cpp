@@ -3,9 +3,25 @@
 #include <kernels.hpp>
 #include <parse_util.hpp>
 
-void Body::build_preconditioner(double eta) {
-    update_singularity_subtraction_vecs(eta);
+void Body::update_K_matrix() {
+    K_.resize(3 * num_nodes_, 6);
+    for (int i = 0; i < num_nodes_; ++i) {
+        // J matrix
+        K_.block(i * 3, 0, 3, 3).diagonal().array() = -1.0;
+        // rot matrix
+        Eigen::Vector3d vec = node_positions_.col(i);
+        K_.block(i * 3 + 0, 3, 1, 3) = -Eigen::RowVector3d({0.0, vec[2], -vec[1]});
+        K_.block(i * 3 + 1, 3, 1, 3) = -Eigen::RowVector3d({-vec[2], 0.0, vec[0]});
+        K_.block(i * 3 + 2, 3, 1, 3) = -Eigen::RowVector3d({vec[1], -vec[0], 0.0});
+    }
+}
 
+void Body::update_cache(double eta) {
+    update_singularity_subtraction_vecs(eta);
+    update_K_matrix();
+}
+
+void Body::build_preconditioner(double eta) {
     A_.resize(3 * num_nodes_ + 6, 3 * num_nodes_ + 6);
     A_.setZero();
 
@@ -20,23 +36,19 @@ void Body::build_preconditioner(double eta) {
     }
 
     // K matrix
-    for (int i = 0; i < num_nodes_; ++i) {
-        // J matrix
-        A_.block(i * 3, 3 * num_nodes_ + 0, 3, 3).diagonal().array() = -1.0;
-        // rot matrix
-        Eigen::Vector3d vec = node_positions_.col(i);
-        A_.block(i * 3 + 0, 3 * num_nodes_, 1, 3) = -Eigen::Vector3d({0.0, vec[2], -vec[1]});
-        A_.block(i * 3 + 1, 3 * num_nodes_, 1, 3) = -Eigen::Vector3d({-vec[2], 0.0, vec[0]});
-        A_.block(i * 3 + 2, 3 * num_nodes_, 1, 3) = -Eigen::Vector3d({vec[1], -vec[0], 0.0});
-    }
+    A_.block(0, 3 * num_nodes_, 3 * num_nodes_, 6) = -K_;
 
     // K^T matrix
-    A_.block(3 * num_nodes_, 0, 6, 3 * num_nodes_) = A_.block(0, 3 * num_nodes_, 3 * num_nodes_, 6).transpose();
+    A_.block(3 * num_nodes_, 0, 6, 3 * num_nodes_) = -K_.transpose();
 
     // Last block is apparently diagonal.
     A_.block(3 * num_nodes_, 3 * num_nodes_, 6, 6).diagonal().array() = 1.0;
 
     A_LU_.compute(A_);
+}
+
+void Body::compute_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body) {
+    RHS_ = -Eigen::Map<const Eigen::VectorXd>(v_on_body.data(), v_on_body.size());
 }
 
 void Body::move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation) {
@@ -49,7 +61,6 @@ void Body::move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_or
 
     for (int i = 0; i < num_nodes_; ++i)
         node_normals_.col(i) = rot * node_normals_ref_.col(i);
-
 }
 
 void Body::update_singularity_subtraction_vecs(double eta) {
@@ -87,7 +98,7 @@ Body::Body(const toml::table *body_table, const Params &params) {
     using std::string;
     string precompute_file = parse_val_key<string>(body_table, "precompute_file");
     load_precompute_data(precompute_file);
-    
+
     // TODO: add body assertions so that input file and precompute data necessarily agree
     num_nodes_ = node_positions_.cols();
 

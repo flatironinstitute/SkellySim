@@ -19,6 +19,7 @@ class Body {
     Eigen::Vector3d velocity_;
     Eigen::Vector3d angular_velocity_;
     Eigen::Matrix<double, 6, 1> force_torque_;
+    Eigen::VectorXd RHS_;
 
     Eigen::MatrixXd ex_;
     Eigen::MatrixXd ey_;
@@ -37,6 +38,10 @@ class Body {
 
     Body(const toml::table *body_table, const Params &params);
 
+    void compute_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body);
+    void update_cache(double eta);
+    void update_K_matrix();
+    void update_preconditioner(double eta);
     void build_preconditioner(double eta);
     void load_precompute_data(const std::string &input_file);
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
