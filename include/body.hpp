@@ -25,12 +25,12 @@ class Body {
     Eigen::MatrixXd ey_;
     Eigen::MatrixXd ez_;
 
-    Eigen::MatrixXd K_;
+    Eigen::MatrixXd K_; // 3*num_nodes x 6 matrix that helps translate body info to nodes
 
-    Eigen::MatrixXd node_positions_; // absolute positions of nodes
-    Eigen::MatrixXd node_positions_ref_; // node positions in reference frame
-    Eigen::MatrixXd node_normals_;
-    Eigen::MatrixXd node_normals_ref_; // node normals in reference frame
+    Eigen::MatrixXd node_positions_; // node positions in lab frame
+    Eigen::MatrixXd node_positions_ref_; // node positions in reference 'body' frame
+    Eigen::MatrixXd node_normals_; // node normals in lab frame
+    Eigen::MatrixXd node_normals_ref_; // node normals in reference 'body' frame
     Eigen::VectorXd node_weights_;
 
     Eigen::MatrixXd A_;
