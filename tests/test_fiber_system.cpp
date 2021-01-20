@@ -1,5 +1,5 @@
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <mpi.h>
 
 #ifdef NDEBUG
@@ -11,7 +11,6 @@
 #endif
 
 #include <fiber.hpp>
-
 
 #include <omp.h>
 
@@ -58,7 +57,7 @@ int main(int argc, char *argv[]) {
 
     st = omp_get_wtime();
     for (int i = 0; i < n_time; ++i)
-        fibs.form_linear_operators(dt, eta);
+        fibs.update_linear_operators(dt, eta);
     if (rank == 0)
         std::cout << omp_get_wtime() - st << std::endl;
 

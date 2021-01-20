@@ -73,11 +73,11 @@ class Fiber {
         c_1_ = 2.0 / (8.0 * M_PI * eta);
     };
 
-    void build_preconditioner();
-    void form_force_operator();
-    void compute_RHS(double dt, const Eigen::Ref<const Eigen::MatrixXd> flow,
-                     const Eigen::Ref<const Eigen::MatrixXd> f_external);
-    void form_linear_operator(double dt, double eta);
+    void update_preconditioner();
+    void update_force_operator();
+    void update_RHS(double dt, const Eigen::Ref<const Eigen::MatrixXd> flow,
+                    const Eigen::Ref<const Eigen::MatrixXd> f_external);
+    void update_linear_operator(double dt, double eta);
     void apply_bc_rectangular(double dt, const Eigen::Ref<const Eigen::MatrixXd> &v_on_fiber,
                               const Eigen::Ref<const Eigen::MatrixXd> &f_on_fiber);
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
@@ -90,12 +90,12 @@ class FiberContainer {
     std::vector<Fiber> fibers;
     double slenderness_ratio;
 
-    FiberContainer() {};
+    FiberContainer(){};
     FiberContainer(toml::array *fiber_tables, Params &params);
 
     void update_derivatives();
     void update_stokeslets(double eta);
-    void form_linear_operators(double dt, double eta);
+    void update_linear_operators(double dt, double eta);
     int get_total_fib_points() const {
         int tot = 0;
         for (auto &fib : fibers)

@@ -10,9 +10,9 @@
 #include <Tpetra_CrsMatrix.hpp>
 
 #include <cnpy.hpp>
-#include <system.hpp>
 #include <fiber.hpp>
 #include <periphery.hpp>
+#include <system.hpp>
 
 using namespace Teuchos;
 using Eigen::MatrixXd;
@@ -248,7 +248,7 @@ int main(int argc, char *argv[]) {
         for (auto &fib : fc.fibers) {
             fib.update_derivatives();
             fib.update_stokeslet(eta);
-            fib.form_linear_operator(dt, eta);
+            fib.update_linear_operator(dt, eta);
         }
 
         {
@@ -257,16 +257,16 @@ int main(int argc, char *argv[]) {
             MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
             size_t offset = 0;
             for (auto &fib : fc.fibers) {
-                fib.compute_RHS(dt, v_fib2all.block(0, offset, 3, fib.num_points_),
-                                f_on_fibers.block(0, offset, 3, fib.num_points_));
+                fib.update_RHS(dt, v_fib2all.block(0, offset, 3, fib.num_points_),
+                               f_on_fibers.block(0, offset, 3, fib.num_points_));
                 fib.apply_bc_rectangular(dt, v_fib2all.block(0, offset, 3, fib.num_points_),
                                          f_on_fibers.block(0, offset, 3, fib.num_points_));
-                fib.build_preconditioner();
-                fib.form_force_operator();
+                fib.update_preconditioner();
+                fib.update_force_operator();
                 offset += fib.num_points_;
             }
 
-            shell.compute_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));
+            shell.update_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));
         }
 
         RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, fc, shell, eta));

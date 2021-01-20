@@ -6,6 +6,14 @@
 
 Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                                 const Eigen::Ref<const Eigen::MatrixXd> &density, double eta) const {
+    // Calculate velocity at target coordinates due to the periphery.
+    // Input:
+    //    const r_trg [3xn_trg_local]: Target coordinates
+    //    const density [3*n_nodes_local]: Strength of node sources
+    //    eta: Fluid viscosity
+    // Output:
+    //    vel [3xn_trg_local]: velocity at target coordinates
+
     // FIXME: Move fmm object and make more flexible
     static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel,
                                               kernels::stokes_pvel_fmm);
@@ -29,7 +37,11 @@ Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
     return vel;
 }
 
-void Periphery::compute_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell) {
+void Periphery::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell) {
+    // Update the internal right-hand-side state.
+    // No prerequisite calculations, beyond initialization, are needed
+    // Input:
+    //    const v_on_shell [3xn_nodes_local]: Velocity at shell nodes on local MPI rank
     RHS_ = -Eigen::Map<const Eigen::VectorXd>(v_on_shell.data(), v_on_shell.size());
 }
 

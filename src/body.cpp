@@ -16,12 +16,12 @@ void Body::update_K_matrix() {
     }
 }
 
-void Body::update_cache(double eta) {
+void Body::update_cache_variables(double eta) {
     update_singularity_subtraction_vecs(eta);
     update_K_matrix();
 }
 
-void Body::build_preconditioner(double eta) {
+void Body::update_preconditioner(double eta) {
     A_.resize(3 * num_nodes_ + 6, 3 * num_nodes_ + 6);
     A_.setZero();
 
@@ -47,7 +47,7 @@ void Body::build_preconditioner(double eta) {
     A_LU_.compute(A_);
 }
 
-void Body::compute_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body) {
+void Body::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body) {
     RHS_ = -Eigen::Map<const Eigen::VectorXd>(v_on_body.data(), v_on_body.size());
 }
 

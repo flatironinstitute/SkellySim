@@ -2,9 +2,9 @@
 #include <fiber.hpp>
 #include <iostream>
 #include <kernels.hpp>
+#include <parse_util.hpp>
 #include <unordered_map>
 #include <utils.hpp>
-#include <parse_util.hpp>
 
 using Eigen::ArrayXd;
 using Eigen::ArrayXXd;
@@ -66,7 +66,7 @@ void Fiber::update_derivatives() {
 // Calculates the linear operator A_ that define the linear system
 // ONLY 1st ORDER, USES PRECOMPUTED AND STORED MATRICES
 // A * (X^{n+1}, T^{n+1}) = RHS
-void Fiber::form_linear_operator(double dt, double eta) {
+void Fiber::update_linear_operator(double dt, double eta) {
     int num_points_up = num_points_;
     int num_points_down = num_points_;
 
@@ -160,7 +160,7 @@ void Fiber::form_linear_operator(double dt, double eta) {
 // A * (X^{n+1}, T^{n+1}) = RHS
 // with
 // RHS = (X^n / dt + flow + Mobility * force_external, ...)
-void Fiber::compute_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const Eigen::Ref<const MatrixXd> f_external) {
+void Fiber::update_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const Eigen::Ref<const MatrixXd> f_external) {
     const int np = num_points_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
@@ -241,7 +241,7 @@ void Fiber::compute_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const 
     }
 }
 
-void Fiber::form_force_operator() {
+void Fiber::update_force_operator() {
     const int np = num_points_;
     const auto &mats = matrices_.at(np);
 
@@ -261,7 +261,7 @@ void Fiber::form_force_operator() {
     }
 }
 
-void Fiber::build_preconditioner() { A_LU_.compute(A_); }
+void Fiber::update_preconditioner() { A_LU_.compute(A_); }
 
 void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_on_fiber,
                                  const Eigen::Ref<const MatrixXd> &f_on_fiber) {
@@ -481,9 +481,9 @@ void FiberContainer::update_stokeslets(double eta) {
         fib.update_stokeslet(eta);
 }
 
-void FiberContainer::form_linear_operators(double dt, double eta) {
+void FiberContainer::update_linear_operators(double dt, double eta) {
     for (Fiber &fib : fibers)
-        fib.form_linear_operator(dt, eta);
+        fib.update_linear_operator(dt, eta);
 }
 
 VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<const VectorXd> &x_all) const {
@@ -630,7 +630,6 @@ MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<const VectorXd> &x_a
 
     return fw;
 }
-
 
 FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
     if (!fiber_tables) {

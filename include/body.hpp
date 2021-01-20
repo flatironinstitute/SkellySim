@@ -27,10 +27,10 @@ class Body {
 
     Eigen::MatrixXd K_; // 3*num_nodes x 6 matrix that helps translate body info to nodes
 
-    Eigen::MatrixXd node_positions_; // node positions in lab frame
+    Eigen::MatrixXd node_positions_;     // node positions in lab frame
     Eigen::MatrixXd node_positions_ref_; // node positions in reference 'body' frame
-    Eigen::MatrixXd node_normals_; // node normals in lab frame
-    Eigen::MatrixXd node_normals_ref_; // node normals in reference 'body' frame
+    Eigen::MatrixXd node_normals_;       // node normals in lab frame
+    Eigen::MatrixXd node_normals_ref_;   // node normals in reference 'body' frame
     Eigen::VectorXd node_weights_;
 
     Eigen::MatrixXd A_;
@@ -38,14 +38,13 @@ class Body {
 
     Body(const toml::table *body_table, const Params &params);
 
-    void compute_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body);
-    void update_cache(double eta);
+    void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body);
+    void update_cache_variables(double eta);
     void update_K_matrix();
     void update_preconditioner(double eta);
-    void build_preconditioner(double eta);
+    void update_singularity_subtraction_vecs(double eta);
     void load_precompute_data(const std::string &input_file);
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
-    void update_singularity_subtraction_vecs(double eta);
 };
 
 class BodyContainer {};

@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     MatrixXd stokeslet = load_mat(np_fib, "stokeslet");
     assert(allclose(fib.stokeslet_, stokeslet));
 
-    fib.form_linear_operator(dt, eta);
+    fib.update_linear_operator(dt, eta);
     int np = fib.num_points_;
 
     for (int i = 0; i < 4; ++i) {
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Test right-hand-side computation
-    fib.compute_RHS(dt, flow_on, force_external);
+    fib.update_RHS(dt, flow_on, force_external);
     assert(allclose(RHS, fib.RHS_));
 
     // Test BC calculation
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    fib.form_force_operator();
+    fib.update_force_operator();
     assert(allclose(force_operator, fib.force_operator_, 0, 1E-7));
 
     std::cout << "Test passed\n";
