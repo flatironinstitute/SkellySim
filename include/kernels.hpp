@@ -3,6 +3,7 @@
 #include <Eigen/Dense>
 #include <STKFMM/STKFMM.hpp>
 
+/// Namespace for miscellaneous "kernel" functions and related convenience FMM class
 namespace kernels {
 typedef Eigen::MatrixXd (*fmm_kernel_func_t)(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
                                              const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *);

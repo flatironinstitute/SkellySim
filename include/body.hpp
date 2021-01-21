@@ -10,7 +10,6 @@
 
 class Body {
   public:
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     int num_nodes_;
 
     Eigen::Vector3d position_;
@@ -25,12 +24,12 @@ class Body {
     Eigen::MatrixXd ey_;
     Eigen::MatrixXd ez_;
 
-    Eigen::MatrixXd K_; // 3*num_nodes x 6 matrix that helps translate body info to nodes
+    Eigen::MatrixXd K_; ///< [ 3*num_nodes x 6 ] matrix that helps translate body info to nodes
 
-    Eigen::MatrixXd node_positions_;     // node positions in lab frame
-    Eigen::MatrixXd node_positions_ref_; // node positions in reference 'body' frame
-    Eigen::MatrixXd node_normals_;       // node normals in lab frame
-    Eigen::MatrixXd node_normals_ref_;   // node normals in reference 'body' frame
+    Eigen::MatrixXd node_positions_;     ///< node positions in lab frame
+    Eigen::MatrixXd node_positions_ref_; ///< node positions in reference 'body' frame
+    Eigen::MatrixXd node_normals_;       ///< node normals in lab frame
+    Eigen::MatrixXd node_normals_ref_;   ///< node normals in reference 'body' frame
     Eigen::VectorXd node_weights_;
 
     Eigen::MatrixXd A_;
@@ -45,6 +44,7 @@ class Body {
     void update_singularity_subtraction_vecs(double eta);
     void load_precompute_data(const std::string &input_file);
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 class BodyContainer {};

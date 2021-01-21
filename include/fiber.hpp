@@ -18,7 +18,7 @@ class Fiber {
     double length_;
     double bending_rigidity_;
     double penalty_param_ = 500.0;
-    double force_scale_ = 4.0; // scale of external force on node, f_ext = force_scale_ * xs_
+    double force_scale_ = 4.0; ///< scale of external force on node, f_ext = force_scale_ * xs_
     // FIXME: Magic numbers in linear operator calculation
     double beta_tstep_ = 1.0;
     double epsilon_ = 1E-3;
