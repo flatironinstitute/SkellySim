@@ -8,8 +8,6 @@ option(USE_EIGEN_MKL_ALL "Use MKL as the backend for various Eigen calls" ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_EXTENSIONS OFF)
 
 # compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
@@ -18,7 +16,6 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # using intel, disable offloading
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qno-offload -wd1011")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -qno-offload -wd1011")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
