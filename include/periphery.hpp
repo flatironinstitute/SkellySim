@@ -5,6 +5,8 @@
 #include <iostream>
 #include <vector>
 
+#include <kernels.hpp>
+
 class Periphery {
   public:
     Periphery(){};
@@ -14,7 +16,9 @@ class Periphery {
                          double eta) const;
     void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell);
 
-    Eigen::MatrixXd M_inv_;                        // Process local elements of inverse matrix
+    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>
+        fmm_;               // pointer to FMM object (pointer to avoid constructing object with empty Periphery)
+    Eigen::MatrixXd M_inv_; // Process local elements of inverse matrix
     Eigen::MatrixXd stresslet_plus_complementary_; // Process local elements of stresslet tensor
     Eigen::MatrixXd node_pos_;                     // [3xn_nodes_local] matrix representing node positions
     Eigen::MatrixXd node_normal_;        // [3xn_nodes_local] matrix representing node normal vectors (inward facing)

@@ -14,10 +14,6 @@ Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
     // Output:
     //    vel [3xn_trg_local]: velocity at target coordinates
 
-    // FIXME: Move fmm object and make more flexible
-    static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel,
-                                              kernels::stokes_pvel_fmm);
-
     const int n_dl = density.size() / 3;
     const int n_trg = r_trg.size() / 3;
     Eigen::MatrixXd f_dl(9, n_dl);
@@ -31,7 +27,7 @@ Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                 f_dl(i * 3 + j, node) = 2.0 * node_normal_(i, node) * density_reshaped(j, node);
 
     Eigen::MatrixXd r_sl, f_sl; // dummy SL positions/values
-    Eigen::MatrixXd pvel = fmm(r_sl, node_pos_, r_trg, f_sl, f_dl);
+    Eigen::MatrixXd pvel = (*fmm_)(r_sl, node_pos_, r_trg, f_sl, f_dl);
     Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg) / eta;
 
     return vel;
@@ -46,6 +42,15 @@ void Periphery::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell) {
 }
 
 Periphery::Periphery(const std::string &precompute_file) {
+    {
+        using namespace kernels;
+        using namespace stkfmm;
+        const int order = 8;
+        const int maxpts = 2000;
+        fmm_ = std::unique_ptr<FMM<Stk3DFMM>>(
+            new FMM<Stk3DFMM>(order, maxpts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm));
+    }
+
     int world_rank, world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);

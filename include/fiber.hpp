@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <kernels.hpp>
 #include <params.hpp>
 
 #include <toml.hpp>
@@ -88,7 +89,8 @@ class Fiber {
 class FiberContainer {
   public:
     std::vector<Fiber> fibers;
-    double slenderness_ratio;
+    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>
+        fmm_; // pointer to FMM object (pointer to avoid constructing object with empty FiberContainer)
 
     FiberContainer(){};
     FiberContainer(toml::array *fiber_tables, Params &params);

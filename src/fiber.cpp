@@ -558,9 +558,6 @@ MatrixXd FiberContainer::get_r_vectors() const {
 
 MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
                               const Eigen::Ref<const MatrixXd> &r_trg_external, double eta) const {
-    // FIXME: Move fmm object and make more flexible
-    static kernels::FMM<stkfmm::Stk3DFMM> fmm(8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes,
-                                              kernels::stokes_vel_fmm);
     const size_t n_src = fib_forces.cols();
     const size_t n_trg_external = r_trg_external.cols();
 
@@ -587,7 +584,7 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
     if (n_trg_external)
         r_trg.block(0, n_src, 3, n_trg_external) = r_trg_external;
     MatrixXd r_dl_dummy, f_dl_dummy;
-    MatrixXd vel = fmm(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
+    MatrixXd vel = (*fmm_)(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
 
     // Subtract self term
     // FIXME: Subtracting self flow only works when system has only fibers
@@ -635,6 +632,9 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
     if (!fiber_tables) {
         return;
     }
+
+    fmm_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
+        8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
 
     int rank, world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
