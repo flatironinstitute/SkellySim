@@ -8,32 +8,33 @@
 #include <params.hpp>
 #include <toml.hpp>
 
+// Class for "small" bodies such as MTOCs
 class Body {
   public:
-    int num_nodes_;
+    int n_nodes_; ///< Number of nodes representing the body surface
 
-    Eigen::Vector3d position_;
-    Eigen::Quaterniond orientation_;
-    const Eigen::Quaterniond orientation_ref_ = {1.0, 0.0, 0.0, 0.0};
-    Eigen::Vector3d velocity_;
-    Eigen::Vector3d angular_velocity_;
-    Eigen::Matrix<double, 6, 1> force_torque_;
-    Eigen::VectorXd RHS_;
+    Eigen::Vector3d position_;       ///< Instantaneous lab frame position of body, usually the centroid
+    Eigen::Quaterniond orientation_; ///< Instantaneous orientation of body
+    const Eigen::Quaterniond orientation_ref_ = {1.0, 0.0, 0.0, 0.0}; ///< Reference orientation of body
+    Eigen::Vector3d velocity_;                                        ///<  Net instantaneous lab frame velocity of body
+    Eigen::Vector3d angular_velocity_;         ///< Net instantaneous lab frame angular velocity of body
+    Eigen::Matrix<double, 6, 1> force_torque_; ///< Net force+torque vector [fx,fy,fz,tx,ty,tz] about centroid
+    Eigen::VectorXd RHS_;                      ///< Current 'right-hand-side' for matrix formulation of solver
 
-    Eigen::MatrixXd ex_;
-    Eigen::MatrixXd ey_;
-    Eigen::MatrixXd ez_;
+    Eigen::MatrixXd ex_; ///< [ 3 x num_nodes ] Singularity subtraction vector along x
+    Eigen::MatrixXd ey_; ///< [ 3 x num_nodes ] Singularity subtraction vector along y
+    Eigen::MatrixXd ez_; ///< [ 3 x num_nodes ] Singularity subtraction vector along z
 
     Eigen::MatrixXd K_; ///< [ 3*num_nodes x 6 ] matrix that helps translate body info to nodes
 
-    Eigen::MatrixXd node_positions_;     ///< node positions in lab frame
-    Eigen::MatrixXd node_positions_ref_; ///< node positions in reference 'body' frame
-    Eigen::MatrixXd node_normals_;       ///< node normals in lab frame
-    Eigen::MatrixXd node_normals_ref_;   ///< node normals in reference 'body' frame
-    Eigen::VectorXd node_weights_;
+    Eigen::MatrixXd node_positions_;     ///< [ 3 x n_nodes ] node positions in lab frame
+    Eigen::MatrixXd node_positions_ref_; ///< [ 3 x n_nodes ] node positions in reference 'body' frame
+    Eigen::MatrixXd node_normals_;       ///< [ 3 x n_nodes ] node normals in lab frame
+    Eigen::MatrixXd node_normals_ref_;   ///< [ 3 x n_nodes ] node normals in reference 'body' frame
+    Eigen::VectorXd node_weights_;       ///< [ n_nodes ] far field quadrature weights for nodes
 
-    Eigen::MatrixXd A_;
-    Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_;
+    Eigen::MatrixXd A_; ///< Matrix representation of body for solver
+    Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
 
     Body(const toml::table *body_table, const Params &params);
 
