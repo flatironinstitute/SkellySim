@@ -52,8 +52,8 @@ Eigen::MatrixXd kernels::oseen_tensor_contract_direct(const Eigen::Ref<const Eig
     return res;
 }
 
-/// Build the Oseen tensor for N points (sources == targets).
-/// Set to zero diagonal terms.
+/// Build the [ 3*n_src x 3*n_trg ] matrix of stokeslets 'Oseen tensor'
+/// Terms where r_src = r_trg are left zero
 ///
 /// G = f(r) * I + g(r) * (r.T*r)
 ///
@@ -173,8 +173,8 @@ Eigen::MatrixXd kernels::stresslet_times_normal(const Eigen::Ref<const Eigen::Ma
 ///              {\left|{\bf d}_{i,j}\right|^{5}} \f]
 ///
 ///   @param[in] r_src [3 x n_src] matrix of source positions
-///   @param[in] normals [3 x n_src] matrix used to contract the Stresslet (in general this will be the normal vector of a
-///   surface).
+///   @param[in] normals [3 x n_src] matrix used to contract the Stresslet (in general this will be the normal vector of
+///   a surface).
 ///   @param[in] density [3 x n_src] matrix used to contract the Stresslet (in general this will be a double layer
 ///   potential).
 ///   @param[in] eta viscosity of fluid

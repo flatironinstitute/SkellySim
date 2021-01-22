@@ -14,32 +14,47 @@ class Fiber {
   public:
     enum BC { Force, Torque, Velocity, AngularVelocity, Position, Angle };
 
-    int num_points_;
-    double length_;
-    double bending_rigidity_;
-    double penalty_param_ = 500.0;
-    double force_scale_ = 4.0; ///< scale of external force on node, f_ext = force_scale_ * xs_
+    int num_points_;               ///< number of points representing the fiber
+    double length_;                ///< length of fiber
+    double bending_rigidity_;      ///< bending rigidity 'E' of fiber
+    double penalty_param_ = 500.0; ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
+    /// @brief scale of external force on node @see generate_external_force
+    /// \f[{\bf f} = f_s * {\bf x}_s\f]
+    double force_scale_ = 4.0;
     // FIXME: Magic numbers in linear operator calculation
-    double beta_tstep_ = 1.0;
-    double epsilon_ = 1E-3;
-    double v_length_ = 0.0;
-    double c_0_, c_1_;
+    double beta_tstep_ = 1.0; ///< penalty parameter to ensure inextensibility
+    double epsilon_ = 1E-3;   ///< slenderness parameter
+    double v_length_ = 0.0;   ///< fiber growth velocity
 
+    /// @brief Coefficient for SBT @see Fiber::init
+    /// \f[ c_0 = -\frac{log(e \epsilon^\ell)}{8 \pi \eta}\f]
+    double c_0_;
+
+    /// @brief Coefficient for SBT @see Fiber::init
+    /// \f[ c_1 = \frac{1}{4\pi\eta} \f]
+    double c_1_;
+
+    /// Boundary condition pair for minus end of fiber
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
+    /// Boundary condition pair for plus end of fiber
     std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
 
-    Eigen::MatrixXd x_;
-    Eigen::MatrixXd xs_;
-    Eigen::MatrixXd xss_;
-    Eigen::MatrixXd xsss_;
-    Eigen::MatrixXd xssss_;
+    Eigen::MatrixXd x_;     ///< [ 3 x num_points_ ] matrix representing coordinates of fiber points
+    Eigen::MatrixXd xs_;    ///< [ 3 x num_points_ ] matrix representing first derivative of fiber points
+    Eigen::MatrixXd xss_;   ///< [ 3 x num_points_ ] matrix representing second derivative of fiber points
+    Eigen::MatrixXd xsss_;  ///< [ 3 x num_points_ ] matrix representing third derivative of fiber points
+    Eigen::MatrixXd xssss_; ///< [ 3 x num_points_ ] matrix representing fourth derivative of fiber points
+
+    /// [ 3*num_points_ x 3*num_points_] Oseen tensor for fiber @see Fiber::update_stokeslet
     Eigen::MatrixXd stokeslet_;
 
-    Eigen::MatrixXd A_;
-    Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_;
+    Eigen::MatrixXd A_;                         ///< Fiber's linear operator for matrix solver
+    Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< Fiber preconditioner, LU decomposition of Fiber::A_
+    /// Fiber force operator, @see Fiber::update_force_operator, FiberContainer::apply_fiber_force
     Eigen::MatrixXd force_operator_;
-    Eigen::VectorXd RHS_;
+    Eigen::VectorXd RHS_; ///< Current 'right-hand-side' for matrix formulation of solver
 
+    /// Structure that caches arrays useful for calculating various fiber values
     typedef struct {
         Eigen::ArrayXd alpha;
         Eigen::ArrayXd alpha_roots;
@@ -53,15 +68,30 @@ class Fiber {
         Eigen::MatrixXd P_T;
         Eigen::MatrixXd P_downsample_bc;
     } fib_mat_t;
+
+    /// Map of cached matrices for different values of num_points_. Calculated automagically at program start. @see
+    /// compute_matrices
     const static std::unordered_map<int, fib_mat_t> matrices_;
 
     Fiber(toml::table *fiber_table, double eta);
 
+    /// @brief initialize empty fiber
+    /// @param[in] num_points fiber 'resolution'
+    /// @param[in] bending_rigidity bending rigidity of fiber
+    /// @param[in] eta fluid viscosity
+    ///
+    /// @deprecated Initializing with a toml::table structure is the preferred initialization. This is only around for
+    /// testing.
     Fiber(int num_points, double bending_rigidity, double eta)
         : num_points_(num_points), bending_rigidity_(bending_rigidity) {
         init(eta);
     };
 
+    ///< @brief Set some default values and resize arrays
+    ///
+    ///< _MUST_ be called from constructors.
+    ///
+    /// Initializes: Fiber::x_, Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_, Fiber::c_0_, Fiber::c_1_
     void init(double eta) {
         x_ = Eigen::MatrixXd::Zero(3, num_points_);
         x_.row(0) = Eigen::ArrayXd::LinSpaced(num_points_, 0, 1.0).transpose();
@@ -88,17 +118,24 @@ class Fiber {
 
 class FiberContainer {
   public:
-    std::vector<Fiber> fibers;
-    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>
-        fmm_; // pointer to FMM object (pointer to avoid constructing object with empty FiberContainer)
+    std::vector<Fiber> fibers; ///< Array of fibers local to this MPI rank
+    /// pointer to FMM object (pointer to avoid constructing fmm_ with default FiberContainer)
+    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> fmm_;
 
+    /// Empty container constructor to avoid initialization list complications. No way to
+    /// initialize after using this constructor, so overwrite objects with full constructor.
     FiberContainer(){};
     FiberContainer(toml::array *fiber_tables, Params &params);
 
     void update_derivatives();
     void update_stokeslets(double eta);
     void update_linear_operators(double dt, double eta);
+
+    /// @brief get total number of points across fibers in the container
+    /// Usually you need this to form arrays used as input later
+    /// @returns total number of points across fibers in the container :)
     int get_total_fib_points() const {
+        // FIXME: This could certainly be cached
         int tot = 0;
         for (auto &fib : fibers)
             tot += fib.num_points_;

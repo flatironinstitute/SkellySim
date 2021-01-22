@@ -6,12 +6,21 @@
 #include <unordered_map>
 #include <utils.hpp>
 
+/// @file
+/// @brief Implement Fiber and FiberContainer classes and associated functions
+
 using Eigen::ArrayXd;
 using Eigen::ArrayXXd;
 using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
 
+/// @brief Fiber constructor. Duh.
+/// This is the preferred way to initialize a fiber.
+///
+/// @param[in] fiber_table TOML table with associated fiber values
+/// @param[in] eta Fluid viscosity
+/// @return Fiber object. Cache values are _not_ calculated.
 Fiber::Fiber(toml::table *fiber_table, double eta) {
     using namespace parse_util;
 
@@ -50,11 +59,16 @@ Fiber::Fiber(toml::table *fiber_table, double eta) {
     }
 }
 
-void Fiber::update_stokeslet(double eta) {
-    // FIXME: Remove arguments for stokeslet?
-    stokeslet_ = kernels::oseen_tensor_direct(x_, x_, eta = eta);
-}
+/// @brief Update stokeslet for points along fiber
+/// Calls kernels::oseen_tensor_direct with Fiber::x_ as source/target
+///
+/// Updates: Fiber::stokeslet_
+/// @param[in] eta fluid viscosity
+void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_direct(x_, x_, eta = eta); }
 
+/// @brief Update all of the derivative internal cache variables
+///
+/// Updates: Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_
 void Fiber::update_derivatives() {
     auto &fib_mats = matrices_.at(num_points_);
     xs_ = std::pow(2.0 / length_, 1) * x_ * fib_mats.D_1_0;
@@ -63,39 +77,41 @@ void Fiber::update_derivatives() {
     xssss_ = std::pow(2.0 / length_, 4) * x_ * fib_mats.D_4_0;
 }
 
-// Calculates the linear operator A_ that define the linear system
-// ONLY 1st ORDER, USES PRECOMPUTED AND STORED MATRICES
-// A * (X^{n+1}, T^{n+1}) = RHS
+/// @brief Updates the linear operator A_ that defines the linear system
+///
+/// \f[ A * (X^{n+1}, T^{n+1}) = \textrm{RHS} \f]
+/// Updates: Fiber::A_
 void Fiber::update_linear_operator(double dt, double eta) {
     int num_points_up = num_points_;
     int num_points_down = num_points_;
 
-    const auto &mats = matrices_.at(num_points_);
+    const Fiber::fib_mat_t &mats = matrices_.at(num_points_);
     ArrayXXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);
     ArrayXXd D_2 = mats.D_2_0.transpose() * std::pow(2.0 / length_, 2);
     ArrayXXd D_3 = mats.D_3_0.transpose() * std::pow(2.0 / length_, 3);
     ArrayXXd D_4 = mats.D_4_0.transpose() * std::pow(2.0 / length_, 4);
 
-    A_ = MatrixXd::Zero(4 * num_points_up, 4 * num_points_down);
-    auto A_XX = A_.block(0 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    auto A_XY = A_.block(0 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    auto A_XZ = A_.block(0 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    auto A_XT = A_.block(0 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    A_.resize(4 * num_points_up, 4 * num_points_down);
+    A_.setZero();
+    MatrixXd A_XX = A_.block(0 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_XY = A_.block(0 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_XZ = A_.block(0 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_XT = A_.block(0 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
 
-    auto A_YX = A_.block(1 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    auto A_YY = A_.block(1 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    auto A_YZ = A_.block(1 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    auto A_YT = A_.block(1 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_YX = A_.block(1 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_YY = A_.block(1 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_YZ = A_.block(1 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_YT = A_.block(1 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
 
-    auto A_ZX = A_.block(2 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    auto A_ZY = A_.block(2 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    auto A_ZZ = A_.block(2 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    auto A_ZT = A_.block(2 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_ZX = A_.block(2 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_ZY = A_.block(2 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_ZZ = A_.block(2 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_ZT = A_.block(2 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
 
-    auto A_TX = A_.block(3 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    auto A_TY = A_.block(3 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    auto A_TZ = A_.block(3 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    auto A_TT = A_.block(3 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_TX = A_.block(3 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_TY = A_.block(3 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_TZ = A_.block(3 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
+    MatrixXd A_TT = A_.block(3 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
 
     VectorXd I_vec = VectorXd::Ones(num_points_);
 
@@ -152,14 +168,17 @@ void Fiber::update_linear_operator(double dt, double eta) {
 
     A_TT = -2.0 * c_0_ * D_2;
     A_TT += (c_0_ + c_1_) * (xss_x.pow(2) + xss_y.pow(2) + xss_z.pow(2)).matrix().asDiagonal();
-
-    // FIXME: Add nonlocal interactions to fibers?
 }
 
-// Compute the Right Hand Side for the linear system with upsampling
-// A * (X^{n+1}, T^{n+1}) = RHS
-// with
-// RHS = (X^n / dt + flow + Mobility * force_external, ...)
+/// @brief Compute the 'right-hand-side' for the linear system with upsampling
+///
+/// \f[ A * (X^{n+1}, T^{n+1}) = \textrm{RHS} \f]
+/// where
+/// \f[ \textrm{RHS} = (X^n / dt + \textrm{flow} + \textrm{Mobility} * \textrm{force\_external}, ...) \f]
+/// Updates: Fiber::RHS_
+/// @param[in] dt timestep size
+/// @param[in] flow [ 3 x num_points_ ] matrix of flow field sampled at the fiber points
+/// @param[in] f_external [ 3 x num_points_ ] matrix of external forces on the fiber points
 void Fiber::update_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const Eigen::Ref<const MatrixXd> f_external) {
     const int np = num_points_;
     const auto &mats = matrices_.at(np);
@@ -241,6 +260,9 @@ void Fiber::update_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const E
     }
 }
 
+/// @brief Calculate the force operator cache variable
+///
+/// Updates: Fiber::force_operator_
 void Fiber::update_force_operator() {
     const int np = num_points_;
     const auto &mats = matrices_.at(np);
@@ -425,6 +447,9 @@ MatrixXd barycentric_matrix(const Eigen::Ref<const ArrayXd> &x, const Eigen::Ref
     return P;
 }
 
+/// @brief Helper function to initialize Fiber::matrices_
+/// @tparam num_points_finite_diff Number of neighboring points to use in finite difference approximation
+/// @return map of Fiber::fib_mat_t initialized for various numbers of points, where the key will be Fiber::num_points_
 template <int num_points_finite_diff>
 std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
     std::unordered_map<int, Fiber::fib_mat_t> res;
