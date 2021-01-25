@@ -7,6 +7,10 @@
 
 #include <kernels.hpp>
 
+/// Class to represent the containing boundary of the simulated system
+///
+/// There should be only periphery per system. The periphery, which is composed of smaller
+/// discretized nodes, is distributed across all MPI ranks.
 class Periphery {
   public:
     Periphery(){};

@@ -3,6 +3,7 @@
 
 #include <toml.hpp>
 
+/// Class containing input parameters for the simulated system
 class Params {
   public:
     double eta;

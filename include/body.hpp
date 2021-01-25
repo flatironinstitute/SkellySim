@@ -8,7 +8,7 @@
 #include <params.hpp>
 #include <toml.hpp>
 
-// Class for "small" bodies such as MTOCs
+/// Class for "small" bodies such as MTOCs
 class Body {
   public:
     int n_nodes_; ///< Number of nodes representing the body surface

@@ -260,6 +260,8 @@ Eigen::MatrixXd kernels::stresslet_times_normal_times_density(const Eigen::Ref<c
     return Sdn;
 }
 
+// FIXME: FMM kernel functions are unnecessary. The kernel dimension and kernel enum value can
+// be cached and just called directly from the FMM() operator.
 Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
                                         const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, n_trg);

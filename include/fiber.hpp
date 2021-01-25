@@ -10,6 +10,11 @@
 
 #include <toml.hpp>
 
+
+/// @brief Class to represent a single flexible filament
+///
+/// Actions on the fiber class are typically handled via the container object, which will
+/// distribute calls appropriately across all fibers in the container.
 class Fiber {
   public:
     enum BC { Force, Torque, Velocity, AngularVelocity, Position, Angle };
@@ -116,6 +121,16 @@ class Fiber {
     void update_stokeslet(double);
 };
 
+/// Class to hold the fiber objects.
+///
+/// The container object is designed to work on fibers local to that MPI rank. Each MPI rank
+/// should have its own container, with its own unique fibers. The container object does not
+/// have any knowledge of the MPI world state, which, for example, is passed in externally to
+/// the FiberContainer::flow method and potentially others.
+///
+/// Developer note: ideally all interactions with the fiber objects should be through this
+/// container, except for testing purposes. Operating on fibers outside of the container class
+/// is ill-advised.
 class FiberContainer {
   public:
     std::vector<Fiber> fibers; ///< Array of fibers local to this MPI rank

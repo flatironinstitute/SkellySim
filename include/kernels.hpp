@@ -36,6 +36,9 @@ Eigen::MatrixXd stresslet_times_normal_times_density(const Eigen::Ref<const Eige
                                                      const Eigen::Ref<const Eigen::MatrixXd> &density, double eta = 1.0,
                                                      double reg = 5E-3, double epsilon_distance = 1E-5);
 
+/// Convenience class to represent an FMM interaction, which stores the STKFMM pointer. This
+/// setup allows for a direct call to the FMM object which returns the relevant target kernel
+/// evaluation matrix to each MPI rank.
 template <typename stkfmm_type>
 class FMM {
   public:
@@ -44,6 +47,17 @@ class FMM {
         : fmmPtr_(new stkfmm_type(order, maxPoints, paxis, static_cast<unsigned>(k))), k_(k),
           kernel_func_(kernel_func){};
 
+    /// @brief Evaluate the FMM kernel given the given sources/targets
+    ///
+    /// Repeated calls to the FMM object with the same source/target positions will maintain
+    /// the FMM tree and therefore avoid the costly STKFMM::setupTree() call.
+    ///
+    /// @param[in] r_sl [ 3 x n_src ] matrix of 'single-layer' source coordinates
+    /// @param[in] r_dl [ 3 x n_src ] matrix of 'double-layer' source coordinates
+    /// @param[in] r_trg [ 3 x n_trg ] matrix of target coordinates
+    /// @param[in] f_sl [ k_dim_sl x n_src ] matrix of 'single-layer' source strengths
+    /// @param[in] f_sl [ k_dim_dl x n_src ] matrix of 'double-layer' source strengths
+    /// @returns [ k_dim_trg x n_trg ] matrix of kernel evaluated at target positions given the sources
     Eigen::MatrixXd operator()(const Eigen::Ref<const Eigen::MatrixXd> &r_sl,
                                const Eigen::Ref<const Eigen::MatrixXd> &r_dl,
                                const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
@@ -93,12 +107,12 @@ class FMM {
     }
 
   private:
-    std::unique_ptr<stkfmm::STKFMM> fmmPtr_;
-    Eigen::MatrixXd r_sl_old_;
-    Eigen::MatrixXd r_dl_old_;
-    Eigen::MatrixXd r_trg_old_;
-    stkfmm::KERNEL k_;
-    fmm_kernel_func_t kernel_func_;
+    std::unique_ptr<stkfmm::STKFMM> fmmPtr_; ///< Pointer to underlying STKFMM object
+    Eigen::MatrixXd r_sl_old_; ///< cached 'single-layer' source positions to check for FMM tree invalidation
+    Eigen::MatrixXd r_dl_old_; ///< cache 'double-layer' source positions to check for FMM tree invalidation
+    Eigen::MatrixXd r_trg_old_; ///< cache target positions to check for FMM tree invalidation
+    stkfmm::KERNEL k_; ///< Kernel enum from STKFMM that this interaction calls
+    fmm_kernel_func_t kernel_func_; ///< Kernel function pointer from our own kernels namespace for the kernel this object will call
 };
 }; // namespace kernels
 
