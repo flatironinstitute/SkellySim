@@ -1,9 +1,11 @@
 #include <algorithm>
-#include <fiber.hpp>
 #include <iostream>
-#include <kernels.hpp>
-#include <parse_util.hpp>
 #include <unordered_map>
+
+#include <parse_util.hpp>
+
+#include <fiber.hpp>
+#include <kernels.hpp>
 #include <utils.hpp>
 
 /// @file

@@ -69,7 +69,7 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<const Eigen::Matri
                                              const Eigen::Ref<const Eigen::MatrixXd> &r_trg, double eta, double reg,
                                              double epsilon_distance) {
 
-    using namespace Eigen;
+    using Eigen::MatrixXd;
     const int N_src = r_src.size() / 3;
     const int N_trg = r_trg.size() / 3;
 
@@ -115,6 +115,55 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<const Eigen::Matri
     }
 
     return G;
+}
+
+/// @brief Build the rotlet tensor for given source/target/density
+///
+/// @param[in] r_src [3 x n_src] matrix of source positions
+/// @param[in] r_trg [3 x n_trg] matrix of target positions
+/// @param[in] density [3 x n_src] matrix source strengths
+/// @param[in] eta viscosity of fluid
+/// @param[in] reg regularization term
+/// @param[in] epsilon_distance threshold distance, below which source-target distances will be regularized
+/// @return [3 x n_trg] rotlet at target given source points
+Eigen::MatrixXd kernels::rotlet(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
+                                const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
+                                const Eigen::Ref<const Eigen::MatrixXd> &density, double eta, double reg,
+                                double epsilon_distance) {
+    using Eigen::MatrixXd;
+    const int N_src = r_src.size() / 3;
+    const int N_trg = r_trg.size() / 3;
+    const double eps2 = epsilon_distance * epsilon_distance;
+    const double reg2 = reg * reg;
+    const double factor = 1 / (8.0 * M_PI * eta);
+
+    MatrixXd u = MatrixXd::Zero(3, r_trg.size());
+
+    // FIXME: Might want to vectorize rotlet calculation
+    for (int i_trg = 0; i_trg < N_trg; ++i_trg) {
+        for (int i_src = 0; i_src < N_src; ++i_src) {
+            double dx = r_src(0, i_src) - r_trg(0, i_trg);
+            double dy = r_src(1, i_src) - r_trg(1, i_trg);
+            double dz = r_src(2, i_src) - r_trg(2, i_trg);
+            double dr2 = dx * dx + dy * dy + dz * dz;
+
+            double dr = dr2 < eps2 ? sqrt(reg2 + dr2) : sqrt(dr2);
+
+            double fr = 1.0 / std::pow(dr, 3);
+            double Mxy = fr * dz;
+            double Mxz = -fr * dy;
+            double Myx = -fr * dz;
+            double Myz = fr * dx;
+            double Mzx = fr * dy;
+            double Mzy = -fr * dx;
+            u(0, i_trg) = Mxy * density(1, i_src) + Mxz * density(2, i_src);
+            u(1, i_trg) = Myx * density(0, i_src) + Myz * density(2, i_src);
+            u(2, i_trg) = Mzx * density(0, i_src) + Mzy * density(1, i_src);
+        }
+    }
+    u *= factor;
+
+    return u;
 }
 
 /// Build the Stresslet tensor contracted with a vector for N points (sources and targets).
