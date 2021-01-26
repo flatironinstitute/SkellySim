@@ -497,6 +497,17 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
 
 const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matrices<4>();
 
+int FiberContainer::get_global_total_fib_points() const {
+    const int local_fib_points = get_local_total_fib_points();
+    int global_fib_points;
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    MPI_Allreduce(&local_fib_points, &global_fib_points, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    return global_fib_points;
+}
+
 void FiberContainer::update_derivatives() {
     for (Fiber &fib : fibers)
         fib.update_derivatives();
@@ -567,7 +578,7 @@ VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all,
 }
 
 MatrixXd FiberContainer::get_r_vectors() const {
-    const int n_pts_tot = get_total_fib_points();
+    const int n_pts_tot = get_local_total_fib_points();
     MatrixXd r(3, n_pts_tot);
     size_t offset = 0;
 
@@ -627,7 +638,7 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
 }
 
 MatrixXd FiberContainer::generate_constant_force() const {
-    const int n_fib_pts = this->get_total_fib_points();
+    const int n_fib_pts = this->get_local_total_fib_points();
     MatrixXd f(3, n_fib_pts);
     size_t offset = 0;
     for (const auto &fib : fibers) {

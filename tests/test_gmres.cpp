@@ -13,6 +13,7 @@
 #include <fiber.hpp>
 #include <periphery.hpp>
 #include <system.hpp>
+#include <utils.hpp>
 
 using namespace Teuchos;
 using Eigen::MatrixXd;
@@ -50,7 +51,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        const int nfib_pts_local = fc_.get_total_fib_points() * 4;
+        const int nfib_pts_local = fc_.get_local_total_fib_points() * 4;
         const int n_shell_rows_local = shell_.M_inv_.rows();
         const int local_size = nfib_pts_local + n_shell_rows_local;
 
@@ -137,7 +138,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        const int nfib_pts_local = fc_.get_total_fib_points() * 4;
+        const int nfib_pts_local = fc_.get_local_total_fib_points() * 4;
         const int n_shell_pts_local = shell_.M_inv_.rows();
         const int local_size = nfib_pts_local + n_shell_pts_local;
 
@@ -166,7 +167,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             cout << "A_fiber_hydro::apply" << endl;
         }
 
-        const int n_fib_pts_local = 4 * fc_.get_total_fib_points();
+        const int n_fib_pts_local = 4 * fc_.get_local_total_fib_points();
         const int n_shell_pts_local = shell_.node_counts_[rank];
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
             using Eigen::Map;
@@ -308,7 +309,23 @@ int main(int argc, char *argv[]) {
             Eigen::Map<Eigen::VectorXd>(RHS->getDataNonConst(0).getRawPtr() + offset, shell.RHS_.size()) = shell.RHS_;
             offset += shell.RHS_.size();
         }
-        cnpy::npy_save("RHS.npy", RHS->getData().getRawPtr(), {RHS->getLocalLength()});
+
+        std::cout << rank << " " << fc.get_global_total_fib_points() << std::endl;
+        {
+            Eigen::VectorXd RHS_fib_local(fc.get_local_total_fib_points() * 4);
+            int offset = 0;
+            for (auto &fib : fc.fibers) {
+                RHS_fib_local.segment(offset, fib.RHS_.size()) = fib.RHS_;
+                offset += fib.RHS_.size();
+            }
+
+            Eigen::VectorXd RHS_fib_global = utils::collect_into_global(RHS_fib_local);
+            Eigen::VectorXd RHS_shell_global = utils::collect_into_global(shell.RHS_);
+            if (rank == 0) {
+                cnpy::npy_save("RHS_fib.npy", RHS_fib_global.data(), {(unsigned long)RHS_fib_global.size()});
+                cnpy::npy_save("RHS_shell.npy", RHS_shell_global.data(), {(unsigned long)RHS_shell_global.size()});
+            }
+        }
 
         Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, RHS);
         if (rank == 0)

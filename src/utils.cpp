@@ -1,4 +1,5 @@
 #include <utils.hpp>
+#include <mpi.h>
 
 //  Following the paper Calculation of weights in finite different formulas,
 //  Bengt Fornberg, SIAM Rev. 40 (3), 685 (1998).
@@ -67,4 +68,36 @@ Eigen::MatrixXd utils::finite_diff(const Eigen::Ref<Eigen::ArrayXd> &s, int M, i
         }
     }
     return D_s;
+}
+
+/// @brief Collects eigen arrays of potentially varying sizes across MPI ranks and returns them
+/// in one large array to root process.
+///
+/// @param[in] local_vec vector to collect
+/// @returns Concatenated vector of local_vec on rank 0, empty vector otherwise
+Eigen::VectorXd utils::collect_into_global(const Eigen::Ref<const Eigen::VectorXd> &local_vec) {
+    int size, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    Eigen::VectorXi sizes(size);
+    Eigen::VectorXd global_vec;
+
+    const int local_vec_size = local_vec.size();
+
+    MPI_Gather(&local_vec_size, 1, MPI_INT, sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    Eigen::VectorXi displs(size + 1);
+    displs[0] = 0;
+    int global_vec_size = 0;
+    for (int i = 0; i < size; ++i) {
+        displs[i + 1] = displs[i] + sizes[i];
+        global_vec_size += sizes[i];
+    }
+    if (rank == 0)
+        global_vec.resize(global_vec_size);
+
+    MPI_Gatherv(local_vec.data(), local_vec.size(), MPI_DOUBLE, global_vec.data(), sizes.data(), displs.data(),
+                MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    return global_vec;
 }

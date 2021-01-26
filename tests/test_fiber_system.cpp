@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     Params params(config.get_as<toml::table>("params"));
     FiberContainer fibs(config.get_as<toml::array>("fibers"), params);
 
-    Eigen::MatrixXd f_fib = Eigen::MatrixXd::Zero(3, fibs.get_total_fib_points());
+    Eigen::MatrixXd f_fib = Eigen::MatrixXd::Zero(3, fibs.get_local_total_fib_points());
 
     for (auto &fib : fibs.fibers) {
         assert(fib.length_ == length);

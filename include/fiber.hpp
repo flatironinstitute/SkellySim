@@ -149,13 +149,15 @@ class FiberContainer {
     /// @brief get total number of points across fibers in the container
     /// Usually you need this to form arrays used as input later
     /// @returns total number of points across fibers in the container :)
-    int get_total_fib_points() const {
+    int get_local_total_fib_points() const {
         // FIXME: This could certainly be cached
         int tot = 0;
         for (auto &fib : fibers)
             tot += fib.num_points_;
         return tot;
     };
+
+    int get_global_total_fib_points() const;
 
     Eigen::MatrixXd generate_constant_force() const;
     Eigen::MatrixXd get_r_vectors() const;
