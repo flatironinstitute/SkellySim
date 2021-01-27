@@ -310,7 +310,6 @@ int main(int argc, char *argv[]) {
             offset += shell.RHS_.size();
         }
 
-        std::cout << rank << " " << fc.get_global_total_fib_points() << std::endl;
         {
             Eigen::VectorXd RHS_fib_local(fc.get_local_total_fib_points() * 4);
             int offset = 0;
