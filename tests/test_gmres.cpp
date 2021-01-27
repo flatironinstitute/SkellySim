@@ -282,19 +282,8 @@ int main(int argc, char *argv[]) {
         RCP<vec_type> X, RHS;
         X = rcp(new vec_type(map));
         RHS = rcp(new vec_type(map));
-        X->putScalar(1.0);
 
-        A_sim->apply(*X, *RHS);
-
-        cnpy::npy_save("Y.npy", RHS->getData().getRawPtr(), {RHS->getLocalLength()});
         X->putScalar(0.0);
-        { // Initialize FMM for reliable benchmarks
-            double tmp = fc.fibers[0].x_(0, 0);
-            fc.fibers[0].x_(0, 0) = 1.0;
-            A_sim->apply(*X, *RHS);
-            fc.fibers[0].x_(0, 0) = tmp;
-        }
-
         RHS->putScalar(0.0);
         { // Initialize RHS
             int offset = 0;
@@ -311,20 +300,35 @@ int main(int argc, char *argv[]) {
         }
 
         {
-            Eigen::VectorXd RHS_fib_local(fc.get_local_total_fib_points() * 4);
-            int offset = 0;
-            for (auto &fib : fc.fibers) {
-                RHS_fib_local.segment(offset, fib.RHS_.size()) = fib.RHS_;
-                offset += fib.RHS_.size();
-            }
+            const int n_fib_x = fc.get_local_total_fib_points() * 4;
+            const int n_shell_x = shell.RHS_.size();
+            RCP<vec_type> Y = rcp(new vec_type(map));
+            const double *RHS_ptr = RHS->getData(0).getRawPtr();
+            const double *Y_ptr = Y->getData(0).getRawPtr();
 
-            Eigen::VectorXd RHS_fib_global = utils::collect_into_global(RHS_fib_local);
-            Eigen::VectorXd RHS_shell_global = utils::collect_into_global(shell.RHS_);
+            X->putScalar(1.0);
+            A_sim->apply(*X, *Y);
+            X->putScalar(0.0);
+
+            Eigen::VectorXd RHS_fib_global =
+                utils::collect_into_global(Eigen::Map<const Eigen::VectorXd>(RHS_ptr, n_fib_x));
+            Eigen::VectorXd RHS_shell_global =
+                utils::collect_into_global(Eigen::Map<const Eigen::VectorXd>(RHS_ptr + n_fib_x, n_shell_x));
+            Eigen::VectorXd Y_fib_global =
+                utils::collect_into_global(Eigen::Map<const Eigen::VectorXd>(Y_ptr, n_fib_x));
+            Eigen::VectorXd Y_shell_global =
+                utils::collect_into_global(Eigen::Map<const Eigen::VectorXd>(Y_ptr + n_fib_x, n_shell_x));
+
             if (rank == 0) {
                 cnpy::npy_save("RHS_fib.npy", RHS_fib_global.data(), {(unsigned long)RHS_fib_global.size()});
                 cnpy::npy_save("RHS_shell.npy", RHS_shell_global.data(), {(unsigned long)RHS_shell_global.size()});
+                cnpy::npy_save("Y_fib.npy", Y_fib_global.data(), {(unsigned long)Y_fib_global.size()});
+                cnpy::npy_save("Y_shell.npy", Y_shell_global.data(), {(unsigned long)RHS_shell_global.size()});
             }
         }
+
+        fc.fmm_->force_setup_tree();
+        shell.fmm_->force_setup_tree();
 
         Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, RHS);
         if (rank == 0)

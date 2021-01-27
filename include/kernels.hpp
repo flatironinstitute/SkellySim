@@ -47,6 +47,9 @@ class FMM {
         : fmmPtr_(new stkfmm_type(order, maxPoints, paxis, static_cast<unsigned>(k))), k_(k),
           kernel_func_(kernel_func){};
 
+    /// @brief Set flag to force next call to set up tree, regardless of cache variables
+    void force_setup_tree() { force_setup_tree_ = true; };
+
     /// @brief Evaluate the FMM kernel given the given sources/targets
     ///
     /// Repeated calls to the FMM object with the same source/target positions will maintain
@@ -65,8 +68,8 @@ class FMM {
                                const Eigen::Ref<const Eigen::MatrixXd> &f_dl) {
         // Check if LOCAL source/target points have changed, and then broadcast that for a GLOBAL update
         char setup_flag_local =
-            (r_sl_old_.size() != r_sl.size() || r_dl_old_.size() != r_dl.size() || r_trg_old_.size() != r_trg.size() ||
-             r_sl_old_ != r_sl || r_dl_old_ != r_dl || r_trg_old_ != r_trg);
+            (force_setup_tree_ || r_sl_old_.size() != r_sl.size() || r_dl_old_.size() != r_dl.size() ||
+             r_trg_old_.size() != r_trg.size() || r_sl_old_ != r_sl || r_dl_old_ != r_dl || r_trg_old_ != r_trg);
         char setup_flag;
         MPI_Allreduce(&setup_flag_local, &setup_flag, 1, MPI_CHAR, MPI_LOR, MPI_COMM_WORLD);
 
@@ -100,6 +103,7 @@ class FMM {
             r_sl_old_ = r_sl;
             r_dl_old_ = r_dl;
             r_trg_old_ = r_trg;
+            force_setup_tree_ = false;
         }
 
         int n_trg = r_trg.size() / 3;
@@ -108,11 +112,14 @@ class FMM {
 
   private:
     std::unique_ptr<stkfmm::STKFMM> fmmPtr_; ///< Pointer to underlying STKFMM object
-    Eigen::MatrixXd r_sl_old_; ///< cached 'single-layer' source positions to check for FMM tree invalidation
-    Eigen::MatrixXd r_dl_old_; ///< cache 'double-layer' source positions to check for FMM tree invalidation
+    bool force_setup_tree_;     ///< When set, forces tree to rebuild on next call, then is cleared. Useful for
+                                ///< testing/benchmarking
+    Eigen::MatrixXd r_sl_old_;  ///< cached 'single-layer' source positions to check for FMM tree invalidation
+    Eigen::MatrixXd r_dl_old_;  ///< cache 'double-layer' source positions to check for FMM tree invalidation
     Eigen::MatrixXd r_trg_old_; ///< cache target positions to check for FMM tree invalidation
-    stkfmm::KERNEL k_; ///< Kernel enum from STKFMM that this interaction calls
-    fmm_kernel_func_t kernel_func_; ///< Kernel function pointer from our own kernels namespace for the kernel this object will call
+    stkfmm::KERNEL k_;          ///< Kernel enum from STKFMM that this interaction calls
+    fmm_kernel_func_t
+        kernel_func_; ///< Kernel function pointer from our own kernels namespace for the kernel this object will call
 };
 }; // namespace kernels
 
