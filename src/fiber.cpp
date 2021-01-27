@@ -95,25 +95,26 @@ void Fiber::update_linear_operator(double dt, double eta) {
 
     A_.resize(4 * num_points_up, 4 * num_points_down);
     A_.setZero();
-    MatrixXd A_XX = A_.block(0 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_XY = A_.block(0 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_XZ = A_.block(0 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_XT = A_.block(0 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    typedef Eigen::Block<Eigen::MatrixXd> submat_t;
+    submat_t A_XX = A_.block(0 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
+    submat_t A_XY = A_.block(0 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
+    submat_t A_XZ = A_.block(0 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
+    submat_t A_XT = A_.block(0 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
 
-    MatrixXd A_YX = A_.block(1 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_YY = A_.block(1 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_YZ = A_.block(1 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_YT = A_.block(1 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    submat_t A_YX = A_.block(1 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
+    submat_t A_YY = A_.block(1 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
+    submat_t A_YZ = A_.block(1 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
+    submat_t A_YT = A_.block(1 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
 
-    MatrixXd A_ZX = A_.block(2 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_ZY = A_.block(2 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_ZZ = A_.block(2 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_ZT = A_.block(2 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    submat_t A_ZX = A_.block(2 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
+    submat_t A_ZY = A_.block(2 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
+    submat_t A_ZZ = A_.block(2 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
+    submat_t A_ZT = A_.block(2 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
 
-    MatrixXd A_TX = A_.block(3 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_TY = A_.block(3 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_TZ = A_.block(3 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    MatrixXd A_TT = A_.block(3 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    submat_t A_TX = A_.block(3 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
+    submat_t A_TY = A_.block(3 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
+    submat_t A_TZ = A_.block(3 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
+    submat_t A_TT = A_.block(3 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
 
     VectorXd I_vec = VectorXd::Ones(num_points_);
 
@@ -536,11 +537,7 @@ VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<const VectorXd> &
 
 VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all,
                                 const Eigen::Ref<const MatrixXd> &v_fib) const {
-    int num_points_tot = 0;
-    for (auto &fib : fibers)
-        num_points_tot += fib.num_points_;
-
-    VectorXd res = VectorXd::Zero(num_points_tot * 4);
+    VectorXd res = VectorXd::Zero(get_local_total_fib_points() * 4);
 
     size_t offset = 0;
     for (auto &fib : fibers) {
