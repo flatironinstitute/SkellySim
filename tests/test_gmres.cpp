@@ -50,8 +50,8 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        const int nfib_pts_local = fc_.get_local_total_fib_points() * 4;
-        const int n_shell_rows_local = shell_.M_inv_.rows();
+        const int nfib_pts_local = fc_.get_local_solution_size();
+        const int n_shell_rows_local = shell_.get_local_solution_size();
         const int local_size = nfib_pts_local + n_shell_rows_local;
 
         // Construct a map for our block row distribution
@@ -155,8 +155,8 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        const int nfib_pts_local = fc_.get_local_total_fib_points() * 4;
-        const int n_shell_pts_local = shell_.M_inv_.rows();
+        const int nfib_pts_local = fc_.get_local_solution_size();
+        const int n_shell_pts_local = shell_.get_local_solution_size();
         const int local_size = nfib_pts_local + n_shell_pts_local;
 
         // Construct a map for our block row distribution
@@ -184,8 +184,9 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             cout << "A_fiber_hydro::apply" << endl;
         }
 
-        const int n_fib_pts_local = 4 * fc_.get_local_total_fib_points();
-        const int n_shell_pts_local = shell_.node_counts_[rank];
+        const int n_fib_pts_local = fc_.get_local_solution_size();
+        const int n_shell_pts_local = shell_.get_local_solution_size();
+        const int n_pts_local = n_fib_pts_local + n_shell_pts_local;
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
             using Eigen::Map;
 
@@ -307,45 +308,35 @@ int main(int argc, char *argv[]) {
 
         X->putScalar(0.0);
         RHS->putScalar(0.0);
-        { // Initialize RHS
-            int offset = 0;
-            for (auto &fib : fc.fibers) {
-                Eigen::Map<Eigen::VectorXd>(RHS->getDataNonConst(0).getRawPtr() + offset, fib.RHS_.size()) = fib.RHS_;
-                offset += fib.RHS_.size();
-            }
+        const int fib_sol_size = fc.get_local_solution_size();
+        const int shell_sol_size = shell.get_local_solution_size();
+        Eigen::Map<Eigen::VectorXd> RHS_fib(RHS->getDataNonConst(0).getRawPtr(), fib_sol_size);
+        Eigen::Map<Eigen::VectorXd> RHS_shell(RHS->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
 
-            // Initialize RHS for shell
-            // Just the velocity, which should be zero on first pass
-            // So.. do nothing
-            Eigen::Map<Eigen::VectorXd>(RHS->getDataNonConst(0).getRawPtr() + offset, shell.RHS_.size()) = shell.RHS_;
-            offset += shell.RHS_.size();
-        }
+        // Initialize GMRES RHS vector
+        RHS_fib = fc.get_RHS();
+        RHS_shell = shell.get_RHS();
 
+        // Output application of A_hydro operator on simple input for comparison to python output
         {
-            const int n_fib_x = fc.get_local_total_fib_points() * 4;
-            const int n_shell_x = shell.RHS_.size();
             RCP<vec_type> Y = rcp(new vec_type(map));
-            const double *RHS_ptr = RHS->getData(0).getRawPtr();
-            const double *Y_ptr = Y->getData(0).getRawPtr();
+            Eigen::Map<Eigen::VectorXd> fib_Y(Y->getDataNonConst(0).getRawPtr(), fib_sol_size);
+            Eigen::Map<Eigen::VectorXd> shell_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
 
             X->putScalar(1.0);
             A_sim->apply(*X, *Y);
             X->putScalar(0.0);
 
-            Eigen::VectorXd RHS_fib_global =
-                utils::collect_into_global(Eigen::Map<const Eigen::VectorXd>(RHS_ptr, n_fib_x));
-            Eigen::VectorXd RHS_shell_global =
-                utils::collect_into_global(Eigen::Map<const Eigen::VectorXd>(RHS_ptr + n_fib_x, n_shell_x));
-            Eigen::VectorXd Y_fib_global =
-                utils::collect_into_global(Eigen::Map<const Eigen::VectorXd>(Y_ptr, n_fib_x));
-            Eigen::VectorXd Y_shell_global =
-                utils::collect_into_global(Eigen::Map<const Eigen::VectorXd>(Y_ptr + n_fib_x, n_shell_x));
+            Eigen::VectorXd RHS_fib_global = utils::collect_into_global(RHS_fib);
+            Eigen::VectorXd RHS_shell_global = utils::collect_into_global(RHS_shell);
+            Eigen::VectorXd fib_Y_global = utils::collect_into_global(fib_Y);
+            Eigen::VectorXd shell_Y_global = utils::collect_into_global(shell_Y);
 
             if (rank == 0) {
                 cnpy::npy_save("RHS_fib.npy", RHS_fib_global.data(), {(unsigned long)RHS_fib_global.size()});
                 cnpy::npy_save("RHS_shell.npy", RHS_shell_global.data(), {(unsigned long)RHS_shell_global.size()});
-                cnpy::npy_save("Y_fib.npy", Y_fib_global.data(), {(unsigned long)Y_fib_global.size()});
-                cnpy::npy_save("Y_shell.npy", Y_shell_global.data(), {(unsigned long)RHS_shell_global.size()});
+                cnpy::npy_save("Y_fib.npy", fib_Y_global.data(), {(unsigned long)fib_Y_global.size()});
+                cnpy::npy_save("Y_shell.npy", shell_Y_global.data(), {(unsigned long)RHS_shell_global.size()});
             }
         }
 

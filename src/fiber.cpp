@@ -574,6 +574,17 @@ VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all,
     return res;
 }
 
+VectorXd FiberContainer::get_RHS() const {
+    Eigen::VectorXd RHS(get_local_solution_size());
+    int offset = 0;
+    for (auto &fib : fibers) {
+        RHS.segment(offset, fib.RHS_.size()) = fib.RHS_;
+        offset += fib.RHS_.size();
+    }
+
+    return RHS;
+}
+
 MatrixXd FiberContainer::get_r_vectors() const {
     const int n_pts_tot = get_local_total_fib_points();
     MatrixXd r(3, n_pts_tot);

@@ -159,8 +159,12 @@ class FiberContainer {
 
     int get_global_total_fib_points() const;
 
+    /// @brief Get the size of all local fibers contribution to the matrix problem solution
+    int get_local_solution_size() const { return get_local_total_fib_points() * 4; }
+
     Eigen::MatrixXd generate_constant_force() const;
     Eigen::MatrixXd get_r_vectors() const;
+    Eigen::VectorXd get_RHS() const;
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &forces,
                          const Eigen::Ref<const Eigen::MatrixXd> &r_trg_external, double eta) const;
     Eigen::VectorXd matvec(const Eigen::Ref<const Eigen::VectorXd> &x_all,

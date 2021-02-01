@@ -51,17 +51,16 @@ Periphery::Periphery(const std::string &precompute_file) {
             new FMM<Stk3DFMM>(order, maxpts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm));
     }
 
-    int world_rank, world_size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
 
     cnpy::npz_t precomp;
 
-    if (world_rank == 0)
+    if (world_rank_ == 0)
         std::cout << "Loading raw precomputation data from file " << precompute_file << " for periphery into rank 0\n";
     int n_rows;
     int n_nodes;
-    if (world_rank == 0) {
+    if (world_rank_ == 0) {
         precomp = cnpy::npz_load(precompute_file);
         n_rows = precomp.at("M_inv").shape[0];
         n_nodes = precomp.at("nodes").shape[0];
@@ -71,16 +70,16 @@ Periphery::Periphery(const std::string &precompute_file) {
     MPI_Bcast((void *)&n_nodes, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     const int n_cols = n_rows;
-    const int node_size_big = 3 * (n_nodes / world_size + 1);
-    const int node_size_small = 3 * (n_nodes / world_size);
-    const int node_size_local = (n_nodes % world_size > world_rank) ? node_size_big : node_size_small;
-    const int n_nodes_big = n_nodes % world_size;
+    const int node_size_big = 3 * (n_nodes / world_size_ + 1);
+    const int node_size_small = 3 * (n_nodes / world_size_);
+    const int node_size_local = (n_nodes % world_size_ > world_rank_) ? node_size_big : node_size_small;
+    const int n_nodes_big = n_nodes % world_size_;
     const int nrows_local = node_size_local;
 
     // TODO: prevent overflow for large matrices in periphery import
-    node_counts_.resize(world_size);
-    node_displs_ = Eigen::VectorXi::Zero(world_size + 1);
-    for (int i = 0; i < world_size; ++i) {
+    node_counts_.resize(world_size_);
+    node_displs_ = Eigen::VectorXi::Zero(world_size_ + 1);
+    for (int i = 0; i < world_size_; ++i) {
         node_counts_[i] = ((i < n_nodes_big) ? node_size_big : node_size_small);
         node_displs_[i + 1] = node_displs_[i] + node_counts_[i];
     }
@@ -89,40 +88,40 @@ Periphery::Periphery(const std::string &precompute_file) {
     quad_counts_ = node_counts_ / 3;
     quad_displs_ = node_displs_ / 3;
 
-    const double *M_inv_raw = (world_rank == 0) ? precomp["M_inv"].data<double>() : NULL;
+    const double *M_inv_raw = (world_rank_ == 0) ? precomp["M_inv"].data<double>() : NULL;
     const double *stresslet_plus_complementary_raw =
-        (world_rank == 0) ? precomp["stresslet_plus_complementary"].data<double>() : NULL;
-    const double *normals_raw = (world_rank == 0) ? precomp["normals"].data<double>() : NULL;
-    const double *nodes_raw = (world_rank == 0) ? precomp["nodes"].data<double>() : NULL;
-    const double *quadrature_weights_raw = (world_rank == 0) ? precomp["quadrature_weights"].data<double>() : NULL;
+        (world_rank_ == 0) ? precomp["stresslet_plus_complementary"].data<double>() : NULL;
+    const double *normals_raw = (world_rank_ == 0) ? precomp["normals"].data<double>() : NULL;
+    const double *nodes_raw = (world_rank_ == 0) ? precomp["nodes"].data<double>() : NULL;
+    const double *quadrature_weights_raw = (world_rank_ == 0) ? precomp["quadrature_weights"].data<double>() : NULL;
 
     // Numpy data is row-major, while eigen is column-major. Easiest way to rectify this is to
     // load in matrix as its transpose, then transpose back
     M_inv_.resize(n_cols, nrows_local);
-    MPI_Scatterv(M_inv_raw, row_counts_.data(), row_displs_.data(), MPI_DOUBLE, M_inv_.data(), row_counts_[world_rank],
+    MPI_Scatterv(M_inv_raw, row_counts_.data(), row_displs_.data(), MPI_DOUBLE, M_inv_.data(), row_counts_[world_rank_],
                  MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     stresslet_plus_complementary_.resize(n_cols, nrows_local);
     MPI_Scatterv(stresslet_plus_complementary_raw, row_counts_.data(), row_displs_.data(), MPI_DOUBLE,
-                 stresslet_plus_complementary_.data(), row_counts_[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                 stresslet_plus_complementary_.data(), row_counts_[world_rank_], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     M_inv_.transposeInPlace();
     stresslet_plus_complementary_.transposeInPlace();
 
     node_normal_.resize(3, node_size_local / 3);
     MPI_Scatterv(normals_raw, node_counts_.data(), node_displs_.data(), MPI_DOUBLE, node_normal_.data(),
-                 node_counts_[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                 node_counts_[world_rank_], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     node_pos_.resize(3, node_size_local / 3);
     MPI_Scatterv(nodes_raw, node_counts_.data(), node_displs_.data(), MPI_DOUBLE, node_pos_.data(),
-                 node_counts_[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                 node_counts_[world_rank_], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     quadrature_weights_.resize(node_size_local / 3);
     MPI_Scatterv(quadrature_weights_raw, quad_counts_.data(), quad_displs_.data(), MPI_DOUBLE,
-                 quadrature_weights_.data(), quad_counts_[world_rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                 quadrature_weights_.data(), quad_counts_[world_rank_], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     n_nodes_global_ = n_nodes;
 
-    if (world_rank == 0)
+    if (world_rank_ == 0)
         std::cout << "Done initializing periphery\n";
 }

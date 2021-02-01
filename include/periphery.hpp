@@ -18,7 +18,13 @@ class Periphery {
 
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &trg, const Eigen::Ref<const Eigen::MatrixXd> &density,
                          double eta) const;
+
+    /// @brief Get the size of the shell's contribution to the matrix problem solution
+    int get_local_solution_size() const { return (world_rank_ == -1) ? 0 : node_counts_[world_rank_]; }
+
     void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell);
+
+    Eigen::VectorXd get_RHS() const { return RHS_; };
 
     /// pointer to FMM object (pointer to avoid constructing object with empty Periphery)
     std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> fmm_;
@@ -43,6 +49,9 @@ class Periphery {
     Eigen::VectorXi row_displs_;
 
     int n_nodes_global_ = 0; ///< Number of nodes across ALL MPI ranks
+  private:
+    int world_size_;
+    int world_rank_ = -1;
 };
 
 #endif
