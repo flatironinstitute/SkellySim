@@ -33,7 +33,7 @@ class Body {
     Eigen::MatrixXd node_normals_ref_;   ///< [ 3 x n_nodes ] node normals in reference 'body' frame
     Eigen::VectorXd node_weights_;       ///< [ n_nodes ] far field quadrature weights for nodes
 
-    Eigen::MatrixXd A_; ///< Matrix representation of body for solver
+    Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
 
     Body(const toml::table *body_table, const Params &params);
@@ -45,9 +45,19 @@ class Body {
     void update_singularity_subtraction_vecs(double eta);
     void load_precompute_data(const std::string &input_file);
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
+
+    // For structures with fixed size Eigen::Vector types, this ensures alignment if the
+    // structure is allocated via `new`
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-class BodyContainer {};
+class BodyContainer {
+  public:
+    std::vector<Body> bodies;
+    /// Empty container constructor to avoid initialization list complications. No way to
+    /// initialize after using this constructor, so overwrite objects with full constructor.
+    BodyContainer(){};
+    BodyContainer(toml::array *body_tables, Params &params);
+};
 
 #endif

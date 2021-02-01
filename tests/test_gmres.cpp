@@ -42,8 +42,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    P_inv_hydro(const RCP<const Comm<int>> comm, const FiberContainer &fc, const Periphery &shell)
-        : fc_(fc), shell_(shell) {
+    P_inv_hydro(const RCP<const Comm<int>> comm, const System &sys) : fc_(sys.fc_), shell_(sys.shell_), bc_(sys.bc_) {
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "P_inv_hydro constructor: The input Comm object must be nonnull.");
         if (comm->getRank() == 0) {
@@ -82,8 +81,10 @@ class P_inv_hydro : public Tpetra::Operator<> {
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
             using Eigen::Map;
 
-            // Get a view of the desired column
+            // Current position in result vector
             local_ordinal_type offset = 0;
+            // Loop through fibers and apply their preconditioner to the Tpetra result vector
+            // Fixme: move Fiber loops to FiberContainer
             for (auto &fib : fc_.fibers) {
                 Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, fib.num_points_ * 4);
                 Map<VectorXd> res_fib(Y.getDataNonConst(c).getRawPtr() + offset, fib.num_points_ * 4);
@@ -92,13 +93,28 @@ class P_inv_hydro : public Tpetra::Operator<> {
                 offset += fib.num_points_ * 4;
             }
 
-            Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_.node_counts_[rank]);
-            VectorXd x_shell(3 * shell_.n_nodes_global_);
+            // Each MPI rank has only a _local_ portion of the inverse matrix, but needs the _global_ 'X' vector to
+            // contract against. Each rank will get a full copy of the 'X' in x_shell
+            VectorXd x_shell(3 * shell_.n_nodes_global_); /// Shell 'x' across _all_ mpi ranks
 
+            // Collect local 'X' data and distribute to _all_ MPI ranks
             MPI_Allgatherv(X.getData(c).getRawPtr() + offset, shell_.node_counts_[rank], MPI_DOUBLE, x_shell.data(),
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
+            // Copy local result into local portion of Tpetra result vector via an Eigen map
+            Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_.node_counts_[rank]);
             res_view_shell = shell_.M_inv_ * x_shell;
+
+            offset += x_shell.size();
+
+            // Fixme: move Body loops to BodyContainer
+            for (auto &body : bc_.bodies) {
+                Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, body.n_nodes_ * 3);
+                Map<VectorXd> res_body(Y.getDataNonConst(c).getRawPtr() + offset, body.n_nodes_ * 3);
+                res_body = body.A_LU_.solve(XView);
+
+                offset += body.n_nodes_ * 3;
+            }
         }
     }
 
@@ -106,6 +122,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
     RCP<const map_type> opMap_;
     const FiberContainer &fc_;
     const Periphery &shell_;
+    const BodyContainer &bc_;
 };
 
 class A_fiber_hydro : public Tpetra::Operator<> {
@@ -129,8 +146,8 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    A_fiber_hydro(const RCP<const Comm<int>> comm, const FiberContainer &fc, const Periphery &shell, const double eta)
-        : fc_(fc), shell_(shell), eta_(eta) {
+    A_fiber_hydro(const RCP<const Comm<int>> comm, const System &sys, const double eta)
+        : fc_(sys.fc_), shell_(sys.shell_), bc_(sys.bc_), eta_(eta) {
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "A_fiber_hydro constructor: The input Comm object must be nonnull.");
         if (comm->getRank() == 0) {
@@ -180,19 +197,22 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             Map<VectorXd> res_fib(res_ptr, n_fib_pts_local);
             Map<VectorXd> res_shell(res_ptr + n_fib_pts_local, n_shell_pts_local);
             MatrixXd r_fib = fc_.get_r_vectors();
+
+            // Collect all X shell data into single vector on all ranks
+            // (for res_shell_local = A_shell_local * x_shell_global + stuff)
             VectorXd x_shell_global(3 * shell_.n_nodes_global_);
             MPI_Allgatherv(x_shell_local.data(), n_shell_pts_local, MPI_DOUBLE, x_shell_global.data(),
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
             // calculate fiber-fiber velocity
             MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
-            MatrixXd v_all = fc_.flow(fw, shell_.node_pos_, eta_);
-            MatrixXd vshell2fib = shell_.flow(r_fib, x_shell_local, eta_);
-            v_all.block(0, 0, 3, r_fib.cols()) += vshell2fib;
+            MatrixXd v_fib2all = fc_.flow(fw, shell_.node_pos_, eta_);
+            MatrixXd v_shell2fib = shell_.flow(r_fib, x_shell_local, eta_);
+            v_fib2all.block(0, 0, 3, r_fib.cols()) += v_shell2fib;
 
-            res_fib = fc_.matvec(x_fib_local, v_all.block(0, 0, 3, r_fib.cols()));
+            res_fib = fc_.matvec(x_fib_local, v_fib2all.block(0, 0, 3, r_fib.cols()));
             res_shell = shell_.stresslet_plus_complementary_ * x_shell_global;
-            res_shell += Map<VectorXd>(v_all.data() + 3 * r_fib.cols(), n_shell_pts_local);
+            res_shell += Map<VectorXd>(v_fib2all.data() + 3 * r_fib.cols(), n_shell_pts_local);
         }
     }
 
@@ -200,6 +220,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     RCP<const map_type> opMap_;
     const FiberContainer &fc_;
     const Periphery &shell_;
+    const BodyContainer &bc_;
     const double eta_;
 };
 
@@ -242,6 +263,7 @@ int main(int argc, char *argv[]) {
         Params &params = system.params_;
         Periphery &shell = system.shell_;
         FiberContainer &fc = system.fc_;
+        BodyContainer &bc = system.bc_;
         const double eta = params.eta;
         const double dt = params.dt;
         const double tol = params.gmres_tol;
@@ -270,8 +292,8 @@ int main(int argc, char *argv[]) {
             shell.update_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));
         }
 
-        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, fc, shell, eta));
-        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm, fc, shell));
+        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, system, eta));
+        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm, system));
 
         RCP<const Tpetra::Map<>> map = A_sim->getDomainMap();
         typedef Tpetra::Vector<A_fiber_hydro::scalar_type, A_fiber_hydro::local_ordinal_type,
