@@ -107,14 +107,14 @@ class P_inv_hydro : public Tpetra::Operator<> {
 
             offset += x_shell.size();
 
-            // Fixme: move Body loops to BodyContainer
-            for (auto &body : bc_.bodies) {
-                Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, body.n_nodes_ * 3);
-                Map<VectorXd> res_body(Y.getDataNonConst(c).getRawPtr() + offset, body.n_nodes_ * 3);
-                res_body = body.A_LU_.solve(XView);
+            // // Fixme: move Body loops to BodyContainer
+            // for (auto &body : bc_.bodies) {
+            //     Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, body.n_nodes_ * 3);
+            //     Map<VectorXd> res_body(Y.getDataNonConst(c).getRawPtr() + offset, body.n_nodes_ * 3);
+            //     res_body = body.A_LU_.solve(XView);
 
-                offset += body.n_nodes_ * 3;
-            }
+            //     offset += body.n_nodes_ * 3;
+            // }
         }
     }
 

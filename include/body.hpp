@@ -58,6 +58,37 @@ class BodyContainer {
     /// initialize after using this constructor, so overwrite objects with full constructor.
     BodyContainer(){};
     BodyContainer(toml::array *body_tables, Params &params);
+
+    int get_local_total_body_nodes() const {
+        int tot = 0;
+        for (const auto &body : bodies)
+            tot += body.n_nodes_;
+        return tot;
+    }
+    /// @brief Get the size of all local bodies contribution to the matrix problem solution
+    ///
+    /// Since there aren't many bodies, and there is no easy way to synchronize them across processes, the rank 0
+    /// process handles all components of the solution.
+    int get_local_solution_size() const {
+        return (world_rank_ == 0) ? get_local_total_body_nodes() + 6 * bodies.size() : 0;
+    }
+
+    Eigen::VectorXd get_RHS() const;
+
+    void update_cache_variables(double eta) {
+        for (auto &body : bodies)
+            body.update_cache_variables(eta);
+    }
+
+    /// @brief Synchronize body objects across processes
+    ///
+    /// Forces/torques/positions/orientations must be synchronized since each rank's contribution to force/torque will
+    /// be different. This routine will appropriately make all body objects across processes the same.
+    void synchronize();
+
+  private:
+    int world_rank_ = 0;
+    int world_size_;
 };
 
 #endif

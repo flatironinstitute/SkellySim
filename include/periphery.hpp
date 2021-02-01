@@ -20,7 +20,7 @@ class Periphery {
                          double eta) const;
 
     /// @brief Get the size of the shell's contribution to the matrix problem solution
-    int get_local_solution_size() const { return (world_rank_ == -1) ? 0 : node_counts_[world_rank_]; }
+    int get_local_solution_size() const { return M_inv_.rows(); }
 
     void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell);
 

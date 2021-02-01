@@ -501,9 +501,6 @@ const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matri
 int FiberContainer::get_global_total_fib_points() const {
     const int local_fib_points = get_local_total_fib_points();
     int global_fib_points;
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     MPI_Allreduce(&local_fib_points, &global_fib_points, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     return global_fib_points;
@@ -577,7 +574,7 @@ VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all,
 VectorXd FiberContainer::get_RHS() const {
     Eigen::VectorXd RHS(get_local_solution_size());
     int offset = 0;
-    for (auto &fib : fibers) {
+    for (const auto &fib : fibers) {
         RHS.segment(offset, fib.RHS_.size()) = fib.RHS_;
         offset += fib.RHS_.size();
     }
@@ -675,6 +672,9 @@ MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<const VectorXd> &x_a
 }
 
 FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
+
     if (!fiber_tables) {
         return;
     }
@@ -682,25 +682,21 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
     fmm_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
         8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
 
-    int rank, world_size;
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
     const int n_fibs_tot = fiber_tables->size();
-    const int n_fibs_extra = n_fibs_tot % world_size;
-    if (rank == 0)
+    const int n_fibs_extra = n_fibs_tot % world_size_;
+    if (world_rank_ == 0)
         std::cout << "Reading in " << n_fibs_tot << " fibers.\n";
 
-    std::vector<int> displs(world_size + 1);
-    for (int i = 1; i < world_size + 1; ++i) {
-        displs[i] = displs[i - 1] + n_fibs_tot / world_size;
+    std::vector<int> displs(world_size_ + 1);
+    for (int i = 1; i < world_size_ + 1; ++i) {
+        displs[i] = displs[i - 1] + n_fibs_tot / world_size_;
         if (i <= n_fibs_extra)
             displs[i]++;
     }
 
     for (int i_fib = 0; i_fib < n_fibs_tot; ++i_fib) {
-        const int i_fib_low = displs[rank];
-        const int i_fib_high = displs[rank + 1];
+        const int i_fib_low = displs[world_rank_];
+        const int i_fib_high = displs[world_rank_ + 1];
 
         if (i_fib >= i_fib_low && i_fib < i_fib_high) {
             toml::table *fiber_table = fiber_tables->get_as<toml::table>(i_fib);

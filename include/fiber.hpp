@@ -171,6 +171,10 @@ class FiberContainer {
                            const Eigen::Ref<const Eigen::MatrixXd> &v_fib) const;
     Eigen::MatrixXd apply_fiber_force(const Eigen::Ref<const Eigen::VectorXd> &x_all) const;
     Eigen::VectorXd apply_preconditioner(const Eigen::Ref<const Eigen::VectorXd> &x_all) const;
+
+  private:
+    int world_size_ = -1;
+    int world_rank_;
 };
 
 #endif

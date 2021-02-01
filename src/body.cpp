@@ -152,3 +152,40 @@ Body::Body(const toml::table *body_table, const Params &params) {
 
     move(position_, orientation_);
 }
+
+Eigen::VectorXd BodyContainer::get_RHS() const {
+    Eigen::VectorXd RHS(get_local_solution_size());
+
+    if (world_rank_ == 0) {
+        int offset = 0;
+        for (const auto &body : bodies) {
+            RHS.segment(offset, body.RHS_.size()) = body.RHS_;
+            offset += body.RHS_.size();
+        }
+    }
+    return RHS;
+}
+
+BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
+
+    if (!body_tables) {
+        return;
+    }
+
+    const int n_bodies_tot = body_tables->size();
+    const int n_bodies_extra = n_bodies_tot % world_size_;
+    if (world_rank_ == 0)
+        std::cout << "Reading in " << n_bodies_tot << " bodies.\n";
+
+    for (int i_body = 0; i_body < n_bodies_tot; ++i_body) {
+        toml::table *body_table = body_tables->get_as<toml::table>(i_body);
+        bodies.emplace_back(Body(body_table, params));
+
+        auto &body = bodies.back();
+        if (world_rank_ == 0)
+            std::cout << "Body " << i_body << ": " << body.node_weights_.size() << " [ " << body.position_.transpose()
+                      << " ]\n";
+    }
+}
