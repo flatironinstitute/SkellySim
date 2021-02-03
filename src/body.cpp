@@ -166,6 +166,72 @@ Eigen::VectorXd BodyContainer::get_RHS() const {
     return RHS;
 }
 
+Eigen::MatrixXd BodyContainer::get_node_positions() const {
+    Eigen::MatrixXd r_body_nodes;
+
+    const int n_nodes = get_local_solution_size();
+    if (world_rank_ == 0) {
+        r_body_nodes.resize(3, n_nodes);
+        int offset = 0;
+        for (const auto &body : bodies) {
+            r_body_nodes.block(0, offset, 3, body.n_nodes_) = body.node_positions_;
+            offset += body.n_nodes_;
+        }
+    }
+
+    return r_body_nodes;
+}
+
+Eigen::MatrixXd BodyContainer::get_node_normals() const {
+    Eigen::MatrixXd r_body_nodes;
+
+    const int n_nodes = get_local_solution_size();
+    if (world_rank_ == 0) {
+        r_body_nodes.resize(3, n_nodes);
+        int offset = 0;
+        for (const auto &body : bodies) {
+            r_body_nodes.block(0, offset, 3, body.n_nodes_) = body.node_normals_;
+            offset += body.n_nodes_;
+        }
+    }
+
+    return r_body_nodes;
+}
+
+Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
+                                    const Eigen::Ref<const Eigen::MatrixXd> &densities,
+                                    const Eigen::Ref<const Eigen::MatrixXd> &forces_torques, double eta) const {
+    const int n_nodes = get_local_solution_size(); //< Distributed node counts for fmm calls
+    const Eigen::MatrixXd node_positions = get_node_positions(); //< Distributed node positions for fmm calls
+    const Eigen::MatrixXd node_normals = get_node_normals();     //< Distributed node normals for fmm calls
+    const Eigen::MatrixXd null_matrix; //< Empty matrix for dummy arguments to kernels
+
+    // Section: Stresslet kernel
+    const Eigen::MatrixXd &r_dl = node_positions; //< "double layer" positions for stresslet kernel
+    Eigen::MatrixXd f_dl(9, n_nodes); //< "double layer" "force" for stresslet kernel
+
+    // double layer density is 2 * outer product of normals with density
+    for (int node = 0; node < n_nodes; ++node)
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+                f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node);
+
+    Eigen::MatrixXd v_bdy2all =
+        (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, r_trg.cols()) / eta;
+
+    // Section: Oseen kernel
+    Eigen::MatrixXd center_positions = get_center_positions(); //< Distributed center positions for FMM calls
+    const Eigen::MatrixXd forces = forces_torques.block(0, 0, 3, center_positions.cols());
+    const Eigen::MatrixXd torques = forces_torques.block(3, 0, 3, center_positions.cols());
+    v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
+
+    constexpr bool override_distributed = true;
+    center_positions = get_center_positions(override_distributed);
+    v_bdy2all += kernels::rotlet(center_positions, r_trg, torques);
+
+    return v_bdy2all;
+}
+
 BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
@@ -173,6 +239,12 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
     if (!body_tables) {
         return;
     }
+
+    // TODO: Make mult_order and max_pts passable fmm parameters
+    stresslet_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
+        8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm));
+    oseen_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
+        8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
 
     const int n_bodies_tot = body_tables->size();
     const int n_bodies_extra = n_bodies_tot % world_size_;

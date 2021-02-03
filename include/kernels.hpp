@@ -24,8 +24,8 @@ Eigen::MatrixXd oseen_tensor_direct(const Eigen::Ref<const Eigen::MatrixXd> &r_s
                                     double epsilon_distance = 1E-5);
 
 Eigen::MatrixXd rotlet(const Eigen::Ref<const Eigen::MatrixXd> &r_src, const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
-                       const Eigen::Ref<const Eigen::MatrixXd> &density, double eta, double reg,
-                       double epsilon_distance);
+                       const Eigen::Ref<const Eigen::MatrixXd> &density, double eta = 1.0, double reg = 5E-3,
+                       double epsilon_distance = 1E-5);
 
 Eigen::MatrixXd stresslet_times_normal(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
                                        const Eigen::Ref<const Eigen::MatrixXd> &normals, double eta = 1.0,

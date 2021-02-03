@@ -5,6 +5,7 @@
 #include <Eigen/Geometry>
 #include <Eigen/LU>
 
+#include <kernels.hpp>
 #include <params.hpp>
 #include <toml.hpp>
 
@@ -59,6 +60,11 @@ class BodyContainer {
     BodyContainer(){};
     BodyContainer(toml::array *body_tables, Params &params);
 
+    /// Pointer to FMM stresslet kernel (Stokes)
+    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> stresslet_kernel_;
+    /// Pointer to FMM oseen kernel (PVel)
+    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> oseen_kernel_;
+
     int get_local_total_body_nodes() const {
         int tot = 0;
         for (const auto &body : bodies)
@@ -74,6 +80,23 @@ class BodyContainer {
     }
 
     Eigen::VectorXd get_RHS() const;
+    Eigen::MatrixXd get_node_positions() const;
+    Eigen::MatrixXd get_node_normals() const;
+    Eigen::MatrixXd get_center_positions(bool override_distributed = false) const {
+        if (world_rank_ != 0 && !override_distributed)
+            return Eigen::MatrixXd();
+
+        Eigen::MatrixXd centers(3, bodies.size());
+        int offset = 0;
+        for (const auto &body : bodies)
+            centers.block(0, offset, 3, 1) = body.position_;
+
+        return centers;
+    };
+
+    Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
+                         const Eigen::Ref<const Eigen::MatrixXd> &densities,
+                         const Eigen::Ref<const Eigen::MatrixXd> &force_torque_bodies, double eta) const;
 
     void update_cache_variables(double eta) {
         for (auto &body : bodies)
