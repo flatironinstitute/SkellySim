@@ -5,6 +5,8 @@
 #include <parse_util.hpp>
 #include <system.hpp>
 
+// TODO: Refactor all preprocess stuff. It's awful
+
 /// RNG for generating nucleation site positions
 std::mt19937 rng;
 std::uniform_real_distribution<double> uniform_rng(0.0, 1.0);
@@ -136,6 +138,7 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
 
         int n_nucleation_sites = (*body_table)["n_nucleation_sites"].value_or(nucleation_sites[i_body].size());
         double radius = *(*body_table)["radius"].value<double>();
+        // FIXME: add min_separation parameter
         const double min_separation2 = 0.01 * 0.01;
 
         for (int i = 0; i < n_nucleation_sites; ++i) {
