@@ -39,6 +39,9 @@ class Fiber {
     /// \f[ c_1 = \frac{1}{4\pi\eta} \f]
     double c_1_;
 
+    /// (body, site) pair for minus end binding. -1 implies unbound
+    std::pair<int, int> binding_site_;
+
     /// Boundary condition pair for minus end of fiber
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
     /// Boundary condition pair for plus end of fiber

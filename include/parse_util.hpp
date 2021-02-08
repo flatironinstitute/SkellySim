@@ -4,6 +4,7 @@
 #include <toml.hpp>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <iostream>
 
 namespace parse_util {
 
@@ -27,8 +28,10 @@ inline T convert_array(const toml::array *src) {
 template <typename T = Eigen::VectorXd>
 inline T parse_array_key(const toml::table *tbl, const std::string &key) {
     const toml::node *src_node = tbl->get(key);
-    if (!src_node)
+    if (!src_node) {
+        std::cerr << "\n\n" << *tbl << "\n\n";
         throw std::runtime_error("Key not found \"" + key + "\"");
+    }
     const toml::array *src = src_node->as_array();
 
     return convert_array<T>(src);
@@ -37,8 +40,10 @@ inline T parse_array_key(const toml::table *tbl, const std::string &key) {
 template <typename T>
 T parse_val_key(const toml::table *tbl, const std::string &key) {
     const toml::node *src_node = tbl->get(key);
-    if (!src_node)
+    if (!src_node) {
+        std::cerr << "\n\n" << *tbl << "\n\n";
         throw std::runtime_error("Key not found \"" + key + "\"");
+    }
 
     return src_node->as<T>()->get();
 }

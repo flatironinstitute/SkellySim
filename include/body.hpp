@@ -28,11 +28,14 @@ class Body {
 
     Eigen::MatrixXd K_; ///< [ 3*num_nodes x 6 ] matrix that helps translate body info to nodes
 
-    Eigen::MatrixXd node_positions_;     ///< [ 3 x n_nodes ] node positions in lab frame
-    Eigen::MatrixXd node_positions_ref_; ///< [ 3 x n_nodes ] node positions in reference 'body' frame
-    Eigen::MatrixXd node_normals_;       ///< [ 3 x n_nodes ] node normals in lab frame
-    Eigen::MatrixXd node_normals_ref_;   ///< [ 3 x n_nodes ] node normals in reference 'body' frame
-    Eigen::VectorXd node_weights_;       ///< [ n_nodes ] far field quadrature weights for nodes
+    Eigen::MatrixXd node_positions_;       ///< [ 3 x n_nodes ] node positions in lab frame
+    Eigen::MatrixXd node_positions_ref_;   ///< [ 3 x n_nodes ] node positions in reference 'body' frame
+    Eigen::MatrixXd node_normals_;         ///< [ 3 x n_nodes ] node normals in lab frame
+    Eigen::MatrixXd node_normals_ref_;     ///< [ 3 x n_nodes ] node normals in reference 'body' frame
+    Eigen::VectorXd node_weights_;         ///< [ n_nodes ] far field quadrature weights for nodes
+
+    /// [ 3 x n_nucleation_sites ] nucleation site positions in reference 'body' frame
+    Eigen::MatrixXd nucleation_sites_ref_;
 
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner

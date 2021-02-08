@@ -70,7 +70,7 @@ void Body::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body) {
 
 /// @brief Move body to new position with new orientation
 ///
-/// Updates: Body::position_, Body::orientation_, Body::node_positions_, Body::node_normals_
+/// Updates: Body::position_, Body::orientation_, Body::node_positions_, Body::node_normals_, Body::nucleation_sites_
 /// @param[in] new_pos new lab frame position to move the body centroid
 /// @param[in] new_orientation new orientation of the body
 void Body::move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation) {
@@ -83,6 +83,9 @@ void Body::move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_or
 
     for (int i = 0; i < n_nodes_; ++i)
         node_normals_.col(i) = rot * node_normals_ref_.col(i);
+
+    for (int i = 0; i < n_nodes_; ++i)
+        nucleation_sites_ref_.col(i) = position_ + rot * nucleation_sites_ref_.col(i);
 }
 
 /// @brief Calculate/cache the internal 'singularity subtraction vectors', used in linear operator application
@@ -150,6 +153,11 @@ Body::Body(const toml::table *body_table, const Params &params) {
     if (!!body_table->get("orientation"))
         orientation_ = parse_array_key<Eigen::Quaterniond>(body_table, "orientation");
 
+    if (!!body_table->get("nucleation_sites")) {
+        nucleation_sites_ref_ = parse_array_key<>(body_table, "nucleation_sites");
+        nucleation_sites_ref_.resize(3, nucleation_sites_ref_.size() / 3);
+    }
+
     move(position_, orientation_);
 }
 
@@ -201,14 +209,14 @@ Eigen::MatrixXd BodyContainer::get_node_normals() const {
 Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                                     const Eigen::Ref<const Eigen::MatrixXd> &densities,
                                     const Eigen::Ref<const Eigen::MatrixXd> &forces_torques, double eta) const {
-    const int n_nodes = get_local_solution_size(); //< Distributed node counts for fmm calls
+    const int n_nodes = get_local_solution_size();               //< Distributed node counts for fmm calls
     const Eigen::MatrixXd node_positions = get_node_positions(); //< Distributed node positions for fmm calls
     const Eigen::MatrixXd node_normals = get_node_normals();     //< Distributed node normals for fmm calls
-    const Eigen::MatrixXd null_matrix; //< Empty matrix for dummy arguments to kernels
+    const Eigen::MatrixXd null_matrix;                           //< Empty matrix for dummy arguments to kernels
 
     // Section: Stresslet kernel
     const Eigen::MatrixXd &r_dl = node_positions; //< "double layer" positions for stresslet kernel
-    Eigen::MatrixXd f_dl(9, n_nodes); //< "double layer" "force" for stresslet kernel
+    Eigen::MatrixXd f_dl(9, n_nodes);             //< "double layer" "force" for stresslet kernel
 
     // double layer density is 2 * outer product of normals with density
     for (int node = 0; node < n_nodes; ++node)

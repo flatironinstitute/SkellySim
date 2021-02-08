@@ -25,40 +25,19 @@ using Eigen::VectorXd;
 /// @return Fiber object. Cache values are _not_ calculated.
 Fiber::Fiber(toml::table *fiber_table, double eta) {
     using namespace parse_util;
-
-    num_points_ = parse_val_key<int64_t>(fiber_table, "num_points", -1);
-    bending_rigidity_ = parse_val_key<double>(fiber_table, "bending_rigidity");
-    length_ = parse_val_key<double>(fiber_table, "length");
-    force_scale_ = parse_val_key<double>(fiber_table, "force_scale", 0.0);
-
     toml::array *x_array = fiber_table->get_as<toml::array>("x");
-    toml::array *x_0 = fiber_table->get_as<toml::array>("base_position");
-    toml::array *u = fiber_table->get_as<toml::array>("orientation");
-
-    if (num_points_ == -1) {
-        num_points_ = x_array->size() / 3;
-        if (num_points_ == 0)
-            throw std::runtime_error("Attempt to initialize fiber without point count or positions.");
-    }
+    num_points_ = x_array->size() / 3;
 
     init(eta);
 
-    if ((!!x_array && !!x_0) || (!!x_array && !!u))
-        throw std::runtime_error(
-            "Fiber supplied 'base_position' or 'orientation' with node positions 'x', ambiguous initialization.");
+    x_ = convert_array<>(x_array);
+    x_.resize(3, num_points_);
 
-    if (!!x_array) {
-        x_ = convert_array<>(x_array);
-        x_.resize(3, num_points_);
-    }
-
-    // FIXME: Make test for this case
-    if (!!x_0 && !!u && x_0->size() == 3 && u->size() == 3) {
-        Vector3d origin = convert_array<>(x_0);
-        Vector3d orientation = convert_array<>(u);
-        for (int i = 0; i < 3; ++i)
-            x_.row(i) = origin(i) + orientation(i) * Eigen::ArrayXd::LinSpaced(num_points_, 0, length_).transpose();
-    }
+    bending_rigidity_ = parse_val_key<double>(fiber_table, "bending_rigidity");
+    length_ = parse_val_key<double>(fiber_table, "length");
+    force_scale_ = parse_val_key<double>(fiber_table, "force_scale", 0.0);
+    binding_site_.first = (*fiber_table)["parent_body"].value_or(-1);
+    binding_site_.second = (*fiber_table)["parent_site"].value_or(-1);
 }
 
 /// @brief Update stokeslet for points along fiber
