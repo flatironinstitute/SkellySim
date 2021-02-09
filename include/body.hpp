@@ -28,11 +28,11 @@ class Body {
 
     Eigen::MatrixXd K_; ///< [ 3*num_nodes x 6 ] matrix that helps translate body info to nodes
 
-    Eigen::MatrixXd node_positions_;       ///< [ 3 x n_nodes ] node positions in lab frame
-    Eigen::MatrixXd node_positions_ref_;   ///< [ 3 x n_nodes ] node positions in reference 'body' frame
-    Eigen::MatrixXd node_normals_;         ///< [ 3 x n_nodes ] node normals in lab frame
-    Eigen::MatrixXd node_normals_ref_;     ///< [ 3 x n_nodes ] node normals in reference 'body' frame
-    Eigen::VectorXd node_weights_;         ///< [ n_nodes ] far field quadrature weights for nodes
+    Eigen::MatrixXd node_positions_;     ///< [ 3 x n_nodes ] node positions in lab frame
+    Eigen::MatrixXd node_positions_ref_; ///< [ 3 x n_nodes ] node positions in reference 'body' frame
+    Eigen::MatrixXd node_normals_;       ///< [ 3 x n_nodes ] node normals in lab frame
+    Eigen::MatrixXd node_normals_ref_;   ///< [ 3 x n_nodes ] node normals in reference 'body' frame
+    Eigen::VectorXd node_weights_;       ///< [ n_nodes ] far field quadrature weights for nodes
 
     /// [ 3 x n_nucleation_sites ] nucleation site positions in reference 'body' frame
     Eigen::MatrixXd nucleation_sites_ref_;
@@ -68,18 +68,25 @@ class BodyContainer {
     /// Pointer to FMM oseen kernel (PVel)
     std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> oseen_kernel_;
 
-    int get_local_total_body_nodes() const {
+    /// @brief Get total number of nodes associated with body
+    ///
+    /// See BodyContainer::get_local_solution_size for notes about how this is distributed
+    int get_local_node_count() const {
+        if (world_rank_ != 0)
+            return 0;
+
         int tot = 0;
         for (const auto &body : bodies)
             tot += body.n_nodes_;
         return tot;
     }
+
     /// @brief Get the size of all local bodies contribution to the matrix problem solution
     ///
     /// Since there aren't many bodies, and there is no easy way to synchronize them across processes, the rank 0
     /// process handles all components of the solution.
     int get_local_solution_size() const {
-        return (world_rank_ == 0) ? 3 * get_local_total_body_nodes() + 6 * bodies.size() : 0;
+        return (world_rank_ == 0) ? 3 * get_local_node_count() + 6 * bodies.size() : 0;
     }
 
     Eigen::VectorXd get_RHS() const;

@@ -19,6 +19,9 @@ class Periphery {
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &trg, const Eigen::Ref<const Eigen::MatrixXd> &density,
                          double eta) const;
 
+    /// @brief Get the number of nodes local to the MPI rank
+    int get_local_node_count() const { return M_inv_.rows() / 3; }
+
     /// @brief Get the size of the shell's contribution to the matrix problem solution
     int get_local_solution_size() const { return M_inv_.rows(); }
 

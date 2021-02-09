@@ -193,9 +193,9 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         const int shell_sol_offset = fib_sol_size;
         const int body_sol_offset = shell_sol_offset + shell_sol_size;
 
-        const int fib_v_size = fib_sol_size / 4;
-        const int shell_v_size = shell_sol_size / 3;
-        const int body_v_size = (body_sol_size - 6 * bc_.bodies.size()) / 3;
+        const int fib_v_size = fc_.get_local_node_count();
+        const int shell_v_size = shell_.get_local_node_count();
+        const int body_v_size = bc_.get_local_node_count();
         const int v_size = fib_v_size + shell_v_size + body_v_size;
 
         const int fib_v_offset = 0;
@@ -241,7 +241,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
 
             res_fib = fc_.matvec(x_fib_local, v_fib);
             res_shell = shell_.stresslet_plus_complementary_ * x_shell_global;
-            res_shell += Map<VectorXd>(v_all.data() + 3 * shell_v_offset, shell_sol_size);
+            res_shell += Map<VectorXd>(v_shell.data(), shell_sol_size);
 
             // Calculate forces/torques on body
 

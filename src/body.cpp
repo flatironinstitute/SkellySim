@@ -209,9 +209,8 @@ Eigen::MatrixXd BodyContainer::get_node_normals() const {
 Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                                     const Eigen::Ref<const Eigen::MatrixXd> &densities,
                                     const Eigen::Ref<const Eigen::MatrixXd> &forces_torques, double eta) const {
-    const int n_nodes = get_local_solution_size();               //< Distributed node counts for fmm calls
-    if (!n_nodes)
-        return Eigen::MatrixXd();
+    const int n_nodes = get_local_node_count();               //< Distributed node counts for fmm calls
+    const int n_trg = r_trg.cols();
     const Eigen::MatrixXd node_positions = get_node_positions(); //< Distributed node positions for fmm calls
     const Eigen::MatrixXd node_normals = get_node_normals();     //< Distributed node normals for fmm calls
     const Eigen::MatrixXd null_matrix;                           //< Empty matrix for dummy arguments to kernels
@@ -227,7 +226,7 @@ Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_t
                 f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node);
 
     Eigen::MatrixXd v_bdy2all =
-        (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, r_trg.cols()) / eta;
+        (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, n_trg) / eta;
 
     // Section: Oseen kernel
     Eigen::MatrixXd center_positions = get_center_positions(); //< Distributed center positions for FMM calls
@@ -235,6 +234,8 @@ Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_t
     const Eigen::MatrixXd torques = forces_torques.block(3, 0, 3, center_positions.cols());
     v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
 
+    // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
+    // rank gets the body centers and calculates the center->target rotlet
     constexpr bool override_distributed = true;
     center_positions = get_center_positions(override_distributed);
     v_bdy2all += kernels::rotlet(center_positions, r_trg, torques);
