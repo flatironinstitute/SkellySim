@@ -184,36 +184,68 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             cout << "A_fiber_hydro::apply" << endl;
         }
 
-        const int n_fib_pts_local = fc_.get_local_solution_size();
-        const int n_shell_pts_local = shell_.get_local_solution_size();
-        const int n_pts_local = n_fib_pts_local + n_shell_pts_local;
+        const int fib_sol_size = fc_.get_local_solution_size();
+        const int shell_sol_size = shell_.get_local_solution_size();
+        const int body_sol_size = bc_.get_local_solution_size();
+        const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
+
+        const int fib_sol_offset = 0;
+        const int shell_sol_offset = fib_sol_size;
+        const int body_sol_offset = shell_sol_offset + shell_sol_size;
+
+        const int fib_v_size = fib_sol_size / 4;
+        const int shell_v_size = shell_sol_size / 3;
+        const int body_v_size = (body_sol_size - 6 * bc_.bodies.size()) / 3;
+        const int v_size = fib_v_size + shell_v_size + body_v_size;
+
+        const int fib_v_offset = 0;
+        const int shell_v_offset = fib_v_size;
+        const int body_v_offset = shell_v_offset + shell_v_size;
+
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
+            using Eigen::Block;
             using Eigen::Map;
 
             // Get views and temporary arrays
             double *res_ptr = Y.getDataNonConst(c).getRawPtr();
             const double *x_ptr = X.getData(c).getRawPtr();
-            Map<const VectorXd> x_fib_local(x_ptr, n_fib_pts_local);
-            Map<const VectorXd> x_shell_local(x_ptr + n_fib_pts_local, n_shell_pts_local);
-            Map<VectorXd> res_fib(res_ptr, n_fib_pts_local);
-            Map<VectorXd> res_shell(res_ptr + n_fib_pts_local, n_shell_pts_local);
+            Map<const VectorXd> x_fib_local(x_ptr, fib_sol_size);
+            Map<const VectorXd> x_shell_local(x_ptr + fib_sol_size, shell_sol_size);
+            Map<VectorXd> res_fib(res_ptr, fib_sol_size);
+            Map<VectorXd> res_shell(res_ptr + fib_sol_size, shell_sol_size);
+            Map<VectorXd> res_bodies(res_ptr + fib_sol_size + shell_sol_size, body_sol_size);
             MatrixXd r_fib = fc_.get_r_vectors();
+            MatrixXd v_all = MatrixXd(3, v_size);
+
+            Block<MatrixXd> v_fib = v_all.block(0, fib_v_offset, 3, fib_v_size);
+            Block<MatrixXd> v_shell = v_all.block(0, shell_v_offset, 3, shell_v_size);
+            Block<MatrixXd> v_bodies = v_all.block(0, body_v_offset, 3, body_v_size);
 
             // Collect all X shell data into single vector on all ranks
-            // (for res_shell_local = A_shell_local * x_shell_global + stuff)
+            // (for res_shell_local = A_shell_local * x_shell_global + ...)
             VectorXd x_shell_global(3 * shell_.n_nodes_global_);
-            MPI_Allgatherv(x_shell_local.data(), n_shell_pts_local, MPI_DOUBLE, x_shell_global.data(),
+            MPI_Allgatherv(x_shell_local.data(), shell_sol_size, MPI_DOUBLE, x_shell_global.data(),
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
             // calculate fiber-fiber velocity
             MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
             MatrixXd v_fib2all = fc_.flow(fw, shell_.node_pos_, eta_);
-            MatrixXd v_shell2fib = shell_.flow(r_fib, x_shell_local, eta_);
-            v_fib2all.block(0, 0, 3, r_fib.cols()) += v_shell2fib;
+            Block<MatrixXd> v_fib2fib = v_fib2all.block(0, fib_v_offset, 3, fib_v_size);
+            Block<MatrixXd> v_fib2shell = v_fib2all.block(0, shell_v_offset, 3, shell_v_size);
+            Block<MatrixXd> v_fib2bodies = v_fib2all.block(0, body_v_offset, 3, body_v_size);
 
-            res_fib = fc_.matvec(x_fib_local, v_fib2all.block(0, 0, 3, r_fib.cols()));
+            MatrixXd v_shell2fib = shell_.flow(r_fib, x_shell_local, eta_);
+
+            v_all = v_fib2all;
+            v_fib += v_shell2fib;
+
+            res_fib = fc_.matvec(x_fib_local, v_fib);
             res_shell = shell_.stresslet_plus_complementary_ * x_shell_global;
-            res_shell += Map<VectorXd>(v_fib2all.data() + 3 * r_fib.cols(), n_shell_pts_local);
+            res_shell += Map<VectorXd>(v_all.data() + 3 * shell_v_offset, shell_sol_size);
+
+            // Calculate forces/torques on body
+
+            // Calculate flow on other objects due to body forces
         }
     }
 

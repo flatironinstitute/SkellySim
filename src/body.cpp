@@ -210,6 +210,8 @@ Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_t
                                     const Eigen::Ref<const Eigen::MatrixXd> &densities,
                                     const Eigen::Ref<const Eigen::MatrixXd> &forces_torques, double eta) const {
     const int n_nodes = get_local_solution_size();               //< Distributed node counts for fmm calls
+    if (!n_nodes)
+        return Eigen::MatrixXd();
     const Eigen::MatrixXd node_positions = get_node_positions(); //< Distributed node positions for fmm calls
     const Eigen::MatrixXd node_normals = get_node_normals();     //< Distributed node normals for fmm calls
     const Eigen::MatrixXd null_matrix;                           //< Empty matrix for dummy arguments to kernels

@@ -79,7 +79,7 @@ class BodyContainer {
     /// Since there aren't many bodies, and there is no easy way to synchronize them across processes, the rank 0
     /// process handles all components of the solution.
     int get_local_solution_size() const {
-        return (world_rank_ == 0) ? get_local_total_body_nodes() + 6 * bodies.size() : 0;
+        return (world_rank_ == 0) ? 3 * get_local_total_body_nodes() + 6 * bodies.size() : 0;
     }
 
     Eigen::VectorXd get_RHS() const;
