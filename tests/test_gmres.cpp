@@ -42,7 +42,8 @@ class P_inv_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    P_inv_hydro(const RCP<const Comm<int>> comm, const System &sys) : fc_(sys.fc_), shell_(sys.shell_), bc_(sys.bc_) {
+    P_inv_hydro(const RCP<const Comm<int>> comm)
+        : fc_(System::get_fiber_container()), shell_(System::get_shell()), bc_(System::get_body_container()) {
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "P_inv_hydro constructor: The input Comm object must be nonnull.");
         if (comm->getRank() == 0) {
@@ -146,8 +147,9 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    A_fiber_hydro(const RCP<const Comm<int>> comm, const System &sys, const double eta)
-        : fc_(sys.fc_), shell_(sys.shell_), bc_(sys.bc_), eta_(eta) {
+    A_fiber_hydro(const RCP<const Comm<int>> comm, const double eta)
+        : fc_(System::get_fiber_container()), shell_(System::get_shell()), bc_(System::get_body_container()),
+          eta_(eta) {
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "A_fiber_hydro constructor: The input Comm object must be nonnull.");
         if (comm->getRank() == 0) {
@@ -291,12 +293,12 @@ int main(int argc, char *argv[]) {
             return -1;
         }
 
-        System system(config_file);
+        System::init(config_file);
 
-        Params &params = system.params_;
-        Periphery &shell = system.shell_;
-        FiberContainer &fc = system.fc_;
-        BodyContainer &bc = system.bc_;
+        Params &params = System::get_params();
+        Periphery &shell = System::get_shell();
+        FiberContainer &fc = System::get_fiber_container();
+        BodyContainer &bc = System::get_body_container();
         const double eta = params.eta;
         const double dt = params.dt;
         const double tol = params.gmres_tol;
@@ -325,8 +327,8 @@ int main(int argc, char *argv[]) {
             shell.update_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));
         }
 
-        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, system, eta));
-        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm, system));
+        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, eta));
+        RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm));
 
         RCP<const Tpetra::Map<>> map = A_sim->getDomainMap();
         typedef Tpetra::Vector<A_fiber_hydro::scalar_type, A_fiber_hydro::local_ordinal_type,

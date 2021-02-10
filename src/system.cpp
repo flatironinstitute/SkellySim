@@ -219,8 +219,11 @@ void preprocess(toml::table &config, unsigned long seed) {
         resolve_nucleation_sites(fiber_array, body_array);
 }
 
-System::System(std::string &input_file) {
-    toml::table config = toml::parse_file(input_file);
+System::System(std::string *input_file) {
+    if (input_file == nullptr)
+        throw std::runtime_error("System uninitialized. Call System::init(\"config_file\").");
+
+    toml::table config = toml::parse_file(*input_file);
     params_ = Params(config.get_as<toml::table>("params"));
 
     preprocess(config, params_.seed);

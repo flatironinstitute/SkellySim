@@ -31,10 +31,12 @@ int main(int argc, char *argv[]) {
     toml::array *body_configs = config.get_as<toml::array>("bodies");
     Body body(body_configs->get_as<toml::table>(0), params);
 
-    System sys(config_file);
-    for (auto &fiber : sys.fc_.fibers) {
+    System::init(config_file);
+    FiberContainer &fc = System::get_fiber_container();
+    BodyContainer &bc = System::get_body_container();
+    for (auto &fiber : fc.fibers) {
         auto [i_body, i_site] = fiber.binding_site_;
-        auto &body = sys.bc_.bodies[i_body];
+        auto &body = bc.bodies[i_body];
 
         if (i_site > 0)
             std::cout << i_body << " " << i_site << " [" << body.nucleation_sites_ref_.col(i_site).transpose() << "] ["
