@@ -85,7 +85,7 @@ void Body::move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_or
         node_normals_.col(i) = rot * node_normals_ref_.col(i);
 
     for (int i = 0; i < n_nodes_; ++i)
-        nucleation_sites_ref_.col(i) = position_ + rot * nucleation_sites_ref_.col(i);
+        nucleation_sites_.col(i) = position_ + rot * nucleation_sites_ref_.col(i);
 }
 
 /// @brief Calculate/cache the internal 'singularity subtraction vectors', used in linear operator application

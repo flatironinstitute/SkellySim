@@ -36,6 +36,8 @@ class Body {
 
     /// [ 3 x n_nucleation_sites ] nucleation site positions in reference 'body' frame
     Eigen::MatrixXd nucleation_sites_ref_;
+    /// [ 3 x n_nucleation_sites ] nucleation site positions in lab frame
+    Eigen::MatrixXd nucleation_sites_;
 
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
@@ -112,6 +114,10 @@ class BodyContainer {
         for (auto &body : bodies)
             body.update_cache_variables(eta);
     }
+
+    Eigen::Vector3d get_nucleation_site(int i_body, int j_site) {
+        return bodies[i_body].nucleation_sites_.col(j_site);
+    };
 
     /// @brief Synchronize body objects across processes
     ///
