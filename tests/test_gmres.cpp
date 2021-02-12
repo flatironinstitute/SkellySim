@@ -51,9 +51,10 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        const int nfib_pts_local = fc_.get_local_solution_size();
-        const int n_shell_rows_local = shell_.get_local_solution_size();
-        const int local_size = nfib_pts_local + n_shell_rows_local;
+        const int fiber_sol_size = fc_.get_local_solution_size();
+        const int shell_sol_size = shell_.get_local_solution_size();
+        const int body_sol_size = bc_.get_local_solution_size();
+        const int local_size = fiber_sol_size + shell_sol_size + body_sol_size;
 
         // Construct a map for our block row distribution
         opMap_ = rcp(new map_type(OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
@@ -108,14 +109,18 @@ class P_inv_hydro : public Tpetra::Operator<> {
 
             offset += x_shell.size();
 
-            // // Fixme: move Body loops to BodyContainer
-            // for (auto &body : bc_.bodies) {
-            //     Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, body.n_nodes_ * 3);
-            //     Map<VectorXd> res_body(Y.getDataNonConst(c).getRawPtr() + offset, body.n_nodes_ * 3);
-            //     res_body = body.A_LU_.solve(XView);
+            // Fixme: move Body loops to BodyContainer
+            if (rank == 0) {
+                for (int i = 0; i < bc_.get_local_count(); ++i) {
+                    const Body &body = bc_.bodies[i];
+                    const int n_nodes = body.n_nodes_;
+                    Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, n_nodes * 3 + 6);
+                    Map<VectorXd> res_body(Y.getDataNonConst(c).getRawPtr() + offset, n_nodes * 3 + 6);
+                    res_body = body.A_LU_.solve(XView);
 
-            //     offset += body.n_nodes_ * 3;
-            // }
+                    offset += n_nodes * 3 + 6;
+                }
+            }
         }
     }
 
@@ -157,9 +162,10 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        const int nfib_pts_local = fc_.get_local_solution_size();
-        const int n_shell_pts_local = shell_.get_local_solution_size();
-        const int local_size = nfib_pts_local + n_shell_pts_local;
+        const int fiber_sol_size = fc_.get_local_solution_size();
+        const int shell_sol_size = shell_.get_local_solution_size();
+        const int body_sol_size = bc_.get_local_solution_size();
+        const int local_size = fiber_sol_size + shell_sol_size + body_sol_size;
 
         // Construct a map for our block row distribution
         opMap_ = rcp(new map_type(OrdinalTraits<Tpetra::global_size_t>::invalid(), local_size, indexBase, comm));
@@ -347,6 +353,10 @@ int main(int argc, char *argv[]) {
             }
 
             shell.update_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));
+
+            // FIXME: Body update_RHS
+            Eigen::MatrixXd v_on_bodies = Eigen::MatrixXd::Zero(3, bc.get_local_solution_size());
+            bc.update_RHS(v_on_bodies);
         }
 
         RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, eta));
@@ -366,12 +376,16 @@ int main(int argc, char *argv[]) {
         RHS->putScalar(0.0);
         const int fib_sol_size = fc.get_local_solution_size();
         const int shell_sol_size = shell.get_local_solution_size();
+        const int body_sol_size = bc.get_local_solution_size();
         Eigen::Map<Eigen::VectorXd> RHS_fib(RHS->getDataNonConst(0).getRawPtr(), fib_sol_size);
         Eigen::Map<Eigen::VectorXd> RHS_shell(RHS->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
+        Eigen::Map<Eigen::VectorXd> RHS_body(RHS->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size,
+                                             body_sol_size);
 
         // Initialize GMRES RHS vector
         RHS_fib = fc.get_RHS();
         RHS_shell = shell.get_RHS();
+        RHS_body = bc.get_RHS();
 
         // Output application of A_hydro operator on simple input for comparison to python output
         {

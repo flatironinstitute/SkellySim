@@ -92,6 +92,7 @@ class BodyContainer {
         return (world_rank_ == 0) ? 3 * get_local_node_count() + 6 * bodies.size() : 0;
     }
 
+    void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> &v_on_body);
     Eigen::VectorXd get_RHS() const;
     Eigen::MatrixXd get_global_node_positions() const;
     Eigen::MatrixXd get_local_node_positions() const;

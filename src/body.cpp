@@ -165,6 +165,14 @@ Body::Body(const toml::table *body_table, const Params &params) {
     update_cache_variables(params.eta);
 }
 
+void BodyContainer::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> &v_on_bodies) {
+    int offset = 0;
+    for (auto &body : bodies) {
+        body.update_RHS(v_on_bodies.block(0, offset, 3, body.n_nodes_));
+        offset += body.n_nodes_;
+    }
+}
+
 Eigen::VectorXd BodyContainer::get_RHS() const {
     Eigen::VectorXd RHS(get_local_solution_size());
 
