@@ -26,12 +26,12 @@ using Eigen::VectorXd;
 Fiber::Fiber(toml::table *fiber_table, double eta) {
     using namespace parse_util;
     toml::array *x_array = fiber_table->get_as<toml::array>("x");
-    num_points_ = x_array->size() / 3;
+    n_nodes_ = x_array->size() / 3;
 
     init(eta);
 
     x_ = convert_array<>(x_array);
-    x_.resize(3, num_points_);
+    x_.resize(3, n_nodes_);
 
     bending_rigidity_ = parse_val_key<double>(fiber_table, "bending_rigidity");
     length_ = parse_val_key<double>(fiber_table, "length");
@@ -51,7 +51,7 @@ void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_di
 ///
 /// Updates: Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_
 void Fiber::update_derivatives() {
-    auto &fib_mats = matrices_.at(num_points_);
+    auto &fib_mats = matrices_.at(n_nodes_);
     xs_ = std::pow(2.0 / length_, 1) * x_ * fib_mats.D_1_0;
     xss_ = std::pow(2.0 / length_, 2) * x_ * fib_mats.D_2_0;
     xsss_ = std::pow(2.0 / length_, 3) * x_ * fib_mats.D_3_0;
@@ -63,51 +63,51 @@ void Fiber::update_derivatives() {
 /// \f[ A * (X^{n+1}, T^{n+1}) = \textrm{RHS} \f]
 /// Updates: Fiber::A_
 void Fiber::update_linear_operator(double dt, double eta) {
-    int num_points_up = num_points_;
-    int num_points_down = num_points_;
+    int n_nodes_up = n_nodes_;
+    int n_nodes_down = n_nodes_;
 
-    const Fiber::fib_mat_t &mats = matrices_.at(num_points_);
+    const Fiber::fib_mat_t &mats = matrices_.at(n_nodes_);
     ArrayXXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);
     ArrayXXd D_2 = mats.D_2_0.transpose() * std::pow(2.0 / length_, 2);
     ArrayXXd D_3 = mats.D_3_0.transpose() * std::pow(2.0 / length_, 3);
     ArrayXXd D_4 = mats.D_4_0.transpose() * std::pow(2.0 / length_, 4);
 
-    A_.resize(4 * num_points_up, 4 * num_points_down);
+    A_.resize(4 * n_nodes_up, 4 * n_nodes_down);
     A_.setZero();
     typedef Eigen::Block<Eigen::MatrixXd> submat_t;
-    submat_t A_XX = A_.block(0 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    submat_t A_XY = A_.block(0 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    submat_t A_XZ = A_.block(0 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    submat_t A_XT = A_.block(0 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    submat_t A_XX = A_.block(0 * n_nodes_up, 0 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_XY = A_.block(0 * n_nodes_up, 1 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_XZ = A_.block(0 * n_nodes_up, 2 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_XT = A_.block(0 * n_nodes_up, 3 * n_nodes_down, n_nodes_up, n_nodes_down);
 
-    submat_t A_YX = A_.block(1 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    submat_t A_YY = A_.block(1 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    submat_t A_YZ = A_.block(1 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    submat_t A_YT = A_.block(1 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    submat_t A_YX = A_.block(1 * n_nodes_up, 0 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_YY = A_.block(1 * n_nodes_up, 1 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_YZ = A_.block(1 * n_nodes_up, 2 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_YT = A_.block(1 * n_nodes_up, 3 * n_nodes_down, n_nodes_up, n_nodes_down);
 
-    submat_t A_ZX = A_.block(2 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    submat_t A_ZY = A_.block(2 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    submat_t A_ZZ = A_.block(2 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    submat_t A_ZT = A_.block(2 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    submat_t A_ZX = A_.block(2 * n_nodes_up, 0 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_ZY = A_.block(2 * n_nodes_up, 1 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_ZZ = A_.block(2 * n_nodes_up, 2 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_ZT = A_.block(2 * n_nodes_up, 3 * n_nodes_down, n_nodes_up, n_nodes_down);
 
-    submat_t A_TX = A_.block(3 * num_points_up, 0 * num_points_down, num_points_up, num_points_down);
-    submat_t A_TY = A_.block(3 * num_points_up, 1 * num_points_down, num_points_up, num_points_down);
-    submat_t A_TZ = A_.block(3 * num_points_up, 2 * num_points_down, num_points_up, num_points_down);
-    submat_t A_TT = A_.block(3 * num_points_up, 3 * num_points_down, num_points_up, num_points_down);
+    submat_t A_TX = A_.block(3 * n_nodes_up, 0 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_TY = A_.block(3 * n_nodes_up, 1 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_TZ = A_.block(3 * n_nodes_up, 2 * n_nodes_down, n_nodes_up, n_nodes_down);
+    submat_t A_TT = A_.block(3 * n_nodes_up, 3 * n_nodes_down, n_nodes_up, n_nodes_down);
 
-    VectorXd I_vec = VectorXd::Ones(num_points_);
+    VectorXd I_vec = VectorXd::Ones(n_nodes_);
 
-    ArrayXd xs_x = xs_.block(0, 0, 1, num_points_).transpose().array();
-    ArrayXd xs_y = xs_.block(1, 0, 1, num_points_).transpose().array();
-    ArrayXd xs_z = xs_.block(2, 0, 1, num_points_).transpose().array();
+    ArrayXd xs_x = xs_.block(0, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xs_y = xs_.block(1, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xs_z = xs_.block(2, 0, 1, n_nodes_).transpose().array();
 
-    ArrayXd xss_x = xss_.block(0, 0, 1, num_points_).transpose().array();
-    ArrayXd xss_y = xss_.block(1, 0, 1, num_points_).transpose().array();
-    ArrayXd xss_z = xss_.block(2, 0, 1, num_points_).transpose().array();
+    ArrayXd xss_x = xss_.block(0, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xss_y = xss_.block(1, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xss_z = xss_.block(2, 0, 1, n_nodes_).transpose().array();
 
-    ArrayXd xsss_x = xsss_.block(0, 0, 1, num_points_).transpose().array();
-    ArrayXd xsss_y = xsss_.block(1, 0, 1, num_points_).transpose().array();
-    ArrayXd xsss_z = xsss_.block(2, 0, 1, num_points_).transpose().array();
+    ArrayXd xsss_x = xsss_.block(0, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xsss_y = xsss_.block(1, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xsss_z = xsss_.block(2, 0, 1, n_nodes_).transpose().array();
 
     A_XX = beta_tstep_ / dt * I_vec.asDiagonal();
     A_XX += bending_rigidity_ * (c_0_) * (D_4.colwise() * (I_vec.array() + xs_x.pow(2))).matrix();
@@ -159,10 +159,10 @@ void Fiber::update_linear_operator(double dt, double eta) {
 /// \f[ \textrm{RHS} = (X^n / dt + \textrm{flow} + \textrm{Mobility} * \textrm{force\_external}, ...) \f]
 /// Updates: Fiber::RHS_
 /// @param[in] dt timestep size
-/// @param[in] flow [ 3 x num_points_ ] matrix of flow field sampled at the fiber points
-/// @param[in] f_external [ 3 x num_points_ ] matrix of external forces on the fiber points
+/// @param[in] flow [ 3 x n_nodes_ ] matrix of flow field sampled at the fiber points
+/// @param[in] f_external [ 3 x n_nodes_ ] matrix of external forces on the fiber points
 void Fiber::update_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const Eigen::Ref<const MatrixXd> f_external) {
-    const int np = num_points_;
+    const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
     MatrixXd D_2 = mats.D_2_0 * std::pow(2.0 / length_, 2);
@@ -246,7 +246,7 @@ void Fiber::update_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const E
 ///
 /// Updates: Fiber::force_operator_
 void Fiber::update_force_operator() {
-    const int np = num_points_;
+    const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
 
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
@@ -269,7 +269,7 @@ void Fiber::update_preconditioner() { A_LU_.compute(A_); }
 
 void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_on_fiber,
                                  const Eigen::Ref<const MatrixXd> &f_on_fiber) {
-    const int np = num_points_;
+    const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);
     MatrixXd D_2 = mats.D_2_0.transpose() * std::pow(2.0 / length_, 2);
@@ -430,32 +430,31 @@ MatrixXd barycentric_matrix(const Eigen::Ref<const ArrayXd> &x, const Eigen::Ref
 }
 
 /// @brief Helper function to initialize Fiber::matrices_
-/// @tparam num_points_finite_diff Number of neighboring points to use in finite difference approximation
-/// @return map of Fiber::fib_mat_t initialized for various numbers of points, where the key will be Fiber::num_points_
-template <int num_points_finite_diff>
+/// @tparam n_nodes_finite_diff Number of neighboring points to use in finite difference approximation
+/// @return map of Fiber::fib_mat_t initialized for various numbers of points, where the key will be Fiber::n_nodes_
+template <int n_nodes_finite_diff>
 std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
     std::unordered_map<int, Fiber::fib_mat_t> res;
 
-    for (auto num_points : {8, 16, 24, 32, 48, 64, 96}) {
-        auto &mats = res[num_points];
-        mats.alpha = ArrayXd::LinSpaced(num_points, -1.0, 1.0);
+    for (auto n_nodes : {8, 16, 24, 32, 48, 64, 96}) {
+        auto &mats = res[n_nodes];
+        mats.alpha = ArrayXd::LinSpaced(n_nodes, -1.0, 1.0);
 
-        auto num_points_roots = num_points - 4;
-        mats.alpha_roots =
-            2 * (0.5 + ArrayXd::LinSpaced(num_points_roots, 0, num_points_roots - 1)) / num_points_roots - 1;
+        auto n_nodes_roots = n_nodes - 4;
+        mats.alpha_roots = 2 * (0.5 + ArrayXd::LinSpaced(n_nodes_roots, 0, n_nodes_roots - 1)) / n_nodes_roots - 1;
 
-        auto num_points_tension = num_points - 2;
+        auto n_nodes_tension = n_nodes - 2;
         mats.alpha_tension =
-            2 * (0.5 + ArrayXd::LinSpaced(num_points_tension, 0, num_points_tension - 1)) / num_points_tension - 1;
+            2 * (0.5 + ArrayXd::LinSpaced(n_nodes_tension, 0, n_nodes_tension - 1)) / n_nodes_tension - 1;
 
         // this is the order of the finite differencing
         // 2nd order scheme: 3 points for 1st der, 4 points for 2nd, 5 points for 3rd, 6 points for 4th
         // 4th order scheme: 5 points for 1st der, 6 points for 2nd, 7 points for 3rd, 8 points for 4th
         // Pre-transpose so can be left multiplied by our point-vectors-as-columns position format
-        mats.D_1_0 = utils::finite_diff(mats.alpha, 1, num_points_finite_diff + 1).transpose();
-        mats.D_2_0 = utils::finite_diff(mats.alpha, 2, num_points_finite_diff + 2).transpose();
-        mats.D_3_0 = utils::finite_diff(mats.alpha, 3, num_points_finite_diff + 3).transpose();
-        mats.D_4_0 = utils::finite_diff(mats.alpha, 4, num_points_finite_diff + 4).transpose();
+        mats.D_1_0 = utils::finite_diff(mats.alpha, 1, n_nodes_finite_diff + 1).transpose();
+        mats.D_2_0 = utils::finite_diff(mats.alpha, 2, n_nodes_finite_diff + 2).transpose();
+        mats.D_3_0 = utils::finite_diff(mats.alpha, 3, n_nodes_finite_diff + 3).transpose();
+        mats.D_4_0 = utils::finite_diff(mats.alpha, 4, n_nodes_finite_diff + 4).transpose();
 
         mats.P_X = barycentric_matrix(mats.alpha, mats.alpha_roots);
         mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
@@ -463,10 +462,10 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
         mats.weights_0 = ArrayXd::Ones(mats.alpha.size()) * 2.0;
         mats.weights_0(0) = 1.0;
         mats.weights_0(mats.weights_0.size() - 1) = 1.0;
-        mats.weights_0 /= (num_points - 1);
+        mats.weights_0 /= (n_nodes - 1);
 
-        const int np = num_points;
-        mats.P_downsample_bc = MatrixXd::Zero(4 * num_points - 14, 4 * num_points);
+        const int np = n_nodes;
+        mats.P_downsample_bc = MatrixXd::Zero(4 * n_nodes - 14, 4 * n_nodes);
         mats.P_downsample_bc.block(0 * (np - 4), 0 * np, np - 4, np) = mats.P_X;
         mats.P_downsample_bc.block(1 * (np - 4), 1 * np, np - 4, np) = mats.P_X;
         mats.P_downsample_bc.block(2 * (np - 4), 2 * np, np - 4, np) = mats.P_X;
@@ -477,12 +476,12 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
 
 const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matrices<4>();
 
-int FiberContainer::get_global_total_fib_points() const {
-    const int local_fib_points = get_local_node_count();
-    int global_fib_points;
+int FiberContainer::get_global_total_fib_nodes() const {
+    const int local_fib_nodes = get_local_node_count();
+    int global_fib_nodes;
 
-    MPI_Allreduce(&local_fib_points, &global_fib_points, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-    return global_fib_points;
+    MPI_Allreduce(&local_fib_nodes, &global_fib_nodes, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    return global_fib_nodes;
 }
 
 void FiberContainer::update_derivatives() {
@@ -505,8 +504,8 @@ VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<const VectorXd> &
     VectorXd y(x_all.size());
     size_t offset = 0;
     for (auto &fib : fibers) {
-        y.segment(offset, 4 * fib.num_points_) = fib.A_LU_.solve(x_all.segment(offset, 4 * fib.num_points_));
-        offset += 4 * fib.num_points_;
+        y.segment(offset, 4 * fib.n_nodes_) = fib.A_LU_.solve(x_all.segment(offset, 4 * fib.n_nodes_));
+        offset += 4 * fib.n_nodes_;
     }
     return y;
 }
@@ -517,8 +516,8 @@ VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all,
 
     size_t offset = 0;
     for (auto &fib : fibers) {
-        auto &mats = fib.matrices_.at(fib.num_points_);
-        const int np = fib.num_points_;
+        auto &mats = fib.matrices_.at(fib.n_nodes_);
+        const int np = fib.n_nodes_;
         MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / fib.length_, 1);
         MatrixXd xsDs = (D_1.array().colwise() * fib.xs_.row(0).transpose().array()).transpose();
         MatrixXd ysDs = (D_1.array().colwise() * fib.xs_.row(1).transpose().array()).transpose();
@@ -567,12 +566,12 @@ MatrixXd FiberContainer::get_r_vectors() const {
     size_t offset = 0;
 
     for (const Fiber &fib : fibers) {
-        for (int i_pt = 0; i_pt < fib.num_points_; ++i_pt) {
+        for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt) {
             for (int i = 0; i < 3; ++i) {
                 r(i, i_pt + offset) = fib.x_(i, i_pt);
             }
         }
-        offset += fib.num_points_;
+        offset += fib.n_nodes_;
     }
 
     return r;
@@ -588,15 +587,15 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
     size_t offset = 0;
 
     for (const Fiber &fib : fibers) {
-        const ArrayXd &weights = 0.5 * fib.length_ * fib.matrices_.at(fib.num_points_).weights_0;
+        const ArrayXd &weights = 0.5 * fib.length_ * fib.matrices_.at(fib.n_nodes_).weights_0;
 
-        for (int i_pt = 0; i_pt < fib.num_points_; ++i_pt) {
+        for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt) {
             for (int i = 0; i < 3; ++i) {
                 weighted_forces(i, i_pt + offset) = weights(i_pt) * fib_forces(i, i_pt + offset);
                 r_src(i, i_pt + offset) = fib.x_(i, i_pt);
             }
         }
-        offset += fib.num_points_;
+        offset += fib.n_nodes_;
     }
 
     // All-to-all
@@ -612,10 +611,10 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
     // FIXME: Subtracting self flow only works when system has only fibers
     offset = 0;
     for (const Fiber &fib : fibers) {
-        Eigen::Map<VectorXd> wf_flat(weighted_forces.data() + offset * 3, fib.num_points_ * 3);
-        Eigen::Map<VectorXd> vel_flat(vel.data() + offset * 3, fib.num_points_ * 3);
+        Eigen::Map<VectorXd> wf_flat(weighted_forces.data() + offset * 3, fib.n_nodes_ * 3);
+        Eigen::Map<VectorXd> vel_flat(vel.data() + offset * 3, fib.n_nodes_ * 3);
         vel_flat -= fib.stokeslet_ * wf_flat;
-        offset += fib.num_points_;
+        offset += fib.n_nodes_;
     }
 
     return vel;
@@ -626,8 +625,8 @@ MatrixXd FiberContainer::generate_constant_force() const {
     MatrixXd f(3, n_fib_pts);
     size_t offset = 0;
     for (const auto &fib : fibers) {
-        f.block(0, offset, 3, fib.num_points_) = fib.force_scale_ * fib.xs_;
-        offset += fib.num_points_;
+        f.block(0, offset, 3, fib.n_nodes_) = fib.force_scale_ * fib.xs_;
+        offset += fib.n_nodes_;
     }
     return f;
 }
@@ -638,7 +637,7 @@ MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<const VectorXd> &x_a
     size_t offset = 0;
     for (size_t ifib = 0; ifib < fibers.size(); ++ifib) {
         const auto &fib = fibers[ifib];
-        const int np = fib.num_points_;
+        const int np = fib.n_nodes_;
         auto force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
         fw.block(0, offset, 1, np) = force_fibers.segment(0 * np, np).transpose();
         fw.block(1, offset, 1, np) = force_fibers.segment(1 * np, np).transpose();
@@ -682,8 +681,8 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
             fibers.emplace_back(Fiber(fiber_table, params.eta));
 
             auto &fib = fibers.back();
-            std::cout << "Fiber " << i_fib << ": " << fib.num_points_ << " " << fib.bending_rigidity_ << " "
-                      << fib.length_ << std::endl;
+            std::cout << "Fiber " << i_fib << ": " << fib.n_nodes_ << " " << fib.bending_rigidity_ << " " << fib.length_
+                      << std::endl;
         }
     }
 }

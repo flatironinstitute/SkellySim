@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     for (auto &fib : fibs.fibers) {
         assert(fib.length_ == length);
         assert(fib.bending_rigidity_ == bending_rigidity);
-        assert(fib.num_points_ == n_pts);
+        assert(fib.n_nodes_ == n_pts);
     }
 
     double st = omp_get_wtime();

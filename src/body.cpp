@@ -211,6 +211,28 @@ Eigen::MatrixXd BodyContainer::get_node_normals() const {
     return r_body_nodes;
 }
 
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
+BodyContainer::unpack_solution_vector(const Eigen::Ref<const Eigen::VectorXd> &x) const {
+    using Eigen::MatrixXd;
+    const int n_bodies_global = get_global_count();
+    MatrixXd body_velocities(6, n_bodies_global);
+    MatrixXd body_densities(3, get_local_node_count());
+    if (world_rank_ == 0) {
+        int offset = 0;
+        for (int i = 0; i < n_bodies_global; ++i) {
+            for (int j = 0; j < bodies[i].n_nodes_; ++j) {
+                body_densities.col(i) = x.segment(offset, 3);
+                offset += 3;
+            }
+
+            body_velocities.col(i) = x.segment(offset, 6);
+            offset += 6;
+        }
+    }
+    MPI_Bcast(body_velocities.data(), 6 * n_bodies_global, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    return std::make_pair(body_velocities, body_densities);
+}
+
 Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                                     const Eigen::Ref<const Eigen::MatrixXd> &densities,
                                     const Eigen::Ref<const Eigen::MatrixXd> &forces_torques, double eta) const {
@@ -219,8 +241,8 @@ Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_t
     const Eigen::MatrixXd node_positions = get_local_node_positions(); //< Distributed node positions for fmm calls
     const Eigen::MatrixXd node_normals = get_node_normals();           //< Distributed node normals for fmm calls
     const Eigen::MatrixXd null_matrix;                                 //< Empty matrix for dummy arguments to kernels
-    const int n_bodies_global = bodies.size();
-    
+    const int n_bodies_global = get_global_count();
+
     // Section: Stresslet kernel
     const Eigen::MatrixXd &r_dl = node_positions; //< "double layer" positions for stresslet kernel
     Eigen::MatrixXd f_dl(9, n_nodes);             //< "double layer" "force" for stresslet kernel
@@ -235,14 +257,13 @@ Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_t
         (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, n_trg) / eta;
 
     // Section: Oseen kernel
-    Eigen::MatrixXd center_positions = get_center_positions(); //< Distributed center positions for FMM calls
+    Eigen::MatrixXd center_positions = get_local_center_positions(); //< Distributed center positions for FMM calls
     Eigen::MatrixXd forces = forces_torques.block(0, 0, 3, center_positions.cols());
     v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
     // rank gets the body centers and calculates the center->target rotlet
-    constexpr bool override_distributed = true;
-    center_positions = get_center_positions(override_distributed);
+    center_positions = get_global_center_positions();
     Eigen::MatrixXd torques = forces_torques.block(3, 0, 3, n_bodies_global);
 
     v_bdy2all += kernels::rotlet(center_positions, r_trg, torques);

@@ -96,7 +96,7 @@ class BodyContainer {
     Eigen::MatrixXd get_global_node_positions() const;
     Eigen::MatrixXd get_local_node_positions() const;
     Eigen::MatrixXd get_node_normals() const;
-    Eigen::MatrixXd get_center_positions(bool override_distributed = false) const {
+    Eigen::MatrixXd get_center_positions(bool override_distributed) const {
         if (world_rank_ != 0 && !override_distributed)
             return Eigen::MatrixXd(3, 0);
 
@@ -107,6 +107,12 @@ class BodyContainer {
 
         return centers;
     };
+
+    std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
+    unpack_solution_vector(const Eigen::Ref<const Eigen::VectorXd> &x) const;
+
+    Eigen::MatrixXd get_local_center_positions() const { return get_center_positions(false); };
+    Eigen::MatrixXd get_global_center_positions() const { return get_center_positions(true); };
 
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                          const Eigen::Ref<const Eigen::MatrixXd> &densities,
@@ -123,13 +129,10 @@ class BodyContainer {
 
     const Body &at(size_t i) const { return bodies.at(i); };
 
-    size_t size() const { return bodies.size(); };
-
-    /// @brief Synchronize body objects across processes
-    ///
-    /// Forces/torques/positions/orientations must be synchronized since each rank's contribution to force/torque will
-    /// be different. This routine will appropriately make all body objects across processes the same.
-    void synchronize();
+    /// @brief return number of bodies relevant for local calculations
+    size_t get_local_count() const { return (world_rank_ == 0) ? bodies.size() : 0; };
+    /// @brief return number of bodies relevant for global calculations
+    size_t get_global_count() const { return bodies.size(); };
 
   private:
     int world_rank_ = 0;

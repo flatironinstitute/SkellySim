@@ -16,16 +16,16 @@ std::uniform_real_distribution<double> uniform_rng(0.0, 1.0);
 void resolve_fiber_positions(toml::array *fiber_array) {
     for (int i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
         toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
-        int64_t num_points = parse_util::parse_val_key<int64_t>(fiber_table, "num_points", -1);
+        int64_t n_nodes = parse_util::parse_val_key<int64_t>(fiber_table, "n_nodes", -1);
         double length = parse_util::parse_val_key<double>(fiber_table, "length");
 
         toml::array *x_array = fiber_table->get_as<toml::array>("x");
         toml::array *x_0 = fiber_table->get_as<toml::array>("relative_position");
         toml::array *u = fiber_table->get_as<toml::array>("orientation");
 
-        if (num_points == -1) {
-            num_points = x_array->size() / 3;
-            if (num_points == 0)
+        if (n_nodes == -1) {
+            n_nodes = x_array->size() / 3;
+            if (n_nodes == 0)
                 throw std::runtime_error("Attempt to initialize fiber without point count or positions.");
         }
 
@@ -37,11 +37,11 @@ void resolve_fiber_positions(toml::array *fiber_array) {
         if (!!x_0 && !!u && x_0->size() == 3 && u->size() == 3) {
             fiber_table->insert("x", toml::array());
             x_array = fiber_table->get_as<toml::array>("x");
-            Eigen::MatrixXd x(3, num_points);
+            Eigen::MatrixXd x(3, n_nodes);
             Eigen::Vector3d origin = parse_util::convert_array<>(x_0);
             Eigen::Vector3d orientation = parse_util::convert_array<>(u);
             for (int i = 0; i < 3; ++i)
-                x.row(i) = origin(i) + orientation(i) * Eigen::ArrayXd::LinSpaced(num_points, 0, length).transpose();
+                x.row(i) = origin(i) + orientation(i) * Eigen::ArrayXd::LinSpaced(n_nodes, 0, length).transpose();
             for (int i = 0; i < x.size(); ++i) {
                 x_array->push_back(x.data()[i]);
             }
@@ -227,14 +227,14 @@ System::calculate_body_fiber_link_conditions(const FiberContainer &fc, const Bod
     using Eigen::MatrixXd;
     using Eigen::Vector3d;
 
-    Eigen::MatrixXd force_torque_on_body = MatrixXd::Zero(6, bc.size());
-    Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.size());
+    Eigen::MatrixXd force_torque_on_body = MatrixXd::Zero(6, bc.get_global_count());
+    Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
 
     int xt_offset = 0;
     for (size_t i_fib = 0; i_fib < fc.fibers.size(); ++i_fib) {
         const auto &fib = fc.fibers[i_fib];
-        const auto &fib_mats = fib.matrices_.at(fib.num_points_);
-        const int n_pts = fib.num_points_;
+        const auto &fib_mats = fib.matrices_.at(fib.n_nodes_);
+        const int n_pts = fib.n_nodes_;
 
         auto &[i_body, i_site] = fib.binding_site_;
         if (i_body < 0)

@@ -87,11 +87,11 @@ class P_inv_hydro : public Tpetra::Operator<> {
             // Loop through fibers and apply their preconditioner to the Tpetra result vector
             // Fixme: move Fiber loops to FiberContainer
             for (auto &fib : fc_.fibers) {
-                Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, fib.num_points_ * 4);
-                Map<VectorXd> res_fib(Y.getDataNonConst(c).getRawPtr() + offset, fib.num_points_ * 4);
+                Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, fib.n_nodes_ * 4);
+                Map<VectorXd> res_fib(Y.getDataNonConst(c).getRawPtr() + offset, fib.n_nodes_ * 4);
                 res_fib = fib.A_LU_.solve(XView);
 
-                offset += fib.num_points_ * 4;
+                offset += fib.n_nodes_ * 4;
             }
 
             // Each MPI rank has only a _local_ portion of the inverse matrix, but needs the _global_ 'X' vector to
@@ -204,6 +204,8 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         const int shell_v_offset = fib_v_size;
         const int body_v_offset = shell_v_offset + shell_v_size;
 
+        const int n_bodies_global = bc_.get_global_count();
+
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
             using Eigen::Block;
             using Eigen::Map;
@@ -225,7 +227,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             r_fib = fc_.get_r_vectors();
             r_shell = shell_.get_node_positions();
             Eigen::MatrixXd r_body_test = bc_.get_local_node_positions();
-            r_body = r_body_test; //bc_.get_local_node_positions();
+            r_body = r_body_test; // bc_.get_local_node_positions();
             MatrixXd v_all = MatrixXd(3, v_size);
             Block<MatrixXd> r_shellbody = r_all.block(0, shell_v_offset, 3, shell_v_size + body_v_size);
 
@@ -240,22 +242,8 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             MPI_Allgatherv(x_shell_local.data(), shell_sol_size, MPI_DOUBLE, x_shell_global.data(),
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
-            MatrixXd body_velocities(6, bc_.size());
-            MatrixXd body_densities(3, body_v_size);
-            if (rank == 0) {
-                int offset = 0;
-                for (int i = 0; i < bc_.size(); ++i) {
-                    for (int j = 0; j < bc_.bodies[i].n_nodes_; ++j) {
-                        body_densities.col(i) = x_body_local.segment(offset, 3);
-                        offset += 3;
-                    }
-
-                    body_velocities.col(i) = x_body_local.segment(offset, 6);
-                    offset += 6;
-                }
-            }
-            MPI_Bcast(body_velocities.data(), 6 * bc_.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
+            Eigen::MatrixXd body_velocities, body_densities;
+            std::tie(body_velocities, body_densities) = bc_.unpack_solution_vector(x_body_local);
 
             // calculate fiber-fiber velocity
             MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
@@ -277,7 +265,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             MatrixXd force_torque_bodies, v_fib_boundary;
             std::tie(force_torque_bodies, v_fib_boundary) =
                 System::calculate_body_fiber_link_conditions(fc_, bc_, x_fib_local, body_velocities);
-            MPI_Allreduce(MPI_IN_PLACE, force_torque_bodies.data(), 6 * bc_.size(), MPI_DOUBLE, MPI_SUM,
+            MPI_Allreduce(MPI_IN_PLACE, force_torque_bodies.data(), force_torque_bodies.size(), MPI_DOUBLE, MPI_SUM,
                           MPI_COMM_WORLD);
 
             // Calculate flow on other objects due to body forces
@@ -349,13 +337,13 @@ int main(int argc, char *argv[]) {
             MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
             size_t offset = 0;
             for (auto &fib : fc.fibers) {
-                fib.update_RHS(dt, v_fib2all.block(0, offset, 3, fib.num_points_),
-                               f_on_fibers.block(0, offset, 3, fib.num_points_));
-                fib.apply_bc_rectangular(dt, v_fib2all.block(0, offset, 3, fib.num_points_),
-                                         f_on_fibers.block(0, offset, 3, fib.num_points_));
+                fib.update_RHS(dt, v_fib2all.block(0, offset, 3, fib.n_nodes_),
+                               f_on_fibers.block(0, offset, 3, fib.n_nodes_));
+                fib.apply_bc_rectangular(dt, v_fib2all.block(0, offset, 3, fib.n_nodes_),
+                                         f_on_fibers.block(0, offset, 3, fib.n_nodes_));
                 fib.update_preconditioner();
                 fib.update_force_operator();
-                offset += fib.num_points_;
+                offset += fib.n_nodes_;
             }
 
             shell.update_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));

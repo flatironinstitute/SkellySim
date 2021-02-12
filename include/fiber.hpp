@@ -10,7 +10,6 @@
 
 #include <toml.hpp>
 
-
 /// @brief Class to represent a single flexible filament
 ///
 /// Actions on the fiber class are typically handled via the container object, which will
@@ -19,7 +18,7 @@ class Fiber {
   public:
     enum BC { Force, Torque, Velocity, AngularVelocity, Position, Angle };
 
-    int num_points_;               ///< number of points representing the fiber
+    int n_nodes_;                  ///< number of nodes representing the fiber
     double length_;                ///< length of fiber
     double bending_rigidity_;      ///< bending rigidity 'E' of fiber
     double penalty_param_ = 500.0; ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
@@ -47,13 +46,13 @@ class Fiber {
     /// Boundary condition pair for plus end of fiber
     std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
 
-    Eigen::MatrixXd x_;     ///< [ 3 x num_points_ ] matrix representing coordinates of fiber points
-    Eigen::MatrixXd xs_;    ///< [ 3 x num_points_ ] matrix representing first derivative of fiber points
-    Eigen::MatrixXd xss_;   ///< [ 3 x num_points_ ] matrix representing second derivative of fiber points
-    Eigen::MatrixXd xsss_;  ///< [ 3 x num_points_ ] matrix representing third derivative of fiber points
-    Eigen::MatrixXd xssss_; ///< [ 3 x num_points_ ] matrix representing fourth derivative of fiber points
+    Eigen::MatrixXd x_;     ///< [ 3 x n_nodes_ ] matrix representing coordinates of fiber nodes
+    Eigen::MatrixXd xs_;    ///< [ 3 x n_nodes_ ] matrix representing first derivative of fiber nodes
+    Eigen::MatrixXd xss_;   ///< [ 3 x n_nodes_ ] matrix representing second derivative of fiber nodes
+    Eigen::MatrixXd xsss_;  ///< [ 3 x n_nodes_ ] matrix representing third derivative of fiber nodes
+    Eigen::MatrixXd xssss_; ///< [ 3 x n_nodes_ ] matrix representing fourth derivative of fiber nodes
 
-    /// [ 3*num_points_ x 3*num_points_] Oseen tensor for fiber @see Fiber::update_stokeslet
+    /// [ 3*n_nodes_ x 3*n_nodes_] Oseen tensor for fiber @see Fiber::update_stokeslet
     Eigen::MatrixXd stokeslet_;
 
     Eigen::MatrixXd A_;                         ///< Fiber's linear operator for matrix solver
@@ -77,21 +76,20 @@ class Fiber {
         Eigen::MatrixXd P_downsample_bc;
     } fib_mat_t;
 
-    /// Map of cached matrices for different values of num_points_. Calculated automagically at program start. @see
+    /// Map of cached matrices for different values of n_nodes_. Calculated automagically at program start. @see
     /// compute_matrices
     const static std::unordered_map<int, fib_mat_t> matrices_;
 
     Fiber(toml::table *fiber_table, double eta);
 
     /// @brief initialize empty fiber
-    /// @param[in] num_points fiber 'resolution'
+    /// @param[in] n_nodes fiber 'resolution'
     /// @param[in] bending_rigidity bending rigidity of fiber
     /// @param[in] eta fluid viscosity
     ///
     /// @deprecated Initializing with a toml::table structure is the preferred initialization. This is only around for
     /// testing.
-    Fiber(int num_points, double bending_rigidity, double eta)
-        : num_points_(num_points), bending_rigidity_(bending_rigidity) {
+    Fiber(int n_nodes, double bending_rigidity, double eta) : n_nodes_(n_nodes), bending_rigidity_(bending_rigidity) {
         init(eta);
     };
 
@@ -101,12 +99,12 @@ class Fiber {
     ///
     /// Initializes: Fiber::x_, Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_, Fiber::c_0_, Fiber::c_1_
     void init(double eta) {
-        x_ = Eigen::MatrixXd::Zero(3, num_points_);
-        x_.row(0) = Eigen::ArrayXd::LinSpaced(num_points_, 0, 1.0).transpose();
-        xs_.resize(3, num_points_);
-        xss_.resize(3, num_points_);
-        xsss_.resize(3, num_points_);
-        xssss_.resize(3, num_points_);
+        x_ = Eigen::MatrixXd::Zero(3, n_nodes_);
+        x_.row(0) = Eigen::ArrayXd::LinSpaced(n_nodes_, 0, 1.0).transpose();
+        xs_.resize(3, n_nodes_);
+        xss_.resize(3, n_nodes_);
+        xsss_.resize(3, n_nodes_);
+        xssss_.resize(3, n_nodes_);
 
         c_0_ = -log(M_E * std::pow(epsilon_, 2)) / (8 * M_PI * eta);
         c_1_ = 2.0 / (8.0 * M_PI * eta);
@@ -149,23 +147,27 @@ class FiberContainer {
     void update_stokeslets(double eta);
     void update_linear_operators(double dt, double eta);
 
-    /// @brief get total number of points across fibers in the container
+    /// @brief get total number of nodes across fibers in the container
     /// Usually you need this to form arrays used as input later
-    /// @returns total number of points across fibers in the container :)
+    /// @returns total number of nodes across fibers in the container :)
     int get_local_node_count() const {
         // FIXME: This could certainly be cached
         int tot = 0;
         for (auto &fib : fibers)
-            tot += fib.num_points_;
+            tot += fib.n_nodes_;
         return tot;
     };
 
-    int get_global_total_fib_points() const;
+    int get_global_total_fib_nodes() const;
 
     /// @brief Get the size of all local fibers contribution to the matrix problem solution
     int get_local_solution_size() const { return get_local_node_count() * 4; }
 
-    size_t size() const { return fibers.size(); };
+    /// @brief Get number of local fibers
+    int get_local_count() const { return fibers.size(); };
+
+    /// @brief Get number of local fibers
+    int get_global_count() const;
 
     Eigen::MatrixXd generate_constant_force() const;
     Eigen::MatrixXd get_r_vectors() const;

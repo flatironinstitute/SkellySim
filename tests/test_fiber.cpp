@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     assert(allclose(fib.stokeslet_, stokeslet));
 
     fib.update_linear_operator(dt, eta);
-    int np = fib.num_points_;
+    int np = fib.n_nodes_;
 
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
