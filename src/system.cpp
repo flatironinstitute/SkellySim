@@ -219,13 +219,93 @@ void preprocess(toml::table &config, unsigned long seed) {
         resolve_nucleation_sites(fiber_array, body_array);
 }
 
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
+System::calculate_body_fiber_link_conditions(const FiberContainer &fc, const BodyContainer &bc,
+                                             const Eigen::Ref<const Eigen::VectorXd> &fibers_xt,
+                                             const Eigen::Ref<const Eigen::MatrixXd> &body_velocities) {
+    using Eigen::ArrayXXd;
+    using Eigen::MatrixXd;
+    using Eigen::Vector3d;
+
+    Eigen::MatrixXd force_torque_on_body = MatrixXd::Zero(6, bc.size());
+    Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.size());
+
+    int xt_offset = 0;
+    for (size_t i_fib = 0; i_fib < fc.fibers.size(); ++i_fib) {
+        const auto &fib = fc.fibers[i_fib];
+        const auto &fib_mats = fib.matrices_.at(fib.num_points_);
+        const int n_pts = fib.num_points_;
+
+        auto &[i_body, i_site] = fib.binding_site_;
+        if (i_body < 0)
+            continue;
+
+        Vector3d site_pos = bc.get_nucleation_site(i_body, i_site) - bc.at(i_body).get_position();
+
+        // clang-format off
+        Vector3d x_new_0 = {
+            fibers_xt(xt_offset + 0 * n_pts),
+            fibers_xt(xt_offset + 1 * n_pts),
+            fibers_xt(xt_offset + 2 * n_pts)
+        };
+        // clang-format on
+        double T_new_0 = fibers_xt(xt_offset + 3 * n_pts);
+
+        Vector3d xs_0 = fib.xs_.col(0);
+        Vector3d xss_new_0 = pow(2.0 / fib.length_, 2) * fib_mats.D_2_0 * x_new_0;
+        Vector3d xsss_new_0 = pow(2.0 / fib.length_, 3) * fib_mats.D_3_0 * x_new_0;
+
+        // FIRST FROM FIBER ON-TO BODY
+        // Force by fiber on body at s = 0, Fext = -F|s=0 = -(EXsss - TXs)
+        // Bending term + Tension term:
+        Vector3d F_body = -fib.bending_rigidity_ * xsss_new_0 + xs_0 * T_new_0;
+
+        // Torque by fiber on body at s = 0
+        // Lext = (L + link_loc x F) = -E(Xss x Xs) - link_loc x (EXsss - TXs)
+        // bending contribution :
+        Vector3d L_body = -fib.bending_rigidity_ * site_pos.cross(xsss_new_0);
+
+        // tension contribution :
+        L_body += site_pos.cross(xss_new_0) * T_new_0;
+
+        // fiber's torque L:
+        L_body -= fib.bending_rigidity_ * xs_0.cross(xss_new_0);
+
+        // Store the contribution of each fiber in this array
+        force_torque_on_body.col(i_body).segment(0, 3) += F_body;
+        force_torque_on_body.col(i_body).segment(3, 3) += L_body;
+
+        // SECOND FROM BODY ON-TO FIBER
+        // Translational and angular velocities at the attacment point are calculated
+        Vector3d v_body = body_velocities.block(0, i_body, 3, 1);
+        Vector3d w_body = body_velocities.block(3, i_body, 3, 1);
+
+        // dx/dt = U + Omega x link_loc (move to LHS so -U -Omega x link_loc)
+        Vector3d v_fiber = -v_body - w_body.cross(w_body);
+
+        // tension condition = -(xs*vx + ys*vy + zs*wz)
+        double tension_condition = -xs_0.dot(v_body) + (xs_0.cross(site_pos)).dot(w_body);
+
+        // Rotational velocity condition on fiber
+        // FIXME: Fiber torque assumes body is a sphere :(
+        Vector3d w_fiber = site_pos.normalized().cross(w_body);
+
+        velocities_on_fiber.col(i_fib).segment(0, 3) = v_fiber;
+        velocities_on_fiber(i_fib, 3) = tension_condition;
+        velocities_on_fiber.col(i_fib).segment(4, 3) = w_fiber;
+
+        xt_offset += 4 * n_pts;
+    }
+
+    return std::make_pair(force_torque_on_body, velocities_on_fiber);
+}
+
 System::System(std::string *input_file) {
     if (input_file == nullptr)
         throw std::runtime_error("System uninitialized. Call System::init(\"config_file\").");
 
     toml::table config = toml::parse_file(*input_file);
     params_ = Params(config.get_as<toml::table>("params"));
-
     preprocess(config, params_.seed);
 
     fc_ = FiberContainer(config.get_as<toml::array>("fibers"), params_);

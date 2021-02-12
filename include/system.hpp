@@ -26,6 +26,10 @@ class System {
     static FiberContainer &get_fiber_container() { return get_instance_impl().fc_; };
     static BodyContainer &get_body_container() { return get_instance_impl().bc_; };
     static Periphery &get_shell() { return get_instance_impl().shell_; };
+    static std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
+    calculate_body_fiber_link_conditions(const FiberContainer &fc, const BodyContainer &bc,
+                                         const Eigen::Ref<const Eigen::VectorXd> &fibers_xt,
+                                         const Eigen::Ref<const Eigen::MatrixXd> &body_velocities);
 };
 
 #endif

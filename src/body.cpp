@@ -84,7 +84,7 @@ void Body::move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_or
     for (int i = 0; i < n_nodes_; ++i)
         node_normals_.col(i) = rot * node_normals_ref_.col(i);
 
-    for (int i = 0; i < n_nodes_; ++i)
+    for (int i = 0; i < nucleation_sites_ref_.cols(); ++i)
         nucleation_sites_.col(i) = position_ + rot * nucleation_sites_ref_.col(i);
 }
 
@@ -126,9 +126,11 @@ void Body::load_precompute_data(const std::string &precompute_file) {
         return Eigen::Map<Eigen::VectorXd>(npz[var].data<double>(), npz[var].shape[0]);
     };
 
-    node_positions_ref_ = load_mat(precomp, "node_positions_ref");
-    node_normals_ref_ = load_mat(precomp, "node_normals_ref");
+    node_positions_ = node_positions_ref_ = load_mat(precomp, "node_positions_ref");
+    node_normals_ = node_normals_ref_ = load_mat(precomp, "node_normals_ref");
     node_weights_ = load_vec(precomp, "node_weights");
+
+    n_nodes_ = node_positions_.cols();
 }
 
 /// @brief Construct body from relevant toml config and system params
@@ -145,7 +147,6 @@ Body::Body(const toml::table *body_table, const Params &params) {
     load_precompute_data(precompute_file);
 
     // TODO: add body assertions so that input file and precompute data necessarily agree
-    n_nodes_ = node_positions_.cols();
 
     if (!!body_table->get("position"))
         position_ = parse_array_key<>(body_table, "position");
@@ -156,9 +157,12 @@ Body::Body(const toml::table *body_table, const Params &params) {
     if (!!body_table->get("nucleation_sites")) {
         nucleation_sites_ref_ = parse_array_key<>(body_table, "nucleation_sites");
         nucleation_sites_ref_.resize(3, nucleation_sites_ref_.size() / 3);
+        nucleation_sites_ = nucleation_sites_ref_;
     }
 
     move(position_, orientation_);
+
+    update_cache_variables(params.eta);
 }
 
 Eigen::VectorXd BodyContainer::get_RHS() const {
@@ -174,10 +178,11 @@ Eigen::VectorXd BodyContainer::get_RHS() const {
     return RHS;
 }
 
-Eigen::MatrixXd BodyContainer::get_node_positions() const {
+Eigen::MatrixXd BodyContainer::get_local_node_positions() const {
     Eigen::MatrixXd r_body_nodes;
 
-    const int n_nodes = get_local_solution_size();
+    const int n_nodes = get_local_node_count();
+    r_body_nodes.resize(3, n_nodes);
     if (world_rank_ == 0) {
         r_body_nodes.resize(3, n_nodes);
         int offset = 0;
@@ -209,12 +214,13 @@ Eigen::MatrixXd BodyContainer::get_node_normals() const {
 Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                                     const Eigen::Ref<const Eigen::MatrixXd> &densities,
                                     const Eigen::Ref<const Eigen::MatrixXd> &forces_torques, double eta) const {
-    const int n_nodes = get_local_node_count();               //< Distributed node counts for fmm calls
+    const int n_nodes = get_local_node_count(); //< Distributed node counts for fmm calls
     const int n_trg = r_trg.cols();
-    const Eigen::MatrixXd node_positions = get_node_positions(); //< Distributed node positions for fmm calls
-    const Eigen::MatrixXd node_normals = get_node_normals();     //< Distributed node normals for fmm calls
-    const Eigen::MatrixXd null_matrix;                           //< Empty matrix for dummy arguments to kernels
-
+    const Eigen::MatrixXd node_positions = get_local_node_positions(); //< Distributed node positions for fmm calls
+    const Eigen::MatrixXd node_normals = get_node_normals();           //< Distributed node normals for fmm calls
+    const Eigen::MatrixXd null_matrix;                                 //< Empty matrix for dummy arguments to kernels
+    const int n_bodies_global = bodies.size();
+    
     // Section: Stresslet kernel
     const Eigen::MatrixXd &r_dl = node_positions; //< "double layer" positions for stresslet kernel
     Eigen::MatrixXd f_dl(9, n_nodes);             //< "double layer" "force" for stresslet kernel
@@ -230,14 +236,15 @@ Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_t
 
     // Section: Oseen kernel
     Eigen::MatrixXd center_positions = get_center_positions(); //< Distributed center positions for FMM calls
-    const Eigen::MatrixXd forces = forces_torques.block(0, 0, 3, center_positions.cols());
-    const Eigen::MatrixXd torques = forces_torques.block(3, 0, 3, center_positions.cols());
+    Eigen::MatrixXd forces = forces_torques.block(0, 0, 3, center_positions.cols());
     v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
     // rank gets the body centers and calculates the center->target rotlet
     constexpr bool override_distributed = true;
     center_positions = get_center_positions(override_distributed);
+    Eigen::MatrixXd torques = forces_torques.block(3, 0, 3, n_bodies_global);
+
     v_bdy2all += kernels::rotlet(center_positions, r_trg, torques);
 
     return v_bdy2all;

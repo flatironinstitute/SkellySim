@@ -212,15 +212,26 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             double *res_ptr = Y.getDataNonConst(c).getRawPtr();
             const double *x_ptr = X.getData(c).getRawPtr();
             Map<const VectorXd> x_fib_local(x_ptr, fib_sol_size);
-            Map<const VectorXd> x_shell_local(x_ptr + fib_sol_size, shell_sol_size);
+            Map<const VectorXd> x_shell_local(x_ptr + shell_sol_offset, shell_sol_size);
+            Map<const VectorXd> x_body_local(x_ptr + body_sol_offset, body_sol_size);
             Map<VectorXd> res_fib(res_ptr, fib_sol_size);
             Map<VectorXd> res_shell(res_ptr + fib_sol_size, shell_sol_size);
             Map<VectorXd> res_bodies(res_ptr + fib_sol_size + shell_sol_size, body_sol_size);
-            MatrixXd r_fib = fc_.get_r_vectors();
+
+            MatrixXd r_all(3, fib_v_size + shell_v_size + body_v_size);
+            Block<MatrixXd> r_fib = r_all.block(0, 0, 3, fib_v_size);
+            Block<MatrixXd> r_shell = r_all.block(0, shell_v_offset, 3, shell_v_size);
+            Block<MatrixXd> r_body = r_all.block(0, body_v_offset, 3, body_v_size);
+            r_fib = fc_.get_r_vectors();
+            r_shell = shell_.get_node_positions();
+            Eigen::MatrixXd r_body_test = bc_.get_local_node_positions();
+            r_body = r_body_test; //bc_.get_local_node_positions();
             MatrixXd v_all = MatrixXd(3, v_size);
+            Block<MatrixXd> r_shellbody = r_all.block(0, shell_v_offset, 3, shell_v_size + body_v_size);
 
             Block<MatrixXd> v_fib = v_all.block(0, fib_v_offset, 3, fib_v_size);
             Block<MatrixXd> v_shell = v_all.block(0, shell_v_offset, 3, shell_v_size);
+            Block<MatrixXd> v_shellbodies = v_all.block(0, shell_v_offset, 3, shell_v_size + body_v_size);
             Block<MatrixXd> v_bodies = v_all.block(0, body_v_offset, 3, body_v_size);
 
             // Collect all X shell data into single vector on all ranks
@@ -229,9 +240,26 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             MPI_Allgatherv(x_shell_local.data(), shell_sol_size, MPI_DOUBLE, x_shell_global.data(),
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
+            MatrixXd body_velocities(6, bc_.size());
+            MatrixXd body_densities(3, body_v_size);
+            if (rank == 0) {
+                int offset = 0;
+                for (int i = 0; i < bc_.size(); ++i) {
+                    for (int j = 0; j < bc_.bodies[i].n_nodes_; ++j) {
+                        body_densities.col(i) = x_body_local.segment(offset, 3);
+                        offset += 3;
+                    }
+
+                    body_velocities.col(i) = x_body_local.segment(offset, 6);
+                    offset += 6;
+                }
+            }
+            MPI_Bcast(body_velocities.data(), 6 * bc_.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+
             // calculate fiber-fiber velocity
             MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
-            MatrixXd v_fib2all = fc_.flow(fw, shell_.node_pos_, eta_);
+            MatrixXd v_fib2all = fc_.flow(fw, r_shellbody, eta_);
             Block<MatrixXd> v_fib2fib = v_fib2all.block(0, fib_v_offset, 3, fib_v_size);
             Block<MatrixXd> v_fib2shell = v_fib2all.block(0, shell_v_offset, 3, shell_v_size);
             Block<MatrixXd> v_fib2bodies = v_fib2all.block(0, body_v_offset, 3, body_v_size);
@@ -246,8 +274,14 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             res_shell += Map<VectorXd>(v_shell.data(), shell_sol_size);
 
             // Calculate forces/torques on body
+            MatrixXd force_torque_bodies, v_fib_boundary;
+            std::tie(force_torque_bodies, v_fib_boundary) =
+                System::calculate_body_fiber_link_conditions(fc_, bc_, x_fib_local, body_velocities);
+            MPI_Allreduce(MPI_IN_PLACE, force_torque_bodies.data(), 6 * bc_.size(), MPI_DOUBLE, MPI_SUM,
+                          MPI_COMM_WORLD);
 
             // Calculate flow on other objects due to body forces
+            bc_.flow(r_all, body_densities, force_torque_bodies, eta_);
         }
     }
 

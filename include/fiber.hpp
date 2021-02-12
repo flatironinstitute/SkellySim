@@ -165,6 +165,8 @@ class FiberContainer {
     /// @brief Get the size of all local fibers contribution to the matrix problem solution
     int get_local_solution_size() const { return get_local_node_count() * 4; }
 
+    size_t size() const { return fibers.size(); };
+
     Eigen::MatrixXd generate_constant_force() const;
     Eigen::MatrixXd get_r_vectors() const;
     Eigen::VectorXd get_RHS() const;

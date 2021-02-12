@@ -137,7 +137,7 @@ Eigen::MatrixXd kernels::rotlet(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
     const double reg2 = reg * reg;
     const double factor = 1 / (8.0 * M_PI * eta);
 
-    MatrixXd u = MatrixXd::Zero(3, r_trg.size());
+    MatrixXd u = MatrixXd::Zero(3, r_trg.cols());
 
     // FIXME: Might want to vectorize rotlet calculation
     for (int i_trg = 0; i_trg < N_trg; ++i_trg) {

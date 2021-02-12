@@ -44,6 +44,7 @@ class Body {
 
     Body(const toml::table *body_table, const Params &params);
 
+    const Eigen::Vector3d &get_position() const { return position_; };
     void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body);
     void update_cache_variables(double eta);
     void update_K_matrix();
@@ -92,16 +93,17 @@ class BodyContainer {
     }
 
     Eigen::VectorXd get_RHS() const;
-    Eigen::MatrixXd get_node_positions() const;
+    Eigen::MatrixXd get_global_node_positions() const;
+    Eigen::MatrixXd get_local_node_positions() const;
     Eigen::MatrixXd get_node_normals() const;
     Eigen::MatrixXd get_center_positions(bool override_distributed = false) const {
         if (world_rank_ != 0 && !override_distributed)
-            return Eigen::MatrixXd();
+            return Eigen::MatrixXd(3, 0);
 
         Eigen::MatrixXd centers(3, bodies.size());
-        int offset = 0;
-        for (const auto &body : bodies)
-            centers.block(0, offset, 3, 1) = body.position_;
+        for (int i = 0; i < bodies.size(); ++i) {
+            centers.block(0, i, 3, 1) = bodies[i].position_;
+        }
 
         return centers;
     };
@@ -115,9 +117,13 @@ class BodyContainer {
             body.update_cache_variables(eta);
     }
 
-    Eigen::Vector3d get_nucleation_site(int i_body, int j_site) {
+    Eigen::Vector3d get_nucleation_site(int i_body, int j_site) const {
         return bodies[i_body].nucleation_sites_.col(j_site);
     };
+
+    const Body &at(size_t i) const { return bodies.at(i); };
+
+    size_t size() const { return bodies.size(); };
 
     /// @brief Synchronize body objects across processes
     ///
