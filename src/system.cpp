@@ -242,18 +242,16 @@ System::calculate_body_fiber_link_conditions(const FiberContainer &fc, const Bod
 
         Vector3d site_pos = bc.get_nucleation_site(i_body, i_site) - bc.at(i_body).get_position();
 
-        // clang-format off
-        Vector3d x_new_0 = {
-            fibers_xt(xt_offset + 0 * n_pts),
-            fibers_xt(xt_offset + 1 * n_pts),
-            fibers_xt(xt_offset + 2 * n_pts)
-        };
-        // clang-format on
+        MatrixXd x_new(3, fib.n_nodes_);
+        x_new.row(0) = fibers_xt.segment(xt_offset + 0 * fib.n_nodes_, fib.n_nodes_);
+        x_new.row(1) = fibers_xt.segment(xt_offset + 1 * fib.n_nodes_, fib.n_nodes_);
+        x_new.row(2) = fibers_xt.segment(xt_offset + 2 * fib.n_nodes_, fib.n_nodes_);
+
         double T_new_0 = fibers_xt(xt_offset + 3 * n_pts);
 
         Vector3d xs_0 = fib.xs_.col(0);
-        Vector3d xss_new_0 = pow(2.0 / fib.length_, 2) * fib_mats.D_2_0 * x_new_0;
-        Vector3d xsss_new_0 = pow(2.0 / fib.length_, 3) * fib_mats.D_3_0 * x_new_0;
+        Vector3d xss_new_0 = pow(2.0 / fib.length_, 2) * fib_mats.D_2_0.row(0) * x_new.transpose();
+        Vector3d xsss_new_0 = pow(2.0 / fib.length_, 3) * fib_mats.D_3_0.row(0) * x_new.transpose();
 
         // FIRST FROM FIBER ON-TO BODY
         // Force by fiber on body at s = 0, Fext = -F|s=0 = -(EXsss - TXs)
@@ -290,9 +288,9 @@ System::calculate_body_fiber_link_conditions(const FiberContainer &fc, const Bod
         // FIXME: Fiber torque assumes body is a sphere :(
         Vector3d w_fiber = site_pos.normalized().cross(w_body);
 
-        velocities_on_fiber.col(i_fib).segment(0, 3) = v_fiber;
-        velocities_on_fiber(i_fib, 3) = tension_condition;
-        velocities_on_fiber.col(i_fib).segment(4, 3) = w_fiber;
+        velocities_on_fiber.block(0, i_fib, 3, 1) = v_fiber;
+        velocities_on_fiber(3, i_fib) = tension_condition;
+        velocities_on_fiber.block(3, i_fib, 3, 1) = w_fiber;
 
         xt_offset += 4 * n_pts;
     }
