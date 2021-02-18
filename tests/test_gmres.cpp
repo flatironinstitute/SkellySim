@@ -267,52 +267,54 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             v_bodies += v_shell2fibbody.block(0, r_fib.cols(), 3, r_body.cols());
 
             // Calculate forces/torques on body
-            MatrixXd force_torque_bodies, v_fib_boundary;
-            std::tie(force_torque_bodies, v_fib_boundary) =
-                System::calculate_body_fiber_link_conditions(fc_, bc_, x_fib_local, body_velocities);
-            MPI_Allreduce(MPI_IN_PLACE, force_torque_bodies.data(), force_torque_bodies.size(), MPI_DOUBLE, MPI_SUM,
-                          MPI_COMM_WORLD);
+            if (bc_.bodies.size()) {
+                MatrixXd force_torque_bodies, v_fib_boundary;
+                std::tie(force_torque_bodies, v_fib_boundary) =
+                    System::calculate_body_fiber_link_conditions(fc_, bc_, x_fib_local, body_velocities);
+                MPI_Allreduce(MPI_IN_PLACE, force_torque_bodies.data(), force_torque_bodies.size(), MPI_DOUBLE, MPI_SUM,
+                              MPI_COMM_WORLD);
 
-            // Calculate flow on other objects due to body forces
-            MatrixXd v_bdy2all = bc_.flow(r_all, body_densities, force_torque_bodies, eta_);
-            Block<MatrixXd> v_bdy2fib = v_bdy2all.block(0, fib_v_offset, 3, fib_v_size);
-            Block<MatrixXd> v_bdy2shell = v_bdy2all.block(0, shell_v_offset, 3, shell_v_size);
-            Block<MatrixXd> v_bdy2bdy = v_bdy2all.block(0, body_v_offset, 3, body_v_size);
-            v_all += v_bdy2all;
+                // Calculate flow on other objects due to body forces
+                MatrixXd v_bdy2all = bc_.flow(r_all, body_densities, force_torque_bodies, eta_);
+                Block<MatrixXd> v_bdy2fib = v_bdy2all.block(0, fib_v_offset, 3, fib_v_size);
+                Block<MatrixXd> v_bdy2shell = v_bdy2all.block(0, shell_v_offset, 3, shell_v_size);
+                Block<MatrixXd> v_bdy2bdy = v_bdy2all.block(0, body_v_offset, 3, body_v_size);
+                v_all += v_bdy2all;
+
+                if (rank == 0) {
+                    int node_offset = 0;
+                    int i_body = 0;
+                    for (auto &body : bc_.bodies) {
+                        Map<VectorXd> res_body_nodes(res_bodies.data(), body.n_nodes_ * 3);
+                        Map<VectorXd> res_body_com(res_bodies.data() + body.n_nodes_, 6);
+
+                        Block<MatrixXd> d = body_densities.block(0, node_offset, 3, body.n_nodes_);
+                        Block<MatrixXd> U = body_velocities.block(0, i_body, 6, 1);
+
+                        VectorXd cx(3 * body.n_nodes_), cy(3 * body.n_nodes_), cz(3 * body.n_nodes_);
+
+                        for (int i = 0; i < body.n_nodes_; ++i) {
+                            cx.segment(i * 3, 3) += d(0, i) * body.node_weights_(i) * body.ex_.col(i);
+                            cy.segment(i * 3, 3) += d(1, i) * body.node_weights_(i) * body.ey_.col(i);
+                            cz.segment(i * 3, 3) += d(2, i) * body.node_weights_(i) * body.ez_.col(i);
+                        }
+
+                        VectorXd KU = body.K_ * U;
+                        VectorXd KTLambda = body.K_.transpose() * Map<VectorXd>(d.data(), 3 * body.n_nodes_);
+
+                        res_body_nodes +=
+                            -(cx + cy + cz) - KU + Map<VectorXd>(v_bodies.data() + node_offset * 3, body.n_nodes_ * 3);
+                        res_body_com = -KTLambda + U;
+
+                        i_body++;
+                        node_offset += body.n_nodes_;
+                    }
+                }
+            }
 
             res_fib = fc_.matvec(x_fib_local, v_fib);
             res_shell =
                 shell_.stresslet_plus_complementary_ * x_shell_global + Map<VectorXd>(v_shell.data(), shell_sol_size);
-
-            if (rank == 0) {
-                int node_offset = 0;
-                int i_body = 0;
-                for (auto &body : bc_.bodies) {
-                    Map<VectorXd> res_body_nodes(res_bodies.data(), body.n_nodes_ * 3);
-                    Map<VectorXd> res_body_com(res_bodies.data() + body.n_nodes_, 6);
-
-                    Block<MatrixXd> d = body_densities.block(0, node_offset, 3, body.n_nodes_);
-                    Block<MatrixXd> U = body_velocities.block(0, i_body, 6, 1);
-
-                    VectorXd cx(3 * body.n_nodes_), cy(3 * body.n_nodes_), cz(3 * body.n_nodes_);
-
-                    for (int i = 0; i < body.n_nodes_; ++i) {
-                        cx.segment(i * 3, 3) += d(0, i) * body.node_weights_(i) * body.ex_.col(i);
-                        cy.segment(i * 3, 3) += d(1, i) * body.node_weights_(i) * body.ey_.col(i);
-                        cz.segment(i * 3, 3) += d(2, i) * body.node_weights_(i) * body.ez_.col(i);
-                    }
-
-                    VectorXd KU = body.K_ * U;
-                    VectorXd KTLambda = body.K_.transpose() * Map<VectorXd>(d.data(), 3 * body.n_nodes_);
-
-                    res_body_nodes +=
-                        -(cx + cy + cz) - KU + Map<VectorXd>(v_bodies.data() + node_offset * 3, body.n_nodes_ * 3);
-                    res_body_com = -KTLambda + U;
-
-                    i_body++;
-                    node_offset += body.n_nodes_;
-                }
-            }
         }
     }
 

@@ -244,6 +244,8 @@ BodyContainer::unpack_solution_vector(const Eigen::Ref<const Eigen::VectorXd> &x
 Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                                     const Eigen::Ref<const Eigen::MatrixXd> &densities,
                                     const Eigen::Ref<const Eigen::MatrixXd> &forces_torques, double eta) const {
+    if (!bodies.size())
+        return Eigen::MatrixXd::Zero(3, r_trg.cols());
     const int n_nodes = get_local_node_count(); //< Distributed node counts for fmm calls
     const int n_trg = r_trg.cols();
     const Eigen::MatrixXd node_positions = get_local_node_positions(); //< Distributed node positions for fmm calls
