@@ -436,7 +436,7 @@ template <int n_nodes_finite_diff>
 std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
     std::unordered_map<int, Fiber::fib_mat_t> res;
 
-    for (auto n_nodes : {8, 16, 24, 32, 48, 64, 96}) {
+    for (auto n_nodes : {8, 16, 24, 32, 48, 64, 96, 128}) {
         auto &mats = res[n_nodes];
         mats.alpha = ArrayXd::LinSpaced(n_nodes, -1.0, 1.0);
 

@@ -11,6 +11,7 @@ class System {
     FiberContainer fc_;
     BodyContainer bc_;
     Periphery shell_;
+    toml::table param_table_;
 
     static System &get_instance_impl(std::string *const input_file = nullptr) {
         static System instance(input_file);
@@ -26,6 +27,7 @@ class System {
     static FiberContainer &get_fiber_container() { return get_instance_impl().fc_; };
     static BodyContainer &get_body_container() { return get_instance_impl().bc_; };
     static Periphery &get_shell() { return get_instance_impl().shell_; };
+    static toml::table &get_param_table() { return get_instance_impl().param_table_; };
     static std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
     calculate_body_fiber_link_conditions(const FiberContainer &fc, const BodyContainer &bc,
                                          const Eigen::Ref<const Eigen::VectorXd> &fibers_xt,
