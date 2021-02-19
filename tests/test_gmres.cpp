@@ -286,17 +286,16 @@ class A_fiber_hydro : public Tpetra::Operator<> {
                     int i_body = 0;
                     for (auto &body : bc_.bodies) {
                         Map<VectorXd> res_body_nodes(res_bodies.data(), body.n_nodes_ * 3);
-                        Map<VectorXd> res_body_com(res_bodies.data() + body.n_nodes_, 6);
+                        Map<VectorXd> res_body_com(res_bodies.data() + body.n_nodes_ * 3, 6);
 
                         Block<MatrixXd> d = body_densities.block(0, node_offset, 3, body.n_nodes_);
                         Block<MatrixXd> U = body_velocities.block(0, i_body, 6, 1);
 
                         VectorXd cx(3 * body.n_nodes_), cy(3 * body.n_nodes_), cz(3 * body.n_nodes_);
-
                         for (int i = 0; i < body.n_nodes_; ++i) {
-                            cx.segment(i * 3, 3) += d(0, i) * body.node_weights_(i) * body.ex_.col(i);
-                            cy.segment(i * 3, 3) += d(1, i) * body.node_weights_(i) * body.ey_.col(i);
-                            cz.segment(i * 3, 3) += d(2, i) * body.node_weights_(i) * body.ez_.col(i);
+                            cx.segment(i * 3, 3) += d(0, i) / body.node_weights_(i) * body.ex_.col(i);
+                            cy.segment(i * 3, 3) += d(1, i) / body.node_weights_(i) * body.ey_.col(i);
+                            cz.segment(i * 3, 3) += d(2, i) / body.node_weights_(i) * body.ez_.col(i);
                         }
 
                         VectorXd KU = body.K_ * U;
@@ -394,6 +393,7 @@ int main(int argc, char *argv[]) {
             shell.update_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));
 
             // FIXME: Body update_RHS
+            bc.update_cache_variables(eta);
             Eigen::MatrixXd v_on_bodies = Eigen::MatrixXd::Zero(3, bc.get_local_solution_size());
             bc.update_RHS(v_on_bodies);
         }

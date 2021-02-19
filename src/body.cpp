@@ -7,6 +7,7 @@
 /// @see update_preconditioner
 void Body::update_K_matrix() {
     K_.resize(3 * n_nodes_, 6);
+    K_.setZero();
     for (int i = 0; i < n_nodes_; ++i) {
         // J matrix
         K_.block(i * 3, 0, 3, 3).diagonal().array() = -1.0;
@@ -229,7 +230,7 @@ BodyContainer::unpack_solution_vector(const Eigen::Ref<const Eigen::VectorXd> &x
         int offset = 0;
         for (int i = 0; i < n_bodies_global; ++i) {
             for (int j = 0; j < bodies[i].n_nodes_; ++j) {
-                body_densities.col(i) = x.segment(offset, 3);
+                body_densities.col(j) = x.segment(offset, 3);
                 offset += 3;
             }
 
