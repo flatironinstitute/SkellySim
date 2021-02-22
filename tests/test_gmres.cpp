@@ -433,6 +433,8 @@ int main(int argc, char *argv[]) {
             RCP<vec_type> Y = rcp(new vec_type(map));
             Eigen::Map<Eigen::VectorXd> fib_Y(Y->getDataNonConst(0).getRawPtr(), fib_sol_size);
             Eigen::Map<Eigen::VectorXd> shell_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
+            Eigen::Map<Eigen::VectorXd> body_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size,
+                                               body_sol_size);
 
             X->putScalar(1.0);
             A_sim->apply(*X, *Y);
@@ -446,13 +448,17 @@ int main(int argc, char *argv[]) {
             if (rank == 0) {
                 cnpy::npy_save("RHS_fib.npy", RHS_fib_global.data(), {(unsigned long)RHS_fib_global.size()});
                 cnpy::npy_save("RHS_shell.npy", RHS_shell_global.data(), {(unsigned long)RHS_shell_global.size()});
+                cnpy::npy_save("RHS_body.npy", RHS_body.data(), {(unsigned long)RHS_body.size()});
                 cnpy::npy_save("Y_fib.npy", fib_Y_global.data(), {(unsigned long)fib_Y_global.size()});
-                cnpy::npy_save("Y_shell.npy", shell_Y_global.data(), {(unsigned long)RHS_shell_global.size()});
+                cnpy::npy_save("Y_shell.npy", shell_Y_global.data(), {(unsigned long)shell_Y_global.size()});
+                cnpy::npy_save("Y_body.npy", body_Y.data(), {(unsigned long)body_Y.size()});
             }
         }
 
         fc.fmm_->force_setup_tree();
         shell.fmm_->force_setup_tree();
+        bc.oseen_kernel_->force_setup_tree();
+        bc.stresslet_kernel_->force_setup_tree();
 
         Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, RHS);
         if (rank == 0)
