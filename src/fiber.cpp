@@ -432,8 +432,7 @@ MatrixXd barycentric_matrix(const Eigen::Ref<const ArrayXd> &x, const Eigen::Ref
 /// @brief Helper function to initialize Fiber::matrices_
 /// @tparam n_nodes_finite_diff Number of neighboring points to use in finite difference approximation
 /// @return map of Fiber::fib_mat_t initialized for various numbers of points, where the key will be Fiber::n_nodes_
-template <int n_nodes_finite_diff>
-std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
+std::unordered_map<int, Fiber::fib_mat_t> compute_matrices(int n_nodes_finite_diff) {
     std::unordered_map<int, Fiber::fib_mat_t> res;
 
     for (auto n_nodes : {8, 16, 24, 32, 48, 64, 96, 128}) {
@@ -474,7 +473,8 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices() {
     return res;
 }
 
-const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matrices<4>();
+// FIXME: Make this an input parameter
+const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matrices(4);
 
 int FiberContainer::get_global_total_fib_nodes() const {
     const int local_fib_nodes = get_local_node_count();
