@@ -25,7 +25,7 @@ class Periphery {
     /// @brief Get the size of the shell's contribution to the matrix problem solution
     int get_local_solution_size() const { return M_inv_.rows(); };
 
-    Eigen::MatrixXd get_node_positions() const { return node_pos_; };
+    Eigen::MatrixXd get_local_node_positions() const { return node_pos_; };
 
     void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell);
 

@@ -10,12 +10,12 @@ void Body::update_K_matrix() {
     K_.setZero();
     for (int i = 0; i < n_nodes_; ++i) {
         // J matrix
-        K_.block(i * 3, 0, 3, 3).diagonal().array() = -1.0;
+        K_.block(i * 3, 0, 3, 3).diagonal().array() = 1.0;
         // rot matrix
-        Eigen::Vector3d vec = node_positions_.col(i);
-        K_.block(i * 3 + 0, 3, 1, 3) = -Eigen::RowVector3d({0.0, vec[2], -vec[1]});
-        K_.block(i * 3 + 1, 3, 1, 3) = -Eigen::RowVector3d({-vec[2], 0.0, vec[0]});
-        K_.block(i * 3 + 2, 3, 1, 3) = -Eigen::RowVector3d({vec[1], -vec[0], 0.0});
+        Eigen::Vector3d vec = node_positions_.col(i) - position_;
+        K_.block(i * 3 + 0, 3, 1, 3) = Eigen::RowVector3d({0.0, vec[2], -vec[1]});
+        K_.block(i * 3 + 1, 3, 1, 3) = Eigen::RowVector3d({-vec[2], 0.0, vec[0]});
+        K_.block(i * 3 + 2, 3, 1, 3) = Eigen::RowVector3d({vec[1], -vec[0], 0.0});
     }
 }
 

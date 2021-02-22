@@ -231,7 +231,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             Block<MatrixXd> r_shell = r_all.block(0, shell_v_offset, 3, shell_v_size);
             Block<MatrixXd> r_body = r_all.block(0, body_v_offset, 3, body_v_size);
             r_fib = fc_.get_r_vectors();
-            r_shell = shell_.get_node_positions();
+            r_shell = shell_.get_local_node_positions();
             r_body = bc_.get_local_node_positions();
             MatrixXd v_all = MatrixXd(3, v_size);
             Block<MatrixXd> r_shellbody = r_all.block(0, shell_v_offset, 3, shell_v_size + body_v_size);
@@ -294,6 +294,9 @@ class A_fiber_hydro : public Tpetra::Operator<> {
                         Block<MatrixXd> U = body_velocities.block(0, i_body, 6, 1);
 
                         VectorXd cx(3 * body.n_nodes_), cy(3 * body.n_nodes_), cz(3 * body.n_nodes_);
+                        cx.setZero();
+                        cy.setZero();
+                        cz.setZero();
                         for (int i = 0; i < body.n_nodes_; ++i) {
                             cx.segment(i * 3, 3) += d(0, i) / body.node_weights_(i) * body.ex_.col(i);
                             cy.segment(i * 3, 3) += d(1, i) / body.node_weights_(i) * body.ey_.col(i);
@@ -378,7 +381,11 @@ int main(int argc, char *argv[]) {
         }
 
         {
-            MatrixXd r_trg_external = shell.node_pos_;
+            MatrixXd r_trg_external(3, shell.get_local_node_count() + bc.get_local_node_count());
+            r_trg_external.block(0, 0, 3, shell.get_local_node_count()) = shell.get_local_node_positions();
+            r_trg_external.block(0, shell.get_local_node_count(), 3, bc.get_local_node_count()) =
+                bc.get_local_node_positions();
+
             MatrixXd f_on_fibers = fc.generate_constant_force();
             MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
             size_t offset = 0;
@@ -392,12 +399,12 @@ int main(int argc, char *argv[]) {
                 offset += fib.n_nodes_;
             }
 
-            shell.update_RHS(v_fib2all.block(0, offset, 3, r_trg_external.cols()));
+            shell.update_RHS(v_fib2all.block(0, offset, 3, shell.get_local_node_count()));
+            offset += shell.get_local_node_count();
 
             // FIXME: Body update_RHS
             bc.update_cache_variables(eta);
-            Eigen::MatrixXd v_on_bodies = Eigen::MatrixXd::Zero(3, bc.get_local_solution_size());
-            bc.update_RHS(v_on_bodies);
+            bc.update_RHS(v_fib2all.block(0, offset, 3, bc.get_local_node_count()));
         }
 
         RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, eta));
