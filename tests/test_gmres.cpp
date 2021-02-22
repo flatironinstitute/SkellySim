@@ -267,8 +267,9 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             v_bodies += v_shell2fibbody.block(0, r_fib.cols(), 3, r_body.cols());
 
             // Calculate forces/torques on body
+            MatrixXd v_fib_boundary;
             if (bc_.bodies.size()) {
-                MatrixXd force_torque_bodies, v_fib_boundary;
+                MatrixXd force_torque_bodies;
                 std::tie(force_torque_bodies, v_fib_boundary) =
                     System::calculate_body_fiber_link_conditions(fc_, bc_, x_fib_local, body_velocities);
                 MPI_Allreduce(MPI_IN_PLACE, force_torque_bodies.data(), force_torque_bodies.size(), MPI_DOUBLE, MPI_SUM,
@@ -316,7 +317,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
                 }
             }
 
-            res_fib = fc_.matvec(x_fib_local, v_fib);
+            res_fib = fc_.matvec(x_fib_local, v_fib, v_fib_boundary);
             res_shell =
                 shell_.stresslet_plus_complementary_ * x_shell_global + Map<VectorXd>(v_shell.data(), shell_sol_size);
         }

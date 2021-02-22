@@ -281,9 +281,9 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
 
     // Downsampled RHS, with rest of RHS filled in by BC calculations
     RHS_.segment(0, 4 * np - 14) = mats.P_downsample_bc * RHS_;
-    auto B_RHS = RHS_.segment(4 * np - 14, 14);
+    Eigen::VectorXd::SegmentReturnType B_RHS = RHS_.segment(4 * np - 14, 14);
     B_RHS.setZero();
-    auto B = A_.block(4 * np - 14, 0, 14, 4 * np);
+    Eigen::MatrixXd::BlockXpr B = A_.block(4 * np - 14, 0, 14, 4 * np);
     B.setZero();
 
     switch (bc_minus_.first) {
@@ -510,36 +510,40 @@ VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<const VectorXd> &
     return y;
 }
 
-VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all,
-                                const Eigen::Ref<const MatrixXd> &v_fib) const {
+VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all, const Eigen::Ref<const MatrixXd> &v_fib,
+                                const Eigen::Ref<const MatrixXd> &v_fib_boundary) const {
     VectorXd res = VectorXd::Zero(get_local_solution_size());
 
     size_t offset = 0;
-    for (auto &fib : fibers) {
+    for (int i_fib = 0; i_fib < fibers.size(); ++i_fib) {
+        auto &fib = fibers[i_fib];
         auto &mats = fib.matrices_.at(fib.n_nodes_);
         const int np = fib.n_nodes_;
         MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / fib.length_, 1);
         MatrixXd xsDs = (D_1.array().colwise() * fib.xs_.row(0).transpose().array()).transpose();
         MatrixXd ysDs = (D_1.array().colwise() * fib.xs_.row(1).transpose().array()).transpose();
         MatrixXd zsDs = (D_1.array().colwise() * fib.xs_.row(2).transpose().array()).transpose();
-        VectorXd vT = VectorXd::Zero(np * 4);
 
+        VectorXd vT = VectorXd::Zero(np * 4);
         auto v_fib_x = v_fib.row(0).segment(offset, np).transpose();
         auto v_fib_y = v_fib.row(1).segment(offset, np).transpose();
         auto v_fib_z = v_fib.row(2).segment(offset, np).transpose();
         vT.segment(0 * np, np) = v_fib_x;
         vT.segment(1 * np, np) = v_fib_y;
         vT.segment(2 * np, np) = v_fib_z;
-
         vT.segment(3 * np, np) = xsDs * v_fib_x + ysDs * v_fib_y + zsDs * v_fib_z;
 
         VectorXd vT_in = VectorXd::Zero(4 * np);
         vT_in.segment(0, 4 * np - 14) = mats.P_downsample_bc * vT;
 
         VectorXd xs_vT = VectorXd::Zero(4 * np); // from body attachments
-        // FIXME: Flow assumes no bodies, only gets BC from minus end magically
-        xs_vT(4 * np - 11) = v_fib_x(0) * fib.xs_(0, 0) + v_fib_y(0) * fib.xs_(1, 0) + v_fib_z(0) * fib.xs_(2, 0);
-        VectorXd y_BC = VectorXd::Zero(4 * np); // from bodies
+        xs_vT(4 * np - 11) =
+            v_fib(offset, 0) * fib.xs_(0, 0) + v_fib(offset, 1) * fib.xs_(1, 0) + v_fib(offset, 2) * fib.xs_(2, 0);
+
+        // Body link BC (match velocities of body to fiber minus end)
+        VectorXd y_BC = VectorXd::Zero(4 * np);
+        if (v_fib_boundary.size() > 0)
+            y_BC.segment(4 * np - 14, 7) = v_fib_boundary.col(i_fib);
 
         res.segment(4 * offset, 4 * np) = fib.A_ * x_all.segment(4 * offset, 4 * np) - vT_in + xs_vT + y_BC;
 

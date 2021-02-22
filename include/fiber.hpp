@@ -175,7 +175,8 @@ class FiberContainer {
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &forces,
                          const Eigen::Ref<const Eigen::MatrixXd> &r_trg_external, double eta) const;
     Eigen::VectorXd matvec(const Eigen::Ref<const Eigen::VectorXd> &x_all,
-                           const Eigen::Ref<const Eigen::MatrixXd> &v_fib) const;
+                           const Eigen::Ref<const Eigen::MatrixXd> &v_fib,
+                           const Eigen::Ref<const Eigen::MatrixXd> &v_fib_boundary) const;
     Eigen::MatrixXd apply_fiber_force(const Eigen::Ref<const Eigen::VectorXd> &x_all) const;
     Eigen::VectorXd apply_preconditioner(const Eigen::Ref<const Eigen::VectorXd> &x_all) const;
 
