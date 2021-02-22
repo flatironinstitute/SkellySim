@@ -13,38 +13,36 @@ std::uniform_real_distribution<double> uniform_rng(0.0, 1.0);
 
 /// @brief Convert fiber initial positions/orientations to full coordinate representation
 /// @param[out] fiber_array Explicitly instantiated fiber array config
-void resolve_fiber_positions(toml::array *fiber_array) {
-    for (int i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
-        toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
-        int64_t n_nodes = parse_util::parse_val_key<int64_t>(fiber_table, "n_nodes", -1);
-        double length = parse_util::parse_val_key<double>(fiber_table, "length");
+void resolve_fiber_position(toml::table *fiber_table, Eigen::Vector3d &origin) {
+    int64_t n_nodes = parse_util::parse_val_key<int64_t>(fiber_table, "n_nodes", -1);
+    double length = parse_util::parse_val_key<double>(fiber_table, "length");
 
-        toml::array *x_array = fiber_table->get_as<toml::array>("x");
-        toml::array *x_0 = fiber_table->get_as<toml::array>("relative_position");
-        toml::array *u = fiber_table->get_as<toml::array>("orientation");
+    toml::array *x_array = fiber_table->get_as<toml::array>("x");
+    toml::array *x_0 = fiber_table->get_as<toml::array>("relative_position");
+    toml::array *u = fiber_table->get_as<toml::array>("orientation");
 
-        if (n_nodes == -1) {
-            n_nodes = x_array->size() / 3;
-            if (n_nodes == 0)
-                throw std::runtime_error("Attempt to initialize fiber without point count or positions.");
-        }
+    if (n_nodes == -1) {
+        n_nodes = x_array->size() / 3;
+        if (n_nodes == 0)
+            throw std::runtime_error("Attempt to initialize fiber without point count or positions.");
+    }
 
-        if ((!!x_array && !!x_0) || (!!x_array && !!u))
-            throw std::runtime_error("Fiber supplied 'relative_position' or 'orientation' with node positions 'x', "
-                                     "ambiguous initialization.");
+    if ((!!x_array && !!x_0) || (!!x_array && !!u))
+        throw std::runtime_error("Fiber supplied 'relative_position' or 'orientation' with node positions 'x', "
+                                 "ambiguous initialization.");
 
-        // FIXME: Make test for this case
-        if (!!x_0 && !!u && x_0->size() == 3 && u->size() == 3) {
-            fiber_table->insert("x", toml::array());
-            x_array = fiber_table->get_as<toml::array>("x");
-            Eigen::MatrixXd x(3, n_nodes);
-            Eigen::Vector3d origin = parse_util::convert_array<>(x_0);
-            Eigen::Vector3d orientation = parse_util::convert_array<>(u);
-            for (int i = 0; i < 3; ++i)
-                x.row(i) = origin(i) + orientation(i) * Eigen::ArrayXd::LinSpaced(n_nodes, 0, length).transpose();
-            for (int i = 0; i < x.size(); ++i) {
-                x_array->push_back(x.data()[i]);
-            }
+    // FIXME: Make test for this case
+    if (!!x_0 && !!u && x_0->size() == 3 && u->size() == 3) {
+        fiber_table->insert("x", toml::array());
+        x_array = fiber_table->get_as<toml::array>("x");
+        Eigen::MatrixXd x(3, n_nodes);
+        Eigen::Vector3d rel_pos = parse_util::convert_array<>(x_0);
+        Eigen::Vector3d orientation = parse_util::convert_array<>(u);
+        Eigen::ArrayXd s = Eigen::ArrayXd::LinSpaced(n_nodes, 0, length).transpose();
+        for (int i = 0; i < 3; ++i)
+            x.row(i) = origin(i) + rel_pos(i) + orientation(i) * s;
+        for (int i = 0; i < x.size(); ++i) {
+            x_array->push_back(x.data()[i]);
         }
     }
 }
@@ -122,13 +120,18 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
         auto i_fib = site_map.second;
         toml::table *body_table = body_array->get_as<toml::table>(i_body);
         toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
-        toml::array *x_array = fiber_table->get_as<toml::array>("x");
+        toml::array *body_position = body_table->get_as<toml::array>("position");
 
         fiber_table->insert_or_assign("parent_body", i_body);
         fiber_table->insert_or_assign("parent_site", i_site);
+        Eigen::Vector3d origin = parse_util::convert_array<>(body_position);
 
-        nucleation_sites[i_body][i_site] = {x_array->get_as<double>(0)->get(), x_array->get_as<double>(1)->get(),
-                                            x_array->get_as<double>(2)->get()};
+        resolve_fiber_position(fiber_table, origin);
+
+        toml::array *x_array = fiber_table->get_as<toml::array>("x");
+        nucleation_sites[i_body][i_site] = {x_array->get_as<double>(0)->get() - origin[0],
+                                            x_array->get_as<double>(1)->get() - origin[1],
+                                            x_array->get_as<double>(2)->get() - origin[2]};
     }
 
     for (int i_body = 0; i_body < n_bodies; ++i_body) {
@@ -210,13 +213,16 @@ void preprocess(toml::table &config, unsigned long seed) {
     toml::array *body_array = config["bodies"].as<toml::array>();
     toml::array *fiber_array = config["fibers"].as<toml::array>();
 
-    // Fiber positions
-    if (!!fiber_array)
-        resolve_fiber_positions(fiber_array);
-
     // Body-fiber interactions through nucleation sites
     if (!!body_array && !!fiber_array)
         resolve_nucleation_sites(fiber_array, body_array);
+    else if (!!fiber_array) {
+        for (int i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
+            toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
+            Eigen::Vector3d origin{0.0, 0.0, 0.0};
+            resolve_fiber_position(fiber_table, origin);
+        }
+    }
 }
 
 std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
@@ -307,6 +313,7 @@ System::System(std::string *input_file) {
     params_ = Params(param_table_.get_as<toml::table>("params"));
     preprocess(param_table_, params_.seed);
 
+    std::cout << param_table_ << std::endl;
     fc_ = FiberContainer(param_table_.get_as<toml::array>("fibers"), params_);
     shell_ = params_.shell_precompute_file.length() ? Periphery(params_.shell_precompute_file) : Periphery();
     bc_ = BodyContainer(param_table_.get_as<toml::array>("bodies"), params_);
