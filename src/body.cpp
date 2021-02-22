@@ -66,7 +66,9 @@ void Body::update_preconditioner(double eta) {
 /// \f[ \textrm{RHS} = -\left[{\bf v}_0, {\bf v}_1, ..., {\bf v}_N \right] \f]
 /// @param[in] v_on_body [ 3 x n_nodes ] matrix representing the velocity on each node
 void Body::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body) {
-    RHS_ = -Eigen::Map<const Eigen::VectorXd>(v_on_body.data(), v_on_body.size());
+    RHS_.resize(n_nodes_ * 3 + 6);
+    RHS_.segment(0, n_nodes_ * 3) = -Eigen::Map<const Eigen::VectorXd>(v_on_body.data(), v_on_body.size());
+    RHS_.segment(n_nodes_ * 3, 6) = Eigen::VectorXd::Zero(6);
 }
 
 /// @brief Move body to new position with new orientation
@@ -170,7 +172,7 @@ void BodyContainer::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> &v_on_bod
     int offset = 0;
     for (auto &body : bodies) {
         body.update_RHS(v_on_bodies.block(0, offset, 3, body.n_nodes_));
-        offset += body.n_nodes_;
+        offset += body.n_nodes_ + 6;
     }
 }
 
