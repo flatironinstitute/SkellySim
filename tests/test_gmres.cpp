@@ -285,8 +285,10 @@ class A_fiber_hydro : public Tpetra::Operator<> {
                     int node_offset = 0;
                     int i_body = 0;
                     for (auto &body : bc_.bodies) {
-                        Map<VectorXd> res_body_nodes(res_bodies.data(), body.n_nodes_ * 3);
-                        Map<VectorXd> res_body_com(res_bodies.data() + body.n_nodes_ * 3, 6);
+                        Map<VectorXd> res_body_nodes(res_bodies.data() + node_offset * 3 + i_body * 6,
+                                                     body.n_nodes_ * 3);
+                        Map<VectorXd> res_body_com(res_bodies.data() + node_offset * 3 + i_body * 6 + body.n_nodes_ * 3,
+                                                   6);
 
                         Block<MatrixXd> d = body_densities.block(0, node_offset, 3, body.n_nodes_);
                         Block<MatrixXd> U = body_velocities.block(0, i_body, 6, 1);
