@@ -104,7 +104,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
             // Copy local result into local portion of Tpetra result vector via an Eigen map
-            Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_.node_counts_[rank]);
+            Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_.get_local_solution_size());
             res_view_shell = shell_.M_inv_ * x_shell;
 
             offset += shell_.get_local_solution_size();
