@@ -313,7 +313,6 @@ System::System(std::string *input_file) {
     params_ = Params(param_table_.get_as<toml::table>("params"));
     preprocess(param_table_, params_.seed);
 
-    std::cout << param_table_ << std::endl;
     fc_ = FiberContainer(param_table_.get_as<toml::array>("fibers"), params_);
     shell_ = params_.shell_precompute_file.length() ? Periphery(params_.shell_precompute_file) : Periphery();
     bc_ = BodyContainer(param_table_.get_as<toml::array>("bodies"), params_);

@@ -169,6 +169,8 @@ Body::Body(const toml::table *body_table, const Params &params) {
 }
 
 void BodyContainer::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> &v_on_bodies) {
+    if (world_rank_)
+        return;
     int offset = 0;
     for (auto &body : bodies) {
         body.update_RHS(v_on_bodies.block(0, offset, 3, body.n_nodes_));

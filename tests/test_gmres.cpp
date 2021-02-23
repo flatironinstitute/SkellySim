@@ -107,7 +107,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
             Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_.node_counts_[rank]);
             res_view_shell = shell_.M_inv_ * x_shell;
 
-            offset += x_shell.size();
+            offset += shell_.get_local_solution_size();
 
             // Fixme: move Body loops to BodyContainer
             if (rank == 0) {
@@ -417,9 +417,10 @@ int main(int argc, char *argv[]) {
             vec_type;
 
         // Create initial vectors
-        RCP<vec_type> X, RHS;
+        RCP<vec_type> X, RHS, X_guess;
         X = rcp(new vec_type(map));
         RHS = rcp(new vec_type(map));
+        X_guess = rcp(new vec_type(map));
 
         X->putScalar(0.0);
         RHS->putScalar(0.0);
@@ -435,6 +436,7 @@ int main(int argc, char *argv[]) {
         RHS_fib = fc.get_RHS();
         RHS_shell = shell.get_RHS();
         RHS_body = bc.get_RHS();
+        preconditioner->apply(*RHS, *X_guess);
 
         // Output application of A_hydro operator on simple input for comparison to python output
         {
@@ -443,6 +445,10 @@ int main(int argc, char *argv[]) {
             Eigen::Map<Eigen::VectorXd> shell_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
             Eigen::Map<Eigen::VectorXd> body_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size,
                                                body_sol_size);
+            Eigen::Map<Eigen::VectorXd> X_guess_fib(X_guess->getDataNonConst(0).getRawPtr(), fib_sol_size);
+            Eigen::Map<Eigen::VectorXd> X_guess_shell(X_guess->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
+            Eigen::Map<Eigen::VectorXd> X_guess_body(
+                X_guess->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size, body_sol_size);
 
             X->putScalar(1.0);
             A_sim->apply(*X, *Y);
@@ -452,6 +458,7 @@ int main(int argc, char *argv[]) {
             Eigen::VectorXd RHS_shell_global = utils::collect_into_global(RHS_shell);
             Eigen::VectorXd fib_Y_global = utils::collect_into_global(fib_Y);
             Eigen::VectorXd shell_Y_global = utils::collect_into_global(shell_Y);
+            // Eigen::VectorXd X_guess_global = utils::collect_into_global(X_guess_eigen);
 
             if (rank == 0) {
                 cnpy::npy_save("RHS_fib.npy", RHS_fib_global.data(), {(unsigned long)RHS_fib_global.size()});
@@ -460,19 +467,25 @@ int main(int argc, char *argv[]) {
                 cnpy::npy_save("Y_fib.npy", fib_Y_global.data(), {(unsigned long)fib_Y_global.size()});
                 cnpy::npy_save("Y_shell.npy", shell_Y_global.data(), {(unsigned long)shell_Y_global.size()});
                 cnpy::npy_save("Y_body.npy", body_Y.data(), {(unsigned long)body_Y.size()});
+                cnpy::npy_save("X_guess_fib.npy", X_guess_fib.data(), {(unsigned long)X_guess_fib.size()});
+                cnpy::npy_save("X_guess_shell.npy", X_guess_shell.data(), {(unsigned long)X_guess_shell.size()});
+                cnpy::npy_save("X_guess_body.npy", X_guess_body.data(), {(unsigned long)X_guess_body.size()});
             }
         }
 
-        fc.fmm_->force_setup_tree();
-        shell.fmm_->force_setup_tree();
-        bc.oseen_kernel_->force_setup_tree();
-        bc.stresslet_kernel_->force_setup_tree();
+        if (fc.fmm_ != nullptr)
+            fc.fmm_->force_setup_tree();
+        if (shell.fmm_ != nullptr)
+            shell.fmm_->force_setup_tree();
+        if (bc.oseen_kernel_ != nullptr)
+            bc.oseen_kernel_->force_setup_tree();
+        if (bc.stresslet_kernel_ != nullptr)
+            bc.stresslet_kernel_->force_setup_tree();
 
         Belos::LinearProblem<ST, MV, OP> problem(A_sim, X, RHS);
         if (rank == 0)
             cout << "Initialized linear problem\n";
 
-        // TODO: right preconditioner is correct?
         if (prec_flag) {
             problem.setRightPrec(preconditioner);
             if (rank == 0)

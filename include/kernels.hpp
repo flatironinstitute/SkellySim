@@ -112,7 +112,7 @@ class FMM {
 
   private:
     std::unique_ptr<stkfmm::STKFMM> fmmPtr_; ///< Pointer to underlying STKFMM object
-    bool force_setup_tree_;     ///< When set, forces tree to rebuild on next call, then is cleared. Useful for
+    bool force_setup_tree_ = true;     ///< When set, forces tree to rebuild on next call, then is cleared. Useful for
                                 ///< testing/benchmarking
     Eigen::MatrixXd r_sl_old_;  ///< cached 'single-layer' source positions to check for FMM tree invalidation
     Eigen::MatrixXd r_dl_old_;  ///< cache 'double-layer' source positions to check for FMM tree invalidation

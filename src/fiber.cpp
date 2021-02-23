@@ -538,7 +538,7 @@ VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all, const E
 
         VectorXd xs_vT = VectorXd::Zero(4 * np); // from body attachments
         xs_vT(4 * np - 11) =
-            v_fib(offset, 0) * fib.xs_(0, 0) + v_fib(offset, 1) * fib.xs_(1, 0) + v_fib(offset, 2) * fib.xs_(2, 0);
+            v_fib_x(0) * fib.xs_(0, 0) + v_fib_y(0) * fib.xs_(1, 0) + v_fib_z(0) * fib.xs_(2, 0);
 
         // Body link BC (match velocities of body to fiber minus end)
         VectorXd y_BC = VectorXd::Zero(4 * np);
