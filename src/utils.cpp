@@ -87,14 +87,15 @@ Eigen::VectorXd utils::collect_into_global(const Eigen::Ref<const Eigen::VectorX
     MPI_Gather(&local_vec_size, 1, MPI_INT, sizes.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     Eigen::VectorXi displs(size + 1);
-    displs[0] = 0;
-    int global_vec_size = 0;
-    for (int i = 0; i < size; ++i) {
-        displs[i + 1] = displs[i] + sizes[i];
-        global_vec_size += sizes[i];
-    }
-    if (rank == 0)
+    if (rank == 0) {
+        displs[0] = 0;
+        int global_vec_size = 0;
+        for (int i = 0; i < size; ++i) {
+            displs[i + 1] = displs[i] + sizes[i];
+            global_vec_size += sizes[i];
+        }
         global_vec.resize(global_vec_size);
+    }
 
     MPI_Gatherv(local_vec.data(), local_vec.size(), MPI_DOUBLE, global_vec.data(), sizes.data(), displs.data(),
                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
