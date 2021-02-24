@@ -117,6 +117,7 @@ class BodyContainer {
     Eigen::VectorXd matvec(const Eigen::Ref<const Eigen::MatrixXd> &v_bodies,
                            const Eigen::Ref<const Eigen::MatrixXd> &body_densities,
                            const Eigen::Ref<const Eigen::MatrixXd> &body_velocities) const;
+    Eigen::VectorXd apply_preconditioner(const Eigen::Ref<const Eigen::VectorXd> &X) const;
 
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                          const Eigen::Ref<const Eigen::MatrixXd> &densities,

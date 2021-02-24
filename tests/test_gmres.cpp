@@ -103,24 +103,13 @@ class P_inv_hydro : public Tpetra::Operator<> {
             MPI_Allgatherv(X.getData(c).getRawPtr() + offset, shell_.node_counts_[rank], MPI_DOUBLE, x_shell.data(),
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
-            // Copy local result into local portion of Tpetra result vector via an Eigen map
             Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_.get_local_solution_size());
             res_view_shell = shell_.M_inv_ * x_shell;
-
             offset += shell_.get_local_solution_size();
 
-            // Fixme: move Body loops to BodyContainer
-            if (rank == 0) {
-                for (int i = 0; i < bc_.get_local_count(); ++i) {
-                    const Body &body = bc_.bodies[i];
-                    const int n_nodes = body.n_nodes_;
-                    Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, n_nodes * 3 + 6);
-                    Map<VectorXd> res_body(Y.getDataNonConst(c).getRawPtr() + offset, n_nodes * 3 + 6);
-                    res_body = body.A_LU_.solve(XView);
-
-                    offset += n_nodes * 3 + 6;
-                }
-            }
+            Map<VectorXd> res_view_bodies(Y.getDataNonConst(c).getRawPtr() + offset, bc_.get_local_solution_size());
+            Map<const VectorXd> x_view_bodies(X.getData(c).getRawPtr() + offset, bc_.get_local_solution_size());
+            res_view_bodies = bc_.apply_preconditioner(x_view_bodies);
         }
     }
 
@@ -219,7 +208,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             // Get views and temporary arrays
             double *res_ptr = Y.getDataNonConst(c).getRawPtr();
             const double *x_ptr = X.getData(c).getRawPtr();
-            Map<const VectorXd> x_fib_local(x_ptr, fib_sol_size);
+            Map<const VectorXd> x_fib_local(x_ptr + fib_sol_offset, fib_sol_size);
             Map<const VectorXd> x_shell_local(x_ptr + shell_sol_offset, shell_sol_size);
             Map<const VectorXd> x_body_local(x_ptr + body_sol_offset, body_sol_size);
             Map<VectorXd> res_fib(res_ptr, fib_sol_size);
@@ -238,7 +227,6 @@ class A_fiber_hydro : public Tpetra::Operator<> {
 
             Block<MatrixXd> v_fib = v_all.block(0, fib_v_offset, 3, fib_v_size);
             Block<MatrixXd> v_shell = v_all.block(0, shell_v_offset, 3, shell_v_size);
-            Block<MatrixXd> v_shellbodies = v_all.block(0, shell_v_offset, 3, shell_v_size + body_v_size);
             Block<MatrixXd> v_bodies = v_all.block(0, body_v_offset, 3, body_v_size);
 
             // Collect all X shell data into single vector on all ranks
@@ -253,9 +241,6 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             // calculate fiber-fiber velocity
             MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
             MatrixXd v_fib2all = fc_.flow(fw, r_shellbody, eta_);
-            Block<MatrixXd> v_fib2fib = v_fib2all.block(0, fib_v_offset, 3, fib_v_size);
-            Block<MatrixXd> v_fib2shell = v_fib2all.block(0, shell_v_offset, 3, shell_v_size);
-            Block<MatrixXd> v_fib2bodies = v_fib2all.block(0, body_v_offset, 3, body_v_size);
 
             MatrixXd r_fibbody(3, r_fib.cols() + r_body.cols());
             r_fibbody.block(0, 0, 3, r_fib.cols()) = r_fib;
