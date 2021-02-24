@@ -114,6 +114,9 @@ class BodyContainer {
 
     Eigen::MatrixXd get_local_center_positions() const { return get_center_positions(false); };
     Eigen::MatrixXd get_global_center_positions() const { return get_center_positions(true); };
+    Eigen::VectorXd matvec(const Eigen::Ref<const Eigen::MatrixXd> &v_bodies,
+                           const Eigen::Ref<const Eigen::MatrixXd> &body_densities,
+                           const Eigen::Ref<const Eigen::MatrixXd> &body_velocities) const;
 
     Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
                          const Eigen::Ref<const Eigen::MatrixXd> &densities,

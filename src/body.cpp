@@ -286,6 +286,48 @@ Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_t
     return v_bdy2all;
 }
 
+Eigen::VectorXd BodyContainer::matvec(const Eigen::Ref<const Eigen::MatrixXd> &v_bodies,
+                                      const Eigen::Ref<const Eigen::MatrixXd> &body_densities,
+                                      const Eigen::Ref<const Eigen::MatrixXd> &body_velocities) const {
+    using Eigen::Block;
+    using Eigen::Map;
+    using Eigen::MatrixXd;
+    using Eigen::VectorXd;
+    VectorXd res(get_local_solution_size());
+    if (world_rank_ == 0) {
+        int node_offset = 0;
+
+        for (size_t i_body = 0; i_body < bodies.size(); ++i_body) {
+            const auto &body = bodies[i_body];
+            Map<VectorXd> res_nodes(res.data() + node_offset + i_body * 6, body.n_nodes_ * 3);
+            Map<VectorXd> res_com(res.data() + node_offset + i_body * 6 + body.n_nodes_ * 3, 6);
+
+            Map<const MatrixXd> d(body_densities.data() + node_offset, 3, body.n_nodes_);
+            Map<const VectorXd> U(body_velocities.data() + 6 * i_body, 6);
+
+            VectorXd cx(3 * body.n_nodes_), cy(3 * body.n_nodes_), cz(3 * body.n_nodes_);
+            cx.setZero();
+            cy.setZero();
+            cz.setZero();
+            for (int i = 0; i < body.n_nodes_; ++i) {
+                cx.segment(i * 3, 3) += d(0, i) / body.node_weights_(i) * body.ex_.col(i);
+                cy.segment(i * 3, 3) += d(1, i) / body.node_weights_(i) * body.ey_.col(i);
+                cz.segment(i * 3, 3) += d(2, i) / body.node_weights_(i) * body.ez_.col(i);
+            }
+
+            VectorXd KU = body.K_ * U;
+            VectorXd KTLambda = body.K_.transpose() * Map<const VectorXd>(d.data(), 3 * body.n_nodes_);
+
+            res_nodes =
+                -(cx + cy + cz) - KU + Map<const VectorXd>(v_bodies.data() + node_offset * 3, body.n_nodes_ * 3);
+            res_com = -KTLambda + U;
+
+            node_offset += 3 * body.n_nodes_;
+        }
+    }
+    return res;
+}
+
 BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
