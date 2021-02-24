@@ -307,7 +307,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
                         VectorXd KU = body.K_ * U;
                         VectorXd KTLambda = body.K_.transpose() * Map<VectorXd>(d.data(), 3 * body.n_nodes_);
 
-                        res_body_nodes +=
+                        res_body_nodes =
                             -(cx + cy + cz) - KU + Map<VectorXd>(v_bodies.data() + node_offset * 3, body.n_nodes_ * 3);
                         res_body_com = -KTLambda + U;
 
