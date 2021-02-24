@@ -1,10 +1,9 @@
 #ifndef BODY_HPP
 #define BODY_HPP
 
-#include <Eigen/Dense>
-#include <Eigen/Geometry>
-#include <Eigen/LU>
+#include <skelly_sim.hpp>
 
+#include <Eigen/LU>
 #include <kernels.hpp>
 #include <params.hpp>
 #include <toml.hpp>
@@ -45,7 +44,7 @@ class Body {
     Body(const toml::table *body_table, const Params &params);
 
     const Eigen::Vector3d &get_position() const { return position_; };
-    void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body);
+    void update_RHS(MatrixRef &v_on_body);
     void update_cache_variables(double eta);
     void update_K_matrix();
     void update_preconditioner(double eta);
@@ -92,7 +91,7 @@ class BodyContainer {
         return (world_rank_ == 0) ? 3 * get_local_node_count() + 6 * bodies.size() : 0;
     }
 
-    void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> &v_on_body);
+    void update_RHS(MatrixRef &v_on_body);
     Eigen::VectorXd get_RHS() const;
     Eigen::MatrixXd get_global_node_positions() const;
     Eigen::MatrixXd get_local_node_positions() const;
@@ -102,26 +101,21 @@ class BodyContainer {
             return Eigen::MatrixXd(3, 0);
 
         Eigen::MatrixXd centers(3, bodies.size());
-        for (int i = 0; i < bodies.size(); ++i) {
+        for (size_t i = 0; i < bodies.size(); ++i) {
             centers.block(0, i, 3, 1) = bodies[i].position_;
         }
 
         return centers;
     };
 
-    std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
-    unpack_solution_vector(const Eigen::Ref<const Eigen::VectorXd> &x) const;
+    std::pair<Eigen::MatrixXd, Eigen::MatrixXd> unpack_solution_vector(VectorRef &x) const;
 
     Eigen::MatrixXd get_local_center_positions() const { return get_center_positions(false); };
     Eigen::MatrixXd get_global_center_positions() const { return get_center_positions(true); };
-    Eigen::VectorXd matvec(const Eigen::Ref<const Eigen::MatrixXd> &v_bodies,
-                           const Eigen::Ref<const Eigen::MatrixXd> &body_densities,
-                           const Eigen::Ref<const Eigen::MatrixXd> &body_velocities) const;
-    Eigen::VectorXd apply_preconditioner(const Eigen::Ref<const Eigen::VectorXd> &X) const;
+    Eigen::VectorXd matvec(MatrixRef &v_bodies, MatrixRef &body_densities, MatrixRef &body_velocities) const;
+    Eigen::VectorXd apply_preconditioner(VectorRef &X) const;
 
-    Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
-                         const Eigen::Ref<const Eigen::MatrixXd> &densities,
-                         const Eigen::Ref<const Eigen::MatrixXd> &force_torque_bodies, double eta) const;
+    Eigen::MatrixXd flow(MatrixRef &r_trg, MatrixRef &densities, MatrixRef &force_torque_bodies, double eta) const;
 
     void update_cache_variables(double eta) {
         for (auto &body : bodies)

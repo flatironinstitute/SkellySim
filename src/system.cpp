@@ -64,7 +64,7 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
     std::vector<int> n_sites(n_bodies);
 
     // Pass through fibers for assigned bodies
-    for (int i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
+    for (size_t i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
         toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
         int i_body = (*fiber_table)["parent_body"].value_or(-1);
         int i_site = (*fiber_table)["parent_site"].value_or(-1);
@@ -97,7 +97,7 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
 
     // Pass through fibers for unassigned bodies
     std::vector<int> test_site(n_bodies); //< current site to try for insertion
-    for (int i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
+    for (size_t i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
         toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
         int i_body = (*fiber_table)["parent_body"].value_or(-1);
         int i_site = (*fiber_table)["parent_site"].value_or(-1);
@@ -217,7 +217,7 @@ void preprocess(toml::table &config, unsigned long seed) {
     if (!!body_array && !!fiber_array)
         resolve_nucleation_sites(fiber_array, body_array);
     else if (!!fiber_array) {
-        for (int i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
+        for (size_t i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
             toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
             Eigen::Vector3d origin{0.0, 0.0, 0.0};
             resolve_fiber_position(fiber_table, origin);
@@ -225,10 +225,10 @@ void preprocess(toml::table &config, unsigned long seed) {
     }
 }
 
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
-System::calculate_body_fiber_link_conditions(const FiberContainer &fc, const BodyContainer &bc,
-                                             const Eigen::Ref<const Eigen::VectorXd> &fibers_xt,
-                                             const Eigen::Ref<const Eigen::MatrixXd> &body_velocities) {
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_conditions(const FiberContainer &fc,
+                                                                                         const BodyContainer &bc,
+                                                                                         VectorRef &fibers_xt,
+                                                                                         MatrixRef &body_velocities) {
     using Eigen::ArrayXXd;
     using Eigen::MatrixXd;
     using Eigen::Vector3d;

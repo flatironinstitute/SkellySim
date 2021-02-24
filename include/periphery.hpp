@@ -1,7 +1,7 @@
 #ifndef PERIPHERY_HPP
 #define PERIPHERY_HPP
+#include <skelly_sim.hpp>
 
-#include <Eigen/Core>
 #include <iostream>
 #include <vector>
 
@@ -16,8 +16,7 @@ class Periphery {
     Periphery(){};
     Periphery(const std::string &precompute_file);
 
-    Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &trg, const Eigen::Ref<const Eigen::MatrixXd> &density,
-                         double eta) const;
+    Eigen::MatrixXd flow(MatrixRef &trg, MatrixRef &density, double eta) const;
 
     /// @brief Get the number of nodes local to the MPI rank
     int get_local_node_count() const { return M_inv_.rows() / 3; };
@@ -27,7 +26,7 @@ class Periphery {
 
     Eigen::MatrixXd get_local_node_positions() const { return node_pos_; };
 
-    void update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell);
+    void update_RHS(MatrixRef &v_on_shell);
 
     Eigen::VectorXd get_RHS() const { return RHS_; };
 

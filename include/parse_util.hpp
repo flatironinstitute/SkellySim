@@ -1,10 +1,11 @@
 #ifndef PARSE_UTIL_HPP
 #define PARSE_UTIL_HPP
+#include <skelly_sim.hpp>
 
-#include <toml.hpp>
-#include <Eigen/Core>
 #include <Eigen/Geometry>
+
 #include <iostream>
+#include <toml.hpp>
 
 namespace parse_util {
 
@@ -47,7 +48,6 @@ T parse_val_key(const toml::table *tbl, const std::string &key) {
 
     return src_node->as<T>()->get();
 }
-
 
 template <typename T>
 T parse_val_key(const toml::table *tbl, const std::string &key, T default_val) {

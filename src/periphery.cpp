@@ -4,8 +4,7 @@
 
 #include <mpi.h>
 
-Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
-                                const Eigen::Ref<const Eigen::MatrixXd> &density, double eta) const {
+Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta) const {
     // Calculate velocity at target coordinates due to the periphery.
     // Input:
     //    const r_trg [3xn_trg_local]: Target coordinates
@@ -18,7 +17,7 @@ Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
     const int n_trg = r_trg.size() / 3;
     Eigen::MatrixXd f_dl(9, n_dl);
 
-    Eigen::Map<const Eigen::MatrixXd> density_reshaped(density.data(), 3, n_dl);
+    CMatrixMap density_reshaped(density.data(), 3, n_dl);
 
     // double layer density is 2 * outer product of normals with density
     for (int node = 0; node < n_dl; ++node)
@@ -33,12 +32,12 @@ Eigen::MatrixXd Periphery::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
     return vel;
 }
 
-void Periphery::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_shell) {
+void Periphery::update_RHS(MatrixRef &v_on_shell) {
     // Update the internal right-hand-side state.
     // No prerequisite calculations, beyond initialization, are needed
     // Input:
     //    const v_on_shell [3xn_nodes_local]: Velocity at shell nodes on local MPI rank
-    RHS_ = -Eigen::Map<const Eigen::VectorXd>(v_on_shell.data(), v_on_shell.size());
+    RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size());
 }
 
 Periphery::Periphery(const std::string &precompute_file) {

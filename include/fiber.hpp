@@ -1,6 +1,8 @@
 #ifndef FIBER_HPP
 #define FIBER_HPP
-#include <Eigen/Dense>
+
+#include <skelly_sim.hpp>
+
 #include <Eigen/LU>
 #include <unordered_map>
 #include <vector>
@@ -112,11 +114,9 @@ class Fiber {
 
     void update_preconditioner();
     void update_force_operator();
-    void update_RHS(double dt, const Eigen::Ref<const Eigen::MatrixXd> flow,
-                    const Eigen::Ref<const Eigen::MatrixXd> f_external);
+    void update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external);
     void update_linear_operator(double dt, double eta);
-    void apply_bc_rectangular(double dt, const Eigen::Ref<const Eigen::MatrixXd> &v_on_fiber,
-                              const Eigen::Ref<const Eigen::MatrixXd> &f_on_fiber);
+    void apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber);
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
     void update_stokeslet(double);
@@ -172,13 +172,10 @@ class FiberContainer {
     Eigen::MatrixXd generate_constant_force() const;
     Eigen::MatrixXd get_r_vectors() const;
     Eigen::VectorXd get_RHS() const;
-    Eigen::MatrixXd flow(const Eigen::Ref<const Eigen::MatrixXd> &forces,
-                         const Eigen::Ref<const Eigen::MatrixXd> &r_trg_external, double eta) const;
-    Eigen::VectorXd matvec(const Eigen::Ref<const Eigen::VectorXd> &x_all,
-                           const Eigen::Ref<const Eigen::MatrixXd> &v_fib,
-                           const Eigen::Ref<const Eigen::MatrixXd> &v_fib_boundary) const;
-    Eigen::MatrixXd apply_fiber_force(const Eigen::Ref<const Eigen::VectorXd> &x_all) const;
-    Eigen::VectorXd apply_preconditioner(const Eigen::Ref<const Eigen::VectorXd> &x_all) const;
+    Eigen::MatrixXd flow(MatrixRef &forces, MatrixRef &r_trg_external, double eta) const;
+    Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;
+    Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
+    Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
 
   private:
     int world_size_ = -1;

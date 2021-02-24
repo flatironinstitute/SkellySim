@@ -1,3 +1,5 @@
+#include <skelly_sim.hpp>
+
 #include <BelosBlockGmresSolMgr.hpp>
 #include <BelosConfigDefs.hpp>
 #include <BelosLinearProblem.hpp>
@@ -81,19 +83,14 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
-            using Eigen::Map;
-
             // Current position in result vector
-            local_ordinal_type offset = 0;
-            // Loop through fibers and apply their preconditioner to the Tpetra result vector
-            // Fixme: move Fiber loops to FiberContainer
-            for (auto &fib : fc_.fibers) {
-                Map<const VectorXd> XView(X.getData(c).getRawPtr() + offset, fib.n_nodes_ * 4);
-                Map<VectorXd> res_fib(Y.getDataNonConst(c).getRawPtr() + offset, fib.n_nodes_ * 4);
-                res_fib = fib.A_LU_.solve(XView);
+            int offset = 0;
 
-                offset += fib.n_nodes_ * 4;
-            }
+            const int fib_solution_size = fc_.get_local_solution_size();
+            CVectorMap x_fibers(X.getData(c).getRawPtr() + offset, fib_solution_size);
+            VectorMap res_view_fibers(Y.getDataNonConst(c).getRawPtr() + offset, fc_.get_local_solution_size());
+            res_view_fibers = fc_.apply_preconditioner(x_fibers);
+            offset += fib_solution_size;
 
             // Each MPI rank has only a _local_ portion of the inverse matrix, but needs the _global_ 'X' vector to
             // contract against. Each rank will get a full copy of the 'X' in x_shell
@@ -103,13 +100,15 @@ class P_inv_hydro : public Tpetra::Operator<> {
             MPI_Allgatherv(X.getData(c).getRawPtr() + offset, shell_.node_counts_[rank], MPI_DOUBLE, x_shell.data(),
                            shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
 
-            Map<VectorXd> res_view_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_.get_local_solution_size());
-            res_view_shell = shell_.M_inv_ * x_shell;
-            offset += shell_.get_local_solution_size();
+            const int shell_sol_size = shell_.get_local_solution_size();
+            VectorMap res_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_sol_size);
+            res_shell = shell_.M_inv_ * x_shell;
+            offset += shell_sol_size;
 
-            Map<VectorXd> res_view_bodies(Y.getDataNonConst(c).getRawPtr() + offset, bc_.get_local_solution_size());
-            Map<const VectorXd> x_view_bodies(X.getData(c).getRawPtr() + offset, bc_.get_local_solution_size());
-            res_view_bodies = bc_.apply_preconditioner(x_view_bodies);
+            const int body_sol_size = bc_.get_local_solution_size();
+            CVectorMap x_bodies(X.getData(c).getRawPtr() + offset, body_sol_size);
+            VectorMap res_bodies(Y.getDataNonConst(c).getRawPtr() + offset, body_sol_size);
+            res_bodies = bc_.apply_preconditioner(x_bodies);
         }
     }
 
@@ -184,7 +183,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         const int fib_sol_size = fc_.get_local_solution_size();
         const int shell_sol_size = shell_.get_local_solution_size();
         const int body_sol_size = bc_.get_local_solution_size();
-        const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
+        assert((unsigned long)(fib_sol_size + shell_sol_size + body_sol_size) == X.getLocalLength());
 
         const int fib_sol_offset = 0;
         const int shell_sol_offset = fib_sol_size;
@@ -199,8 +198,6 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         const int shell_v_offset = fib_v_size;
         const int body_v_offset = shell_v_offset + shell_v_size;
 
-        const int n_bodies_global = bc_.get_global_count();
-
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
             using Eigen::Block;
             using Eigen::Map;
@@ -208,12 +205,12 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             // Get views and temporary arrays
             double *res_ptr = Y.getDataNonConst(c).getRawPtr();
             const double *x_ptr = X.getData(c).getRawPtr();
-            Map<const VectorXd> x_fib_local(x_ptr + fib_sol_offset, fib_sol_size);
-            Map<const VectorXd> x_shell_local(x_ptr + shell_sol_offset, shell_sol_size);
-            Map<const VectorXd> x_body_local(x_ptr + body_sol_offset, body_sol_size);
-            Map<VectorXd> res_fib(res_ptr, fib_sol_size);
-            Map<VectorXd> res_shell(res_ptr + fib_sol_size, shell_sol_size);
-            Map<VectorXd> res_bodies(res_ptr + fib_sol_size + shell_sol_size, body_sol_size);
+            CVectorMap x_fib_local(x_ptr + fib_sol_offset, fib_sol_size);
+            CVectorMap x_shell_local(x_ptr + shell_sol_offset, shell_sol_size);
+            CVectorMap x_body_local(x_ptr + body_sol_offset, body_sol_size);
+            VectorMap res_fib(res_ptr, fib_sol_size);
+            VectorMap res_shell(res_ptr + fib_sol_size, shell_sol_size);
+            VectorMap res_bodies(res_ptr + fib_sol_size + shell_sol_size, body_sol_size);
 
             MatrixXd r_all(3, fib_v_size + shell_v_size + body_v_size);
             Block<MatrixXd> r_fib = r_all.block(0, 0, 3, fib_v_size);
@@ -267,7 +264,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
 
             res_fib = fc_.matvec(x_fib_local, v_fib, v_fib_boundary);
             res_shell =
-                shell_.stresslet_plus_complementary_ * x_shell_global + Map<VectorXd>(v_shell.data(), shell_sol_size);
+                shell_.stresslet_plus_complementary_ * x_shell_global + VectorMap(v_shell.data(), shell_sol_size);
         }
     }
 
@@ -279,9 +276,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     const double eta_;
 };
 
-VectorXd load_vec(cnpy::npz_t &npz, const char *var) {
-    return Eigen::Map<VectorXd>(npz[var].data<double>(), npz[var].shape[0]);
-}
+VectorXd load_vec(cnpy::npz_t &npz, const char *var) { return VectorMap(npz[var].data<double>(), npz[var].shape[0]); }
 
 int main(int argc, char *argv[]) {
     typedef double ST;
@@ -375,10 +370,9 @@ int main(int argc, char *argv[]) {
         const int fib_sol_size = fc.get_local_solution_size();
         const int shell_sol_size = shell.get_local_solution_size();
         const int body_sol_size = bc.get_local_solution_size();
-        Eigen::Map<Eigen::VectorXd> RHS_fib(RHS->getDataNonConst(0).getRawPtr(), fib_sol_size);
-        Eigen::Map<Eigen::VectorXd> RHS_shell(RHS->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
-        Eigen::Map<Eigen::VectorXd> RHS_body(RHS->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size,
-                                             body_sol_size);
+        VectorMap RHS_fib(RHS->getDataNonConst(0).getRawPtr(), fib_sol_size);
+        VectorMap RHS_shell(RHS->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
+        VectorMap RHS_body(RHS->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size, body_sol_size);
 
         // Initialize GMRES RHS vector
         RHS_fib = fc.get_RHS();
@@ -389,15 +383,13 @@ int main(int argc, char *argv[]) {
         // Output application of A_hydro operator on simple input for comparison to python output
         {
             RCP<vec_type> Y = rcp(new vec_type(map));
-            Eigen::Map<Eigen::VectorXd> fib_Y(Y->getDataNonConst(0).getRawPtr(), fib_sol_size);
-            Eigen::Map<Eigen::VectorXd> shell_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
-            Eigen::Map<Eigen::VectorXd> body_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size,
-                                               body_sol_size);
-            Eigen::Map<Eigen::VectorXd> X_guess_fib(X_guess->getDataNonConst(0).getRawPtr(), fib_sol_size);
-            Eigen::Map<Eigen::VectorXd> X_guess_shell(X_guess->getDataNonConst(0).getRawPtr() + fib_sol_size,
-                                                      shell_sol_size);
-            Eigen::Map<Eigen::VectorXd> X_guess_body(
-                X_guess->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size, body_sol_size);
+            VectorMap fib_Y(Y->getDataNonConst(0).getRawPtr(), fib_sol_size);
+            VectorMap shell_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
+            VectorMap body_Y(Y->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size, body_sol_size);
+            VectorMap X_guess_fib(X_guess->getDataNonConst(0).getRawPtr(), fib_sol_size);
+            VectorMap X_guess_shell(X_guess->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
+            VectorMap X_guess_body(X_guess->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size,
+                                   body_sol_size);
 
             X->putScalar(1.0);
             A_sim->apply(*X, *Y);

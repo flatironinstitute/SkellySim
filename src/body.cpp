@@ -2,6 +2,7 @@
 #include <cnpy.hpp>
 #include <kernels.hpp>
 #include <parse_util.hpp>
+#include <skelly_sim.hpp>
 
 /// @brief Update internal Body::K_ matrix variable
 /// @see update_preconditioner
@@ -65,9 +66,9 @@ void Body::update_preconditioner(double eta) {
 /// Updates only Body::RHS_
 /// \f[ \textrm{RHS} = -\left[{\bf v}_0, {\bf v}_1, ..., {\bf v}_N \right] \f]
 /// @param[in] v_on_body [ 3 x n_nodes ] matrix representing the velocity on each node
-void Body::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> v_on_body) {
+void Body::update_RHS(MatrixRef &v_on_body) {
     RHS_.resize(n_nodes_ * 3 + 6);
-    RHS_.segment(0, n_nodes_ * 3) = -Eigen::Map<const Eigen::VectorXd>(v_on_body.data(), v_on_body.size());
+    RHS_.segment(0, n_nodes_ * 3) = -CVectorMap(v_on_body.data(), v_on_body.size());
     RHS_.segment(n_nodes_ * 3, 6) = Eigen::VectorXd::Zero(6);
 }
 
@@ -126,7 +127,7 @@ void Body::load_precompute_data(const std::string &precompute_file) {
     };
 
     auto load_vec = [](cnpy::npz_t &npz, const char *var) {
-        return Eigen::Map<Eigen::VectorXd>(npz[var].data<double>(), npz[var].shape[0]);
+        return VectorMap(npz[var].data<double>(), npz[var].shape[0]);
     };
 
     node_positions_ = node_positions_ref_ = load_mat(precomp, "node_positions_ref");
@@ -168,7 +169,7 @@ Body::Body(const toml::table *body_table, const Params &params) {
     update_cache_variables(params.eta);
 }
 
-void BodyContainer::update_RHS(const Eigen::Ref<const Eigen::MatrixXd> &v_on_bodies) {
+void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {
     if (world_rank_)
         return;
     int offset = 0;
@@ -224,8 +225,7 @@ Eigen::MatrixXd BodyContainer::get_node_normals() const {
     return r_body_nodes;
 }
 
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
-BodyContainer::unpack_solution_vector(const Eigen::Ref<const Eigen::VectorXd> &x) const {
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> BodyContainer::unpack_solution_vector(VectorRef &x) const {
     using Eigen::MatrixXd;
     const int n_bodies_global = get_global_count();
     MatrixXd body_velocities(6, n_bodies_global);
@@ -246,9 +246,8 @@ BodyContainer::unpack_solution_vector(const Eigen::Ref<const Eigen::VectorXd> &x
     return std::make_pair(body_velocities, body_densities);
 }
 
-Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
-                                    const Eigen::Ref<const Eigen::MatrixXd> &densities,
-                                    const Eigen::Ref<const Eigen::MatrixXd> &forces_torques, double eta) const {
+Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, MatrixRef &forces_torques,
+                                    double eta) const {
     if (!bodies.size())
         return Eigen::MatrixXd::Zero(3, r_trg.cols());
     const int n_nodes = get_local_node_count(); //< Distributed node counts for fmm calls
@@ -286,11 +285,9 @@ Eigen::MatrixXd BodyContainer::flow(const Eigen::Ref<const Eigen::MatrixXd> &r_t
     return v_bdy2all;
 }
 
-Eigen::VectorXd BodyContainer::matvec(const Eigen::Ref<const Eigen::MatrixXd> &v_bodies,
-                                      const Eigen::Ref<const Eigen::MatrixXd> &body_densities,
-                                      const Eigen::Ref<const Eigen::MatrixXd> &body_velocities) const {
+Eigen::VectorXd BodyContainer::matvec(MatrixRef &v_bodies, MatrixRef &body_densities,
+                                      MatrixRef &body_velocities) const {
     using Eigen::Block;
-    using Eigen::Map;
     using Eigen::MatrixXd;
     using Eigen::VectorXd;
     VectorXd res(get_local_solution_size());
@@ -299,11 +296,11 @@ Eigen::VectorXd BodyContainer::matvec(const Eigen::Ref<const Eigen::MatrixXd> &v
 
         for (size_t i_body = 0; i_body < bodies.size(); ++i_body) {
             const auto &body = bodies[i_body];
-            Map<VectorXd> res_nodes(res.data() + node_offset + i_body * 6, body.n_nodes_ * 3);
-            Map<VectorXd> res_com(res.data() + node_offset + i_body * 6 + body.n_nodes_ * 3, 6);
+            VectorMap res_nodes(res.data() + node_offset + i_body * 6, body.n_nodes_ * 3);
+            VectorMap res_com(res.data() + node_offset + i_body * 6 + body.n_nodes_ * 3, 6);
 
-            Map<const MatrixXd> d(body_densities.data() + node_offset, 3, body.n_nodes_);
-            Map<const VectorXd> U(body_velocities.data() + 6 * i_body, 6);
+            CMatrixMap d(body_densities.data() + node_offset, 3, body.n_nodes_);
+            CVectorMap U(body_velocities.data() + 6 * i_body, 6);
 
             VectorXd cx(3 * body.n_nodes_), cy(3 * body.n_nodes_), cz(3 * body.n_nodes_);
             cx.setZero();
@@ -316,13 +313,24 @@ Eigen::VectorXd BodyContainer::matvec(const Eigen::Ref<const Eigen::MatrixXd> &v
             }
 
             VectorXd KU = body.K_ * U;
-            VectorXd KTLambda = body.K_.transpose() * Map<const VectorXd>(d.data(), 3 * body.n_nodes_);
+            VectorXd KTLambda = body.K_.transpose() * CVectorMap(d.data(), 3 * body.n_nodes_);
 
-            res_nodes =
-                -(cx + cy + cz) - KU + Map<const VectorXd>(v_bodies.data() + node_offset * 3, body.n_nodes_ * 3);
+            res_nodes = -(cx + cy + cz) - KU + CVectorMap(v_bodies.data() + node_offset * 3, body.n_nodes_ * 3);
             res_com = -KTLambda + U;
 
             node_offset += 3 * body.n_nodes_;
+        }
+    }
+    return res;
+}
+
+Eigen::VectorXd BodyContainer::apply_preconditioner(VectorRef &X) const {
+    Eigen::VectorXd res(get_local_solution_size());
+    if (world_rank_ == 0) {
+        int offset = 0;
+        for (const auto &b : bodies) {
+            res.segment(offset, b.n_nodes_ * 3 + 6) = b.A_LU_.solve(X.segment(offset, b.n_nodes_ * 3 + 6));
+            offset += b.n_nodes_ * 3 + 6;
         }
     }
     return res;
@@ -343,7 +351,6 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
         8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
 
     const int n_bodies_tot = body_tables->size();
-    const int n_bodies_extra = n_bodies_tot % world_size_;
     if (world_rank_ == 0)
         std::cout << "Reading in " << n_bodies_tot << " bodies.\n";
 

@@ -161,7 +161,7 @@ void Fiber::update_linear_operator(double dt, double eta) {
 /// @param[in] dt timestep size
 /// @param[in] flow [ 3 x n_nodes_ ] matrix of flow field sampled at the fiber points
 /// @param[in] f_external [ 3 x n_nodes_ ] matrix of external forces on the fiber points
-void Fiber::update_RHS(double dt, const Eigen::Ref<const MatrixXd> flow, const Eigen::Ref<const MatrixXd> f_external) {
+void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
@@ -267,8 +267,7 @@ void Fiber::update_force_operator() {
 
 void Fiber::update_preconditioner() { A_LU_.compute(A_); }
 
-void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_on_fiber,
-                                 const Eigen::Ref<const MatrixXd> &f_on_fiber) {
+void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber) {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);
@@ -403,7 +402,7 @@ void Fiber::apply_bc_rectangular(double dt, const Eigen::Ref<const MatrixXd> &v_
 // Inputs:
 //   x = Eigen array, N points x_k.
 //   y = Eigen array, N-m points.
-MatrixXd barycentric_matrix(const Eigen::Ref<const ArrayXd> &x, const Eigen::Ref<const ArrayXd> &y) {
+MatrixXd barycentric_matrix(ArrayRef &x, ArrayRef &y) {
     int N = x.size();
     int M = y.size();
 
@@ -500,7 +499,7 @@ void FiberContainer::update_linear_operators(double dt, double eta) {
         fib.update_linear_operator(dt, eta);
 }
 
-VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<const VectorXd> &x_all) const {
+VectorXd FiberContainer::apply_preconditioner(VectorRef &x_all) const {
     VectorXd y(x_all.size());
     size_t offset = 0;
     for (auto &fib : fibers) {
@@ -510,12 +509,11 @@ VectorXd FiberContainer::apply_preconditioner(const Eigen::Ref<const VectorXd> &
     return y;
 }
 
-VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all, const Eigen::Ref<const MatrixXd> &v_fib,
-                                const Eigen::Ref<const MatrixXd> &v_fib_boundary) const {
+VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const {
     VectorXd res = VectorXd::Zero(get_local_solution_size());
 
     size_t offset = 0;
-    for (int i_fib = 0; i_fib < fibers.size(); ++i_fib) {
+    for (size_t i_fib = 0; i_fib < fibers.size(); ++i_fib) {
         auto &fib = fibers[i_fib];
         auto &mats = fib.matrices_.at(fib.n_nodes_);
         const int np = fib.n_nodes_;
@@ -537,8 +535,7 @@ VectorXd FiberContainer::matvec(const Eigen::Ref<const VectorXd> &x_all, const E
         vT_in.segment(0, 4 * np - 14) = mats.P_downsample_bc * vT;
 
         VectorXd xs_vT = VectorXd::Zero(4 * np); // from body attachments
-        xs_vT(4 * np - 11) =
-            v_fib_x(0) * fib.xs_(0, 0) + v_fib_y(0) * fib.xs_(1, 0) + v_fib_z(0) * fib.xs_(2, 0);
+        xs_vT(4 * np - 11) = v_fib_x(0) * fib.xs_(0, 0) + v_fib_y(0) * fib.xs_(1, 0) + v_fib_z(0) * fib.xs_(2, 0);
 
         // Body link BC (match velocities of body to fiber minus end)
         VectorXd y_BC = VectorXd::Zero(4 * np);
@@ -581,8 +578,7 @@ MatrixXd FiberContainer::get_r_vectors() const {
     return r;
 }
 
-MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
-                              const Eigen::Ref<const MatrixXd> &r_trg_external, double eta) const {
+MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, double eta) const {
     const size_t n_src = fib_forces.cols();
     const size_t n_trg_external = r_trg_external.cols();
 
@@ -615,8 +611,8 @@ MatrixXd FiberContainer::flow(const Eigen::Ref<const MatrixXd> &fib_forces,
     // FIXME: Subtracting self flow only works when system has only fibers
     offset = 0;
     for (const Fiber &fib : fibers) {
-        Eigen::Map<VectorXd> wf_flat(weighted_forces.data() + offset * 3, fib.n_nodes_ * 3);
-        Eigen::Map<VectorXd> vel_flat(vel.data() + offset * 3, fib.n_nodes_ * 3);
+        VectorMap wf_flat(weighted_forces.data() + offset * 3, fib.n_nodes_ * 3);
+        VectorMap vel_flat(vel.data() + offset * 3, fib.n_nodes_ * 3);
         vel_flat -= fib.stokeslet_ * wf_flat;
         offset += fib.n_nodes_;
     }
@@ -635,7 +631,7 @@ MatrixXd FiberContainer::generate_constant_force() const {
     return f;
 }
 
-MatrixXd FiberContainer::apply_fiber_force(const Eigen::Ref<const VectorXd> &x_all) const {
+MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
     MatrixXd fw(3, x_all.size() / 4);
 
     size_t offset = 0;

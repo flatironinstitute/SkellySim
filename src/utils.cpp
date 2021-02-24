@@ -1,5 +1,6 @@
-#include <utils.hpp>
 #include <mpi.h>
+#include <skelly_sim.hpp>
+#include <utils.hpp>
 
 //  Following the paper Calculation of weights in finite different formulas,
 //  Bengt Fornberg, SIAM Rev. 40 (3), 685 (1998).
@@ -11,14 +12,14 @@
 //
 //  Outputs:
 //  D_s = Mth derivative matrix
-Eigen::MatrixXd utils::finite_diff(const Eigen::Ref<Eigen::ArrayXd> &s, int M, int n_s) {
+Eigen::MatrixXd utils::finite_diff(ArrayRef &s, int M, int n_s) {
     int N = s.size() - 1;
-    Eigen::MatrixXd D_s = Eigen::MatrixXd::Zero(s.size(), s.size());
+    Eigen::MatrixXd D_s = Eigen::MatrixXd::Zero(N + 1, N + 1);
     int n_s_half = (n_s - 1) / 2;
     n_s = n_s - 1;
 
-    for (size_t xi = 0; xi < s.size(); ++xi) {
-        auto &si = s[xi];
+    for (int xi = 0; xi < s.size(); ++xi) {
+        const auto &si = s[xi];
         int xlow, xhigh;
 
         if (xi < n_s_half) {
@@ -33,7 +34,7 @@ Eigen::MatrixXd utils::finite_diff(const Eigen::Ref<Eigen::ArrayXd> &s, int M, i
         }
         xlow = xlow < 0 ? s.size() + xlow : xlow;
 
-        Eigen::Map<const Eigen::ArrayXd> x(s.data() + xlow, xhigh - xlow);
+        CArrayMap x(s.data() + xlow, xhigh - xlow);
 
         // Computer coefficients of differential matrices
         double c1 = 1.0;
@@ -75,7 +76,7 @@ Eigen::MatrixXd utils::finite_diff(const Eigen::Ref<Eigen::ArrayXd> &s, int M, i
 ///
 /// @param[in] local_vec vector to collect
 /// @returns Concatenated vector of local_vec on rank 0, empty vector otherwise
-Eigen::VectorXd utils::collect_into_global(const Eigen::Ref<const Eigen::VectorXd> &local_vec) {
+Eigen::VectorXd utils::collect_into_global(VectorRef &local_vec) {
     int size, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

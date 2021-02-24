@@ -2,10 +2,8 @@
 
 #include <STKFMM/STKFMM.hpp>
 
-Eigen::MatrixXd kernels::oseen_tensor_contract_direct(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
-                                                      const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
-                                                      const Eigen::Ref<const Eigen::MatrixXd> &density, double eta,
-                                                      double reg, double epsilon_distance) {
+Eigen::MatrixXd kernels::oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density,
+                                                      double eta, double reg, double epsilon_distance) {
     using namespace Eigen;
     const int N_src = r_src.size() / 3;
     const int N_trg = r_trg.size() / 3;
@@ -65,8 +63,7 @@ Eigen::MatrixXd kernels::oseen_tensor_contract_direct(const Eigen::Ref<const Eig
 ///
 /// Output:
 ///   G = Oseen tensor with dimensions (3*num_points) x (3*num_points).
-Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
-                                             const Eigen::Ref<const Eigen::MatrixXd> &r_trg, double eta, double reg,
+Eigen::MatrixXd kernels::oseen_tensor_direct(MatrixRef &r_src, MatrixRef &r_trg, double eta, double reg,
                                              double epsilon_distance) {
 
     using Eigen::MatrixXd;
@@ -126,9 +123,7 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(const Eigen::Ref<const Eigen::Matri
 /// @param[in] reg regularization term
 /// @param[in] epsilon_distance threshold distance, below which source-target distances will be regularized
 /// @return [3 x n_trg] rotlet at target given source points
-Eigen::MatrixXd kernels::rotlet(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
-                                const Eigen::Ref<const Eigen::MatrixXd> &r_trg,
-                                const Eigen::Ref<const Eigen::MatrixXd> &density, double eta, double reg,
+Eigen::MatrixXd kernels::rotlet(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta, double reg,
                                 double epsilon_distance) {
     using Eigen::MatrixXd;
     const int N_src = r_src.size() / 3;
@@ -186,9 +181,8 @@ Eigen::MatrixXd kernels::rotlet(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
 ///               | ...                      |
 ///     with S_normal12 the stresslet between points r_1 and r_2.
 ///     S_normal12 has dimensions 3 x 3.
-Eigen::MatrixXd kernels::stresslet_times_normal(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
-                                                const Eigen::Ref<const Eigen::MatrixXd> &normals, double eta,
-                                                double reg, double epsilon_distance) {
+Eigen::MatrixXd kernels::stresslet_times_normal(MatrixRef &r_src, MatrixRef &normals, double eta, double reg,
+                                                double epsilon_distance) {
     const double factor = -3.0 / (4.0 * M_PI * eta);
     const double reg2 = reg * reg;
     const int N = r_src.cols();
@@ -230,9 +224,7 @@ Eigen::MatrixXd kernels::stresslet_times_normal(const Eigen::Ref<const Eigen::Ma
 ///   @param[in] reg regularization term
 ///   @param[in] epsilon_distance threshold distance, below which return elements will be zero
 ///   @return [3 x num_points] contracted stresslet tensor 'S_normal'
-Eigen::MatrixXd kernels::stresslet_times_normal_times_density(const Eigen::Ref<const Eigen::MatrixXd> &r_src,
-                                                              const Eigen::Ref<const Eigen::MatrixXd> &normals,
-                                                              const Eigen::Ref<const Eigen::MatrixXd> &density,
+Eigen::MatrixXd kernels::stresslet_times_normal_times_density(MatrixRef &r_src, MatrixRef &normals, MatrixRef &density,
                                                               double eta, double reg, double epsilon_distance) {
     const int N = r_src.size() / 3;
     const double factor = -3.0 / (4.0 * M_PI * eta);
@@ -262,8 +254,7 @@ Eigen::MatrixXd kernels::stresslet_times_normal_times_density(const Eigen::Ref<c
 
 // FIXME: FMM kernel functions are unnecessary. The kernel dimension and kernel enum value can
 // be cached and just called directly from the FMM() operator.
-Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
-                                        const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr) {
+Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, MatrixRef &f_sl, MatrixRef &f_dl, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, n_trg);
     fmmPtr->clearFMM(stkfmm::KERNEL::Stokes);
     fmmPtr->evaluateFMM(stkfmm::KERNEL::Stokes, f_sl.size() / 3, f_sl.data(), n_trg, res.data(), f_dl.size() / 3,
@@ -271,8 +262,7 @@ Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, const Eigen::Ref<const 
     return res;
 }
 
-Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, const Eigen::Ref<const Eigen::MatrixXd> &f_sl,
-                                         const Eigen::Ref<const Eigen::MatrixXd> &f_dl, stkfmm::STKFMM *fmmPtr) {
+Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, MatrixRef &f_sl, MatrixRef &f_dl, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(4, n_trg);
     fmmPtr->clearFMM(stkfmm::KERNEL::PVel);
     fmmPtr->evaluateFMM(stkfmm::KERNEL::PVel, f_sl.size() / 4, f_sl.data(), n_trg, res.data(), f_dl.size() / 9,
