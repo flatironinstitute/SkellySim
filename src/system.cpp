@@ -319,7 +319,7 @@ std::tuple<int, int, int> get_local_node_counts() {
                            System::get_body_container().get_local_node_count());
 }
 
-std::tuple<int, int, int> get_local_solution_sizes() {
+std::tuple<int, int, int> System::get_local_solution_sizes() {
     return std::make_tuple(System::get_fiber_container().get_local_solution_size(),
                            System::get_shell().get_local_solution_size(),
                            System::get_body_container().get_local_solution_size());
@@ -329,7 +329,7 @@ std::tuple<Eigen::Map<Eigen::VectorXd>, Eigen::Map<Eigen::VectorXd>, Eigen::Map<
 get_solution_maps(double *x) {
     using Eigen::Map;
     using Eigen::VectorXd;
-    auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
+    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
     return std::make_tuple(VectorMap(x, fib_sol_size), VectorMap(x + fib_sol_size, shell_sol_size),
                            VectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
 }
@@ -338,7 +338,7 @@ std::tuple<Eigen::Map<const Eigen::VectorXd>, Eigen::Map<const Eigen::VectorXd>,
 get_solution_maps(const double *x) {
     using Eigen::Map;
     using Eigen::VectorXd;
-    auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
+    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
     return std::make_tuple(CVectorMap(x, fib_sol_size), CVectorMap(x + fib_sol_size, shell_sol_size),
                            CVectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
 }

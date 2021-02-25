@@ -32,6 +32,7 @@ class System {
     static toml::table &get_param_table() { return get_instance_impl().param_table_; };
     static std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
                                                                                             MatrixRef &body_velocities);
+    static std::tuple<int, int, int> get_local_solution_sizes();
     static Eigen::VectorXd apply_preconditioner(VectorRef &x);
     static Eigen::VectorXd apply_matvec(VectorRef &x);
 };

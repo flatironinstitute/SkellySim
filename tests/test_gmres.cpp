@@ -44,8 +44,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    P_inv_hydro(const RCP<const Comm<int>> comm)
-        : fc_(System::get_fiber_container()), shell_(System::get_shell()), bc_(System::get_body_container()) {
+    P_inv_hydro(const RCP<const Comm<int>> comm) {
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "P_inv_hydro constructor: The input Comm object must be nonnull.");
         if (comm->getRank() == 0) {
@@ -53,9 +52,7 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        const int fiber_sol_size = fc_.get_local_solution_size();
-        const int shell_sol_size = shell_.get_local_solution_size();
-        const int body_sol_size = bc_.get_local_solution_size();
+        const auto [fiber_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
         const int local_size = fiber_sol_size + shell_sol_size + body_sol_size;
 
         // Construct a map for our block row distribution
@@ -91,9 +88,6 @@ class P_inv_hydro : public Tpetra::Operator<> {
 
   private:
     RCP<const map_type> opMap_;
-    const FiberContainer &fc_;
-    const Periphery &shell_;
-    const BodyContainer &bc_;
 };
 
 class A_fiber_hydro : public Tpetra::Operator<> {
@@ -117,9 +111,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
     //
     // n: Global number of rows and columns in the operator.
     // comm: The communicator over which to distribute those rows and columns.
-    A_fiber_hydro(const RCP<const Comm<int>> comm, const double eta)
-        : fc_(System::get_fiber_container()), shell_(System::get_shell()), bc_(System::get_body_container()),
-          eta_(eta) {
+    A_fiber_hydro(const RCP<const Comm<int>> comm) {
         TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                    "A_fiber_hydro constructor: The input Comm object must be nonnull.");
         if (comm->getRank() == 0) {
@@ -127,9 +119,7 @@ class A_fiber_hydro : public Tpetra::Operator<> {
         }
 
         const global_ordinal_type indexBase = 0;
-        const int fiber_sol_size = fc_.get_local_solution_size();
-        const int shell_sol_size = shell_.get_local_solution_size();
-        const int body_sol_size = bc_.get_local_solution_size();
+        const auto [fiber_sol_size, shell_sol_size, body_sol_size] = System::get_instance().get_local_solution_sizes();
         const int local_size = fiber_sol_size + shell_sol_size + body_sol_size;
 
         // Construct a map for our block row distribution
@@ -166,10 +156,6 @@ class A_fiber_hydro : public Tpetra::Operator<> {
 
   private:
     RCP<const map_type> opMap_;
-    const FiberContainer &fc_;
-    const Periphery &shell_;
-    const BodyContainer &bc_;
-    const double eta_;
 };
 
 VectorXd load_vec(cnpy::npz_t &npz, const char *var) { return VectorMap(npz[var].data<double>(), npz[var].shape[0]); }
@@ -247,7 +233,7 @@ int main(int argc, char *argv[]) {
             bc.update_RHS(v_fib2all.block(0, offset, 3, bc.get_local_node_count()));
         }
 
-        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm, eta));
+        RCP<A_fiber_hydro> A_sim = rcp(new A_fiber_hydro(comm));
         RCP<P_inv_hydro> preconditioner = rcp(new P_inv_hydro(comm));
 
         RCP<const Tpetra::Map<>> map = A_sim->getDomainMap();
