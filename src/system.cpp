@@ -228,13 +228,14 @@ void preprocess(toml::table &config, unsigned long seed) {
     }
 }
 
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_conditions(const FiberContainer &fc,
-                                                                                         const BodyContainer &bc,
-                                                                                         VectorRef &fibers_xt,
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
                                                                                          MatrixRef &body_velocities) {
     using Eigen::ArrayXXd;
     using Eigen::MatrixXd;
     using Eigen::Vector3d;
+
+    auto &fc = System::get_fiber_container();
+    auto &bc = System::get_body_container();
 
     Eigen::MatrixXd force_torque_on_bodies = MatrixXd::Zero(6, bc.get_global_count());
     Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
@@ -368,8 +369,8 @@ Eigen::VectorXd System::apply_preconditioner(VectorRef &x) {
 }
 
 Eigen::VectorXd System::apply_matvec(VectorRef &x) {
-    using Eigen::MatrixXd;
     using Eigen::Block;
+    using Eigen::MatrixXd;
     const FiberContainer &fc = System::get_fiber_container();
     const Periphery &shell = System::get_shell();
     const BodyContainer &bc = System::get_body_container();
@@ -393,20 +394,20 @@ Eigen::VectorXd System::apply_matvec(VectorRef &x) {
     auto [x_fibers, x_shell, x_bodies] = get_solution_maps(x.data());
     auto [res_fibers, res_shell, res_bodies] = get_solution_maps(res.data());
 
-    MatrixXd body_velocities, body_densities, v_fib_boundary, force_torque_bodies;
-    std::tie(body_velocities, body_densities) = bc.unpack_solution_vector(x_bodies);
-    std::tie(force_torque_bodies, v_fib_boundary) =
-        System::calculate_body_fiber_link_conditions(fc, bc, x_fibers, body_velocities);
-
     // calculate fiber-fiber velocity
-    Block<MatrixXd> r_shellbody = r_all.block(0, r_fibers.cols(), 3, r_shell.cols() + r_bodies.cols());
     MatrixXd fw = fc.apply_fiber_force(x_fibers);
+    Block<MatrixXd> r_shellbody = r_all.block(0, r_fibers.cols(), 3, r_shell.cols() + r_bodies.cols());
     MatrixXd v_fib2all = fc.flow(fw, r_shellbody, eta);
 
     MatrixXd r_fibbody(3, r_fibers.cols() + r_bodies.cols());
     r_fibbody.block(0, 0, 3, r_fibers.cols()) = r_fibers;
     r_fibbody.block(0, r_fibers.cols(), 3, r_bodies.cols()) = r_bodies;
     MatrixXd v_shell2fibbody = shell.flow(r_fibbody, x_shell, eta);
+
+    MatrixXd body_velocities, body_densities, v_fib_boundary, force_torque_bodies;
+    std::tie(body_velocities, body_densities) = bc.unpack_solution_vector(x_bodies);
+    std::tie(force_torque_bodies, v_fib_boundary) =
+        System::calculate_body_fiber_link_conditions(x_fibers, body_velocities);
 
     v_all = v_fib2all;
     v_fibers += v_shell2fibbody.block(0, 0, 3, r_fibers.cols());

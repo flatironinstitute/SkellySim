@@ -30,9 +30,7 @@ class System {
     static BodyContainer &get_body_container() { return get_instance_impl().bc_; };
     static Periphery &get_shell() { return get_instance_impl().shell_; };
     static toml::table &get_param_table() { return get_instance_impl().param_table_; };
-    static std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(const FiberContainer &fc,
-                                                                                            const BodyContainer &bc,
-                                                                                            VectorRef &fibers_xt,
+    static std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
                                                                                             MatrixRef &body_velocities);
     static Eigen::VectorXd apply_preconditioner(VectorRef &x);
     static Eigen::VectorXd apply_matvec(VectorRef &x);
