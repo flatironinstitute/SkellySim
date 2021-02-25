@@ -21,7 +21,7 @@ precompute_file = 'test_body2.npz'
 
 
 [[fibers]]
-num_points = 8
+n_nodes = 8
 parent_body = 0
 relative_position = [0.0, 0.0, 1.0]
 orientation = [0.0, 0.0, 1.0]
@@ -29,7 +29,7 @@ bending_rigidity = 10.0
 length = 1.0
 
 [[fibers]]
-num_points = 8
+n_nodes = 8
 parent_body = 1
 relative_position = [1.0, 0.0, 1.0]
 orientation = [0.0, 0.0, 1.0]
@@ -37,7 +37,7 @@ bending_rigidity = 10.0
 length = 1.0
 
 [[fibers]]
-num_points = 8
+n_nodes = 8
 parent_body = 1
 parent_site = 5
 relative_position = [2.0, 0.0, 1.0]
