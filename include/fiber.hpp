@@ -169,7 +169,7 @@ class FiberContainer {
     int get_global_count() const;
 
     Eigen::MatrixXd generate_constant_force() const;
-    Eigen::MatrixXd get_r_vectors() const;
+    Eigen::MatrixXd get_local_node_positions() const;
     Eigen::VectorXd get_RHS() const;
     Eigen::MatrixXd flow(MatrixRef &forces, MatrixRef &r_trg_external, double eta) const;
     Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;

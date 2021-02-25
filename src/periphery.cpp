@@ -4,6 +4,24 @@
 
 #include <mpi.h>
 
+Eigen::VectorXd Periphery::apply_preconditioner(VectorRef &x_local) const {
+    assert(x_local.size() == get_local_solution_size());
+    Eigen::VectorXd x_shell(3 * n_nodes_global_);
+    MPI_Allgatherv(x_local.data(), node_counts_[world_rank_], MPI_DOUBLE, x_shell.data(), node_counts_.data(),
+                   node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
+    return M_inv_ * x_shell;
+}
+
+Eigen::VectorXd Periphery::matvec(VectorRef &x_local, MatrixRef &v_local) const {
+    assert(x_local.size() == get_local_solution_size());
+    assert(v_local.size() == get_local_solution_size());
+    Eigen::VectorXd x_shell(3 * n_nodes_global_);
+    MPI_Allgatherv(x_local.data(), node_counts_[world_rank_], MPI_DOUBLE, x_shell.data(), node_counts_.data(),
+                   node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
+    return stresslet_plus_complementary_ * x_shell + CVectorMap(v_local.data(), v_local.size());
+}
+
+
 Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta) const {
     // Calculate velocity at target coordinates due to the periphery.
     // Input:

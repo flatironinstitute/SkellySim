@@ -34,6 +34,8 @@ class System {
                                                                                             const BodyContainer &bc,
                                                                                             VectorRef &fibers_xt,
                                                                                             MatrixRef &body_velocities);
+    static Eigen::VectorXd apply_preconditioner(VectorRef &x);
+    static Eigen::VectorXd apply_matvec(VectorRef &x);
 };
 
 #endif

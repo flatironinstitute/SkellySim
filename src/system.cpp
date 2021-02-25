@@ -236,7 +236,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_co
     using Eigen::MatrixXd;
     using Eigen::Vector3d;
 
-    Eigen::MatrixXd force_torque_on_body = MatrixXd::Zero(6, bc.get_global_count());
+    Eigen::MatrixXd force_torque_on_bodies = MatrixXd::Zero(6, bc.get_global_count());
     Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
 
     int xt_offset = 0;
@@ -280,8 +280,8 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_co
         L_body += fib.bending_rigidity_ * xs_0.cross(xss_new_0);
 
         // Store the contribution of each fiber in this array
-        force_torque_on_body.col(i_body).segment(0, 3) += F_body;
-        force_torque_on_body.col(i_body).segment(3, 3) += L_body;
+        force_torque_on_bodies.col(i_body).segment(0, 3) += F_body;
+        force_torque_on_bodies.col(i_body).segment(3, 3) += L_body;
 
         // SECOND FROM BODY ON-TO FIBER
         // Translational and angular velocities at the attacment point are calculated
@@ -305,7 +305,119 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_co
         xt_offset += 4 * n_pts;
     }
 
-    return std::make_pair(force_torque_on_body, velocities_on_fiber);
+    // Sum up fiber contributions from all other ranks to body torques
+    MPI_Allreduce(MPI_IN_PLACE, force_torque_on_bodies.data(), force_torque_on_bodies.size(), MPI_DOUBLE, MPI_SUM,
+                  MPI_COMM_WORLD);
+
+    return std::make_pair(force_torque_on_bodies, velocities_on_fiber);
+}
+
+std::tuple<int, int, int> get_local_node_counts() {
+    return std::make_tuple(System::get_fiber_container().get_local_node_count(),
+                           System::get_shell().get_local_node_count(),
+                           System::get_body_container().get_local_node_count());
+}
+
+std::tuple<int, int, int> get_local_solution_sizes() {
+    return std::make_tuple(System::get_fiber_container().get_local_solution_size(),
+                           System::get_shell().get_local_solution_size(),
+                           System::get_body_container().get_local_solution_size());
+}
+
+std::tuple<Eigen::Map<Eigen::VectorXd>, Eigen::Map<Eigen::VectorXd>, Eigen::Map<Eigen::VectorXd>>
+get_solution_maps(double *x) {
+    using Eigen::Map;
+    using Eigen::VectorXd;
+    auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
+    return std::make_tuple(VectorMap(x, fib_sol_size), VectorMap(x + fib_sol_size, shell_sol_size),
+                           VectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
+}
+
+std::tuple<Eigen::Map<const Eigen::VectorXd>, Eigen::Map<const Eigen::VectorXd>, Eigen::Map<const Eigen::VectorXd>>
+get_solution_maps(const double *x) {
+    using Eigen::Map;
+    using Eigen::VectorXd;
+    auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
+    return std::make_tuple(CVectorMap(x, fib_sol_size), CVectorMap(x + fib_sol_size, shell_sol_size),
+                           CVectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
+}
+
+template <typename Derived>
+std::tuple<Eigen::Block<Derived>, Eigen::Block<Derived>, Eigen::Block<Derived>>
+get_node_maps(Eigen::MatrixBase<Derived> &x) {
+    auto [fib_nodes, shell_nodes, body_nodes] = get_local_node_counts();
+    return std::make_tuple(Eigen::Block<Derived>(x.derived(), 0, 0, 3, fib_nodes),
+                           Eigen::Block<Derived>(x.derived(), 0, fib_nodes, 3, shell_nodes),
+                           Eigen::Block<Derived>(x.derived(), 0, fib_nodes + shell_nodes, 3, body_nodes));
+}
+
+Eigen::VectorXd System::apply_preconditioner(VectorRef &x) {
+    const auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
+    const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
+    assert(sol_size == x.size());
+    Eigen::VectorXd res(sol_size);
+
+    auto [x_fibers, x_shell, x_bodies] = get_solution_maps(x.data());
+    auto [res_fibers, res_shell, res_bodies] = get_solution_maps(res.data());
+
+    res_fibers = System::get_fiber_container().apply_preconditioner(x_fibers);
+    res_shell = System::get_shell().apply_preconditioner(x_shell);
+    res_bodies = System::get_body_container().apply_preconditioner(x_bodies);
+
+    return res;
+}
+
+Eigen::VectorXd System::apply_matvec(VectorRef &x) {
+    using Eigen::MatrixXd;
+    using Eigen::Block;
+    const FiberContainer &fc = System::get_fiber_container();
+    const Periphery &shell = System::get_shell();
+    const BodyContainer &bc = System::get_body_container();
+    const double eta = System::get_params().eta;
+
+    const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
+    const int total_node_count = fib_node_count + shell_node_count + body_node_count;
+
+    const auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
+    const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
+    assert(sol_size == x.size());
+    Eigen::VectorXd res(sol_size);
+
+    MatrixXd r_all(3, total_node_count), v_all(3, total_node_count);
+    auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
+    auto [v_fibers, v_shell, v_bodies] = get_node_maps(v_all);
+    r_fibers = fc.get_local_node_positions();
+    r_shell = shell.get_local_node_positions();
+    r_bodies = bc.get_local_node_positions();
+
+    auto [x_fibers, x_shell, x_bodies] = get_solution_maps(x.data());
+    auto [res_fibers, res_shell, res_bodies] = get_solution_maps(res.data());
+
+    MatrixXd body_velocities, body_densities, v_fib_boundary, force_torque_bodies;
+    std::tie(body_velocities, body_densities) = bc.unpack_solution_vector(x_bodies);
+    std::tie(force_torque_bodies, v_fib_boundary) =
+        System::calculate_body_fiber_link_conditions(fc, bc, x_fibers, body_velocities);
+
+    // calculate fiber-fiber velocity
+    Block<MatrixXd> r_shellbody = r_all.block(0, r_fibers.cols(), 3, r_shell.cols() + r_bodies.cols());
+    MatrixXd fw = fc.apply_fiber_force(x_fibers);
+    MatrixXd v_fib2all = fc.flow(fw, r_shellbody, eta);
+
+    MatrixXd r_fibbody(3, r_fibers.cols() + r_bodies.cols());
+    r_fibbody.block(0, 0, 3, r_fibers.cols()) = r_fibers;
+    r_fibbody.block(0, r_fibers.cols(), 3, r_bodies.cols()) = r_bodies;
+    MatrixXd v_shell2fibbody = shell.flow(r_fibbody, x_shell, eta);
+
+    v_all = v_fib2all;
+    v_fibers += v_shell2fibbody.block(0, 0, 3, r_fibers.cols());
+    v_bodies += v_shell2fibbody.block(0, r_fibers.cols(), 3, r_bodies.cols());
+    v_all += bc.flow(r_all, body_densities, force_torque_bodies, eta);
+
+    res_fibers = fc.matvec(x_fibers, v_fibers, v_fib_boundary);
+    res_shell = shell.matvec(x_shell, v_shell);
+    res_bodies = bc.matvec(v_bodies, body_densities, body_velocities);
+
+    return res;
 }
 
 System::System(std::string *input_file) {

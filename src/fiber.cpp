@@ -561,7 +561,7 @@ VectorXd FiberContainer::get_RHS() const {
     return RHS;
 }
 
-MatrixXd FiberContainer::get_r_vectors() const {
+MatrixXd FiberContainer::get_local_node_positions() const {
     const int n_pts_tot = get_local_node_count();
     MatrixXd r(3, n_pts_tot);
     size_t offset = 0;

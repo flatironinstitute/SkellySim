@@ -83,32 +83,9 @@ class P_inv_hydro : public Tpetra::Operator<> {
         }
 
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
-            // Current position in result vector
-            int offset = 0;
-
-            const int fib_solution_size = fc_.get_local_solution_size();
-            CVectorMap x_fibers(X.getData(c).getRawPtr() + offset, fib_solution_size);
-            VectorMap res_view_fibers(Y.getDataNonConst(c).getRawPtr() + offset, fc_.get_local_solution_size());
-            res_view_fibers = fc_.apply_preconditioner(x_fibers);
-            offset += fib_solution_size;
-
-            // Each MPI rank has only a _local_ portion of the inverse matrix, but needs the _global_ 'X' vector to
-            // contract against. Each rank will get a full copy of the 'X' in x_shell
-            VectorXd x_shell(3 * shell_.n_nodes_global_); /// Shell 'x' across _all_ mpi ranks
-
-            // Collect local 'X' data and distribute to _all_ MPI ranks
-            MPI_Allgatherv(X.getData(c).getRawPtr() + offset, shell_.node_counts_[rank], MPI_DOUBLE, x_shell.data(),
-                           shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
-
-            const int shell_sol_size = shell_.get_local_solution_size();
-            VectorMap res_shell(Y.getDataNonConst(c).getRawPtr() + offset, shell_sol_size);
-            res_shell = shell_.M_inv_ * x_shell;
-            offset += shell_sol_size;
-
-            const int body_sol_size = bc_.get_local_solution_size();
-            CVectorMap x_bodies(X.getData(c).getRawPtr() + offset, body_sol_size);
-            VectorMap res_bodies(Y.getDataNonConst(c).getRawPtr() + offset, body_sol_size);
-            res_bodies = bc_.apply_preconditioner(x_bodies);
+            CVectorMap x_local(X.getData(c).getRawPtr(), X.getLocalLength());
+            VectorMap res(Y.getDataNonConst(c).getRawPtr(), Y.getLocalLength());
+            res = System::apply_preconditioner(x_local);
         }
     }
 
@@ -180,91 +157,10 @@ class A_fiber_hydro : public Tpetra::Operator<> {
             cout << "A_fiber_hydro::apply" << endl;
         }
 
-        const int fib_sol_size = fc_.get_local_solution_size();
-        const int shell_sol_size = shell_.get_local_solution_size();
-        const int body_sol_size = bc_.get_local_solution_size();
-        assert((unsigned long)(fib_sol_size + shell_sol_size + body_sol_size) == X.getLocalLength());
-
-        const int fib_sol_offset = 0;
-        const int shell_sol_offset = fib_sol_size;
-        const int body_sol_offset = shell_sol_offset + shell_sol_size;
-
-        const int fib_v_size = fc_.get_local_node_count();
-        const int shell_v_size = shell_.get_local_node_count();
-        const int body_v_size = bc_.get_local_node_count();
-        const int v_size = fib_v_size + shell_v_size + body_v_size;
-
-        const int fib_v_offset = 0;
-        const int shell_v_offset = fib_v_size;
-        const int body_v_offset = shell_v_offset + shell_v_size;
-
         for (size_t c = 0; c < X.getNumVectors(); ++c) {
-            using Eigen::Block;
-            using Eigen::Map;
-
-            // Get views and temporary arrays
-            double *res_ptr = Y.getDataNonConst(c).getRawPtr();
-            const double *x_ptr = X.getData(c).getRawPtr();
-            CVectorMap x_fib_local(x_ptr + fib_sol_offset, fib_sol_size);
-            CVectorMap x_shell_local(x_ptr + shell_sol_offset, shell_sol_size);
-            CVectorMap x_body_local(x_ptr + body_sol_offset, body_sol_size);
-            VectorMap res_fib(res_ptr, fib_sol_size);
-            VectorMap res_shell(res_ptr + fib_sol_size, shell_sol_size);
-            VectorMap res_bodies(res_ptr + fib_sol_size + shell_sol_size, body_sol_size);
-
-            MatrixXd r_all(3, fib_v_size + shell_v_size + body_v_size);
-            Block<MatrixXd> r_fib = r_all.block(0, 0, 3, fib_v_size);
-            Block<MatrixXd> r_shell = r_all.block(0, shell_v_offset, 3, shell_v_size);
-            Block<MatrixXd> r_body = r_all.block(0, body_v_offset, 3, body_v_size);
-            r_fib = fc_.get_r_vectors();
-            r_shell = shell_.get_local_node_positions();
-            r_body = bc_.get_local_node_positions();
-            MatrixXd v_all = MatrixXd(3, v_size);
-            Block<MatrixXd> r_shellbody = r_all.block(0, shell_v_offset, 3, shell_v_size + body_v_size);
-
-            Block<MatrixXd> v_fib = v_all.block(0, fib_v_offset, 3, fib_v_size);
-            Block<MatrixXd> v_shell = v_all.block(0, shell_v_offset, 3, shell_v_size);
-            Block<MatrixXd> v_bodies = v_all.block(0, body_v_offset, 3, body_v_size);
-
-            // Collect all X shell data into single vector on all ranks
-            // (for res_shell_local = A_shell_local * x_shell_global + ...)
-            VectorXd x_shell_global(3 * shell_.n_nodes_global_);
-            MPI_Allgatherv(x_shell_local.data(), shell_sol_size, MPI_DOUBLE, x_shell_global.data(),
-                           shell_.node_counts_.data(), shell_.node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
-
-            Eigen::MatrixXd body_velocities, body_densities;
-            std::tie(body_velocities, body_densities) = bc_.unpack_solution_vector(x_body_local);
-
-            // calculate fiber-fiber velocity
-            MatrixXd fw = fc_.apply_fiber_force(x_fib_local);
-            MatrixXd v_fib2all = fc_.flow(fw, r_shellbody, eta_);
-
-            MatrixXd r_fibbody(3, r_fib.cols() + r_body.cols());
-            r_fibbody.block(0, 0, 3, r_fib.cols()) = r_fib;
-            r_fibbody.block(0, r_fib.cols(), 3, r_body.cols()) = r_body;
-            MatrixXd v_shell2fibbody = shell_.flow(r_fibbody, x_shell_local, eta_);
-
-            v_all = v_fib2all;
-            v_fib += v_shell2fibbody.block(0, 0, 3, r_fib.cols());
-            v_bodies += v_shell2fibbody.block(0, r_fib.cols(), 3, r_body.cols());
-
-            // Calculate forces/torques on body
-            MatrixXd v_fib_boundary;
-            if (bc_.bodies.size()) {
-                MatrixXd force_torque_bodies;
-                std::tie(force_torque_bodies, v_fib_boundary) =
-                    System::calculate_body_fiber_link_conditions(fc_, bc_, x_fib_local, body_velocities);
-                MPI_Allreduce(MPI_IN_PLACE, force_torque_bodies.data(), force_torque_bodies.size(), MPI_DOUBLE, MPI_SUM,
-                              MPI_COMM_WORLD);
-
-                // Calculate flow on other objects due to body forces
-                v_all += bc_.flow(r_all, body_densities, force_torque_bodies, eta_);
-                res_bodies = bc_.matvec(v_bodies, body_densities, body_velocities);
-            }
-
-            res_fib = fc_.matvec(x_fib_local, v_fib, v_fib_boundary);
-            res_shell =
-                shell_.stresslet_plus_complementary_ * x_shell_global + VectorMap(v_shell.data(), shell_sol_size);
+            CVectorMap x_local(X.getData(c).getRawPtr(), X.getLocalLength());
+            VectorMap res(Y.getDataNonConst(c).getRawPtr(), Y.getLocalLength());
+            res = System::apply_matvec(x_local);
         }
     }
 
