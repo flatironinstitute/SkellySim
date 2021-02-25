@@ -1,11 +1,10 @@
 #ifndef PARSE_UTIL_HPP
 #define PARSE_UTIL_HPP
+
 #include <skelly_sim.hpp>
 
 #include <Eigen/Geometry>
-
 #include <iostream>
-#include <toml.hpp>
 
 namespace parse_util {
 

@@ -1,5 +1,6 @@
 #ifndef PERIPHERY_HPP
 #define PERIPHERY_HPP
+
 #include <skelly_sim.hpp>
 
 #include <iostream>

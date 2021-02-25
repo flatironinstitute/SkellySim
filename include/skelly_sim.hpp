@@ -1,6 +1,9 @@
 #ifndef SKELLYSIM_HPP
 #define SKELLYSIM_HPP
 
+#define TOML_HEADER_ONLY 0
+#include <toml.hpp>
+
 #include <Eigen/Core>
 typedef Eigen::Map<Eigen::VectorXd> VectorMap;
 typedef Eigen::Map<const Eigen::VectorXd> CVectorMap;

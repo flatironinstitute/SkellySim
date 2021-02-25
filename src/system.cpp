@@ -1,3 +1,6 @@
+#define TOML_IMPLEMENTATION
+#include <skelly_sim.hpp>
+
 #include <Eigen/Core>
 #include <fstream>
 #include <random>

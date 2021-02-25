@@ -1,7 +1,7 @@
 #ifndef PARAMS_HPP
 #define PARAMS_HPP
 
-#include <toml.hpp>
+#include <skelly_sim.hpp>
 
 /// Class containing input parameters for the simulated system
 class Params {

@@ -10,7 +10,6 @@
 #include <kernels.hpp>
 #include <params.hpp>
 
-#include <toml.hpp>
 
 /// @brief Class to represent a single flexible filament
 ///

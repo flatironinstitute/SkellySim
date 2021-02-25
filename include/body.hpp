@@ -6,7 +6,6 @@
 #include <Eigen/LU>
 #include <kernels.hpp>
 #include <params.hpp>
-#include <toml.hpp>
 
 /// Class for "small" bodies such as MTOCs
 class Body {
