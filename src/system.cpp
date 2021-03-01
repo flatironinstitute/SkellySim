@@ -6,6 +6,7 @@
 #include <random>
 
 #include <parse_util.hpp>
+#include <solver_hydro.hpp>
 #include <system.hpp>
 
 // TODO: Refactor all preprocess stuff. It's awful
@@ -419,6 +420,37 @@ Eigen::VectorXd System::apply_matvec(VectorRef &x) {
     res_bodies = bc.matvec(v_bodies, body_densities, body_velocities);
 
     return res;
+}
+
+void System::step() {
+    using Eigen::MatrixXd;
+    Params &params = System::get_params();
+    Periphery &shell = System::get_shell();
+    FiberContainer &fc = System::get_fiber_container();
+    BodyContainer &bc = System::get_body_container();
+    const double eta = params.eta;
+    const double dt = params.dt;
+    const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
+
+    MatrixXd r_trg_external(3, shell_node_count + body_node_count);
+    r_trg_external.block(0, 0, 3, shell_node_count) = shell.get_local_node_positions();
+    r_trg_external.block(0, shell_node_count, 3, body_node_count) = bc.get_local_node_positions();
+
+    fc.update_cache_variables(dt, eta);
+    MatrixXd f_on_fibers = fc.generate_constant_force();
+    MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
+
+    fc.update_RHS(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
+    fc.apply_BC_rectangular(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
+
+    shell.update_RHS(v_fib2all.block(0, fib_node_count, 3, shell_node_count));
+
+    bc.update_cache_variables(eta);
+    bc.update_RHS(v_fib2all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
+
+    Solver<P_inv_hydro, A_fiber_hydro> solver_;
+    solver_.set_RHS();
+    solver_.solve();
 }
 
 System::System(std::string *input_file) {

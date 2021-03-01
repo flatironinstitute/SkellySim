@@ -43,45 +43,7 @@ int main(int argc, char *argv[]) {
     }
 
     System::init(config_file);
-
-    Params &params = System::get_params();
-    Periphery &shell = System::get_shell();
-    FiberContainer &fc = System::get_fiber_container();
-    BodyContainer &bc = System::get_body_container();
-    const double eta = params.eta;
-    const double dt = params.dt;
-
-    for (auto &fib : fc.fibers) {
-        fib.update_derivatives();
-        fib.update_stokeslet(eta);
-        fib.update_linear_operator(dt, eta);
-    }
-
-    MatrixXd r_trg_external(3, shell.get_local_node_count() + bc.get_local_node_count());
-    r_trg_external.block(0, 0, 3, shell.get_local_node_count()) = shell.get_local_node_positions();
-    r_trg_external.block(0, shell.get_local_node_count(), 3, bc.get_local_node_count()) = bc.get_local_node_positions();
-
-    MatrixXd f_on_fibers = fc.generate_constant_force();
-    MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
-    size_t offset = 0;
-    for (auto &fib : fc.fibers) {
-        fib.update_RHS(dt, v_fib2all.block(0, offset, 3, fib.n_nodes_), f_on_fibers.block(0, offset, 3, fib.n_nodes_));
-        fib.apply_bc_rectangular(dt, v_fib2all.block(0, offset, 3, fib.n_nodes_),
-                                 f_on_fibers.block(0, offset, 3, fib.n_nodes_));
-        fib.update_preconditioner();
-        fib.update_force_operator();
-        offset += fib.n_nodes_;
-    }
-
-    shell.update_RHS(v_fib2all.block(0, offset, 3, shell.get_local_node_count()));
-    offset += shell.get_local_node_count();
-
-    bc.update_cache_variables(eta);
-    bc.update_RHS(v_fib2all.block(0, offset, 3, bc.get_local_node_count()));
-
-    Solver<P_inv_hydro, A_fiber_hydro> solver_;
-    solver_.set_RHS();
-    solver_.solve();
+    System::step();
 
     success = true;
     if (rank == 0)

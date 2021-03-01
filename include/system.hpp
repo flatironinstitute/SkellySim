@@ -35,6 +35,7 @@ class System {
     static std::tuple<int, int, int> get_local_solution_sizes();
     static Eigen::VectorXd apply_preconditioner(VectorRef &x);
     static Eigen::VectorXd apply_matvec(VectorRef &x);
+    static void step();
 };
 
 #endif

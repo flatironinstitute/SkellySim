@@ -63,7 +63,6 @@ void Solver<P_inv_hydro, A_fiber_hydro>::solve() {
     const int rank = comm_->getRank();
     Belos::LinearProblem<ST, MV, OP> problem(matvec_, X_, RHS_);
     problem.setRightPrec(preconditioner_);
-
     bool set = problem.setProblem();
 
     Teuchos::ParameterList belosList;

@@ -649,6 +649,35 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
     return fw;
 }
 
+void FiberContainer::update_cache_variables(double dt, double eta) {
+    for (auto &fib : fibers) {
+        fib.update_derivatives();
+        fib.update_stokeslet(eta);
+        fib.update_linear_operator(dt, eta);
+        fib.update_force_operator();
+    }
+}
+
+void FiberContainer::update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+    size_t offset = 0;
+    for (auto &fib : fibers) {
+        fib.update_RHS(dt, v_on_fibers.block(0, offset, 3, fib.n_nodes_),
+                       f_on_fibers.block(0, offset, 3, fib.n_nodes_));
+        offset += fib.n_nodes_;
+    }
+}
+
+void FiberContainer::apply_BC_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+    size_t offset = 0;
+    for (auto &fib : fibers) {
+        fib.apply_bc_rectangular(dt, v_on_fibers.block(0, offset, 3, fib.n_nodes_),
+                                 f_on_fibers.block(0, offset, 3, fib.n_nodes_));
+        // FIXME: preconditioner update probably shouldn't be here. think of how to organize it with other cache
+        fib.update_preconditioner();
+        offset += fib.n_nodes_;
+    }
+}
+
 FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
