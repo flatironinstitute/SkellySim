@@ -28,6 +28,16 @@ class Solver {
     void set_RHS();
     void solve();
     void apply_preconditioner();
+    CVectorMap get_solution() { return CVectorMap(X_->getData(0).getRawPtr(), X_->getLocalLength()); };
+    double get_residual() {
+        Teuchos::RCP<SV> Y(new SV(map_));
+        matvec_->apply(*X_, *Y);
+        CVectorMap RHS_map(RHS_->getData(0).getRawPtr(), RHS_->getLocalLength());
+        CVectorMap Y_map(Y->getData(0).getRawPtr(), Y->getLocalLength());
+        double residual = (RHS_map - Y_map).squaredNorm();
+        MPI_Allreduce(MPI_IN_PLACE, &residual, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        return sqrt(residual);
+    }
 
   private:
     Teuchos::RCP<const Teuchos::Comm<int>> comm_;
@@ -35,7 +45,6 @@ class Solver {
     Teuchos::RCP<matvec_T> matvec_;
     Teuchos::RCP<SV> X_;
     Teuchos::RCP<SV> RHS_;
-    // Teuchos::RCP<vec_type> res_;
     Teuchos::RCP<const Tpetra::Map<>> map_;
 };
 

@@ -81,15 +81,6 @@ void Solver<P_inv_hydro, A_fiber_hydro>::solve() {
             std::cout << solver.getNumIters() << " " << omp_get_wtime() - st << " " << solver.achievedTol()
                       << std::endl;
         }
-        Teuchos::RCP<SV> Y(new SV(map_));
-        matvec_->apply(*X_, *Y);
-        CVectorMap RHS_map(RHS_->getData(0).getRawPtr(), RHS_->getLocalLength());
-        CVectorMap Y_map(Y->getData(0).getRawPtr(), Y->getLocalLength());
-        double residual = (RHS_map - Y_map).squaredNorm();
-        MPI_Allreduce(MPI_IN_PLACE, &residual, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        residual = sqrt(residual);
-        if (rank == 0)
-            std::cout << "Residual: " << residual << std::endl;
     } else if (rank == 0) {
         std::cout << "Solver failed to converge\n";
     }

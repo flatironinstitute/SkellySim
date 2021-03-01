@@ -9,6 +9,8 @@
 #include <solver_hydro.hpp>
 #include <system.hpp>
 
+#include <mpi.h>
+
 // TODO: Refactor all preprocess stuff. It's awful
 
 /// RNG for generating nucleation site positions
@@ -451,6 +453,38 @@ void System::step() {
     Solver<P_inv_hydro, A_fiber_hydro> solver_;
     solver_.set_RHS();
     solver_.solve();
+    CVectorMap sol = solver_.get_solution();
+
+    double residual = solver_.get_residual();
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank == 0)
+        std::cout << "Residual: " << residual << std::endl;
+
+    auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(sol.data());
+
+    size_t offset = 0;
+    for (auto &fib : fc.fibers) {
+        for (int i = 0; i < 3; ++i)
+            fib.x_.row(i) = sol.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
+        offset += 4 * fib.n_nodes_;
+    }
+
+    Eigen::MatrixXd body_velocities, body_densities;
+    std::tie(body_velocities, body_densities) = bc.unpack_solution_vector(body_sol);
+
+    for (int i = 0; i < bc.bodies.size(); ++i) {
+        auto &body = bc.bodies[i];
+        Eigen::Vector3d x_new = body.position_ + body_velocities.col(i).segment(0, 3) * dt;
+        Eigen::Vector3d phi = body_velocities.col(i).segment(3, 3) * dt;
+        double phi_norm = phi.norm();
+        if (phi_norm) {
+            double s = std::cos(0.5 * phi_norm);
+            Eigen::Vector3d p = std::sin(0.5 * phi_norm) * phi / phi_norm;
+            Eigen::Quaterniond orientation_new = Eigen::Quaterniond(s, p[0], p[1], p[2]) * body.orientation_;
+            body.move(x_new, orientation_new);
+        }
+    }
 }
 
 System::System(std::string *input_file) {
