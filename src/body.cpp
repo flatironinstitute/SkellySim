@@ -4,6 +4,8 @@
 #include <parse_util.hpp>
 #include <skelly_sim.hpp>
 
+#include <spdlog/spdlog.h>
+
 /// @brief Update internal Body::K_ matrix variable
 /// @see update_preconditioner
 void Body::update_K_matrix() {
@@ -351,8 +353,10 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
         8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
 
     const int n_bodies_tot = body_tables->size();
+    // FIXME CRITICAL: shouldn't have to check for rank with logger, but not doing it causes a severe crash in unrelated
+    // routine with GCC
     if (world_rank_ == 0)
-        std::cout << "Reading in " << n_bodies_tot << " bodies.\n";
+        spdlog::info("Reading in {} bodies", n_bodies_tot);
 
     for (int i_body = 0; i_body < n_bodies_tot; ++i_body) {
         toml::table *body_table = body_tables->get_as<toml::table>(i_body);
@@ -360,7 +364,7 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
 
         auto &body = bodies.back();
         if (world_rank_ == 0)
-            std::cout << "Body " << i_body << ": " << body.node_weights_.size() << " [ " << body.position_.transpose()
-                      << " ]\n";
+            spdlog::info("Body {}: {} [ {}, {}, {} ]", i_body, body.node_weights_.size(), body.position_[0],
+                         body.position_[1], body.position_[2]);
     }
 }

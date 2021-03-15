@@ -18,6 +18,8 @@
 #include <system.hpp>
 #include <utils.hpp>
 
+#include <spdlog/spdlog.h>
+
 using namespace Teuchos;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -31,9 +33,7 @@ int main(int argc, char *argv[]) {
 
     bool success = false;
     RCP<const Comm<int>> comm = Tpetra::getDefaultComm();
-    const int rank = comm->getRank();
     RCP<FancyOStream> fos = fancyOStream(rcpFromRef(cout));
-
     std::string config_file = "test_gmres.toml";
 
     CommandLineProcessor cmdp(false, true);
@@ -46,8 +46,7 @@ int main(int argc, char *argv[]) {
     System::step();
 
     success = true;
-    if (rank == 0)
-        cout << "Test passed\n";
+    spdlog::info("Test passed");
 
     return (success ? EXIT_SUCCESS : EXIT_FAILURE);
 }

@@ -7,6 +7,8 @@
 #include <BelosLinearProblem.hpp>
 #include <BelosTpetraAdapter.hpp>
 
+#include <spdlog/spdlog.h>
+
 P_inv_hydro::P_inv_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm) : comm_(comm), rank_(comm->getRank()) {
     TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                "P_inv_hydro constructor: The input Teuchos::Comm object must be nonnull.");
@@ -76,12 +78,9 @@ void Solver<P_inv_hydro, A_fiber_hydro>::solve() {
     double st = omp_get_wtime();
     Belos::ReturnType ret = solver.solve();
     if (ret == Belos::Converged) {
-        if (rank == 0) {
-            std::cout << "Solver converged\n";
-            std::cout << solver.getNumIters() << " " << omp_get_wtime() - st << " " << solver.achievedTol()
-                      << std::endl;
-        }
-    } else if (rank == 0) {
-        std::cout << "Solver failed to converge\n";
+        spdlog::info("Solver converged with parameters: iters {}, time {}, achieved tolerance {}", solver.getNumIters(),
+                     omp_get_wtime() - st, solver.achievedTol());
+    } else {
+        spdlog::info("Solver failed to converge");
     }
 }

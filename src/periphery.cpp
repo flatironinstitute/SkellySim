@@ -4,6 +4,8 @@
 
 #include <mpi.h>
 
+#include <spdlog/spdlog.h>
+
 Eigen::VectorXd Periphery::apply_preconditioner(VectorRef &x_local) const {
     assert(x_local.size() == get_local_solution_size());
     Eigen::VectorXd x_shell(3 * n_nodes_global_);
@@ -73,8 +75,7 @@ Periphery::Periphery(const std::string &precompute_file) {
 
     cnpy::npz_t precomp;
 
-    if (world_rank_ == 0)
-        std::cout << "Loading raw precomputation data from file " << precompute_file << " for periphery into rank 0\n";
+    spdlog::info("Loading raw precomputation data from file {} for periphery into rank 0", precompute_file);
     int n_rows;
     int n_nodes;
     if (world_rank_ == 0) {
@@ -139,6 +140,5 @@ Periphery::Periphery(const std::string &precompute_file) {
 
     n_nodes_global_ = n_nodes;
 
-    if (world_rank_ == 0)
-        std::cout << "Done initializing periphery\n";
+    spdlog::info("Done initializing periphery");
 }

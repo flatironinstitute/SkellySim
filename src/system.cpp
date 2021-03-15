@@ -14,6 +14,11 @@
 
 #include <mpi.h>
 
+#include <spdlog/spdlog.h>
+#include <spdlog/cfg/env.h>
+#include <spdlog/sinks/null_sink.h>
+
+
 // TODO: Refactor all preprocess stuff. It's awful
 
 /// RNG for generating nucleation site positions
@@ -461,8 +466,7 @@ void System::step() {
     double residual = solver_.get_residual();
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (rank == 0)
-        std::cout << "Residual: " << residual << std::endl;
+    spdlog::info("Residual: {}", residual);
 
     auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(sol.data());
 
@@ -491,6 +495,13 @@ void System::step() {
 }
 
 System::System(std::string *input_file) {
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
+    spdlog::logger sink = rank_ == 0
+                              ? spdlog::logger("status", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
+                              : spdlog::logger("status", std::make_shared<spdlog::sinks::null_sink_st>());
+    spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
+    spdlog::cfg::load_env_levels();
+
     if (input_file == nullptr)
         throw std::runtime_error("System uninitialized. Call System::init(\"config_file\").");
 

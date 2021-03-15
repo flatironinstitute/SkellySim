@@ -25,8 +25,9 @@ if(EIGEN_USE_MKL_ALL)
 endif()
 
 set(MPI_CXX_SKIP_MPICXX
-    true
-    CACHE BOOL "The MPI-2 C++ bindings are disabled.")
+  true
+  CACHE BOOL "The MPI-2 C++ bindings are disabled."
+  )
 
 # required compiler features
 find_package(MPI REQUIRED)
@@ -39,12 +40,24 @@ find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 
 add_library(skelly STATIC src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp src/system.cpp src/body.cpp src/solver_hydro.cpp)
-target_include_directories(skelly PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
+target_include_directories(skelly PRIVATE
+  ${PROJECT_SOURCE_DIR}/include
+  ${PROJECT_SOURCE_DIR}/extern/spdlog/include
+  ${PVFMM_INCLUDE_DIR}/pvfmm
+  ${PVFMM_DEP_INCLUDE_DIR}
+  )
 target_link_libraries(skelly PRIVATE libSTKFMM_STATIC.a ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
 
+add_subdirectory(extern/spdlog)
+
 add_executable(skelly_sim src/skelly_sim.cpp)
-target_include_directories(skelly_sim PRIVATE ${PROJECT_SOURCE_DIR}/include ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
-target_link_libraries(skelly_sim PRIVATE skelly Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX
+target_include_directories(skelly_sim PRIVATE
+  ${PROJECT_SOURCE_DIR}/include
+  ${PROJECT_SOURCE_DIR}/extern/spdlog/include
+  ${PVFMM_INCLUDE_DIR}/pvfmm
+  ${PVFMM_DEP_INCLUDE_DIR}
+  )
+target_link_libraries(skelly_sim PRIVATE skelly Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX spdlog
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
 include(CTest)

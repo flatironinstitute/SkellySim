@@ -8,6 +8,8 @@
 #include <kernels.hpp>
 #include <utils.hpp>
 
+#include <spdlog/spdlog.h>
+
 /// @file
 /// @brief Implement Fiber and FiberContainer classes and associated functions
 
@@ -691,8 +693,7 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
 
     const int n_fibs_tot = fiber_tables->size();
     const int n_fibs_extra = n_fibs_tot % world_size_;
-    if (world_rank_ == 0)
-        std::cout << "Reading in " << n_fibs_tot << " fibers.\n";
+    spdlog::info("Reading in {} fibers.", n_fibs_tot);
 
     std::vector<int> displs(world_size_ + 1);
     for (int i = 1; i < world_size_ + 1; ++i) {
@@ -710,8 +711,7 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
             fibers.emplace_back(Fiber(fiber_table, params.eta));
 
             auto &fib = fibers.back();
-            std::cout << "Fiber " << i_fib << ": " << fib.n_nodes_ << " " << fib.bending_rigidity_ << " " << fib.length_
-                      << std::endl;
+            spdlog::info("Fiber {}: {} {} {}", i_fib, fib.n_nodes_, fib.bending_rigidity_, fib.length_);
         }
     }
 }

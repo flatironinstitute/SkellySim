@@ -13,6 +13,7 @@ class System {
     FiberContainer fc_;
     BodyContainer bc_;
     Periphery shell_;
+    int rank_;
     toml::table param_table_;
 
     static System &get_instance_impl(std::string *const input_file = nullptr) {
@@ -30,6 +31,7 @@ class System {
     static BodyContainer &get_body_container() { return get_instance_impl().bc_; };
     static Periphery &get_shell() { return get_instance_impl().shell_; };
     static toml::table &get_param_table() { return get_instance_impl().param_table_; };
+    static int get_rank() { return get_instance_impl().rank_; };
     static std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
                                                                                             MatrixRef &body_velocities);
     static std::tuple<int, int, int> get_local_solution_sizes();
