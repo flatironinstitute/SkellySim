@@ -1,4 +1,7 @@
+#ifndef __INTEL_COMPILER
 #define TOML_IMPLEMENTATION
+#endif
+
 #include <skelly_sim.hpp>
 
 #include <Eigen/Core>
