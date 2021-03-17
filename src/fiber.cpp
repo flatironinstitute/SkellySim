@@ -486,18 +486,18 @@ int FiberContainer::get_global_total_fib_nodes() const {
 }
 
 void FiberContainer::update_derivatives() {
-    for (Fiber &fib : fibers)
+    for (auto &fib : fibers)
         fib.update_derivatives();
 }
 
 void FiberContainer::update_stokeslets(double eta) {
     // FIXME: Remove default arguments for stokeslets
-    for (Fiber &fib : fibers)
+    for (auto &fib : fibers)
         fib.update_stokeslet(eta);
 }
 
 void FiberContainer::update_linear_operators(double dt, double eta) {
-    for (Fiber &fib : fibers)
+    for (auto &fib : fibers)
         fib.update_linear_operator(dt, eta);
 }
 
@@ -515,8 +515,8 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
     VectorXd res = VectorXd::Zero(get_local_solution_size());
 
     size_t offset = 0;
-    for (size_t i_fib = 0; i_fib < fibers.size(); ++i_fib) {
-        auto &fib = fibers[i_fib];
+    int i_fib = 0;
+    for (const auto &fib : fibers) {
         auto &mats = fib.matrices_.at(fib.n_nodes_);
         const int np = fib.n_nodes_;
         MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / fib.length_, 1);
@@ -546,6 +546,7 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
 
         res.segment(4 * offset, 4 * np) = fib.A_ * x_all.segment(4 * offset, 4 * np) - vT_in + xs_vT + y_BC;
 
+        i_fib++;
         offset += np;
     }
 
@@ -568,7 +569,7 @@ MatrixXd FiberContainer::get_local_node_positions() const {
     MatrixXd r(3, n_pts_tot);
     size_t offset = 0;
 
-    for (const Fiber &fib : fibers) {
+    for (const auto &fib : fibers) {
         for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt) {
             for (int i = 0; i < 3; ++i) {
                 r(i, i_pt + offset) = fib.x_(i, i_pt);
@@ -588,7 +589,7 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
     MatrixXd r_src(3, n_src);
     size_t offset = 0;
 
-    for (const Fiber &fib : fibers) {
+    for (const auto &fib : fibers) {
         const ArrayXd &weights = 0.5 * fib.length_ * fib.matrices_.at(fib.n_nodes_).weights_0;
 
         for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt) {
@@ -612,7 +613,7 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
     // Subtract self term
     // FIXME: Subtracting self flow only works when system has only fibers
     offset = 0;
-    for (const Fiber &fib : fibers) {
+    for (const auto &fib : fibers) {
         VectorMap wf_flat(weighted_forces.data() + offset * 3, fib.n_nodes_ * 3);
         VectorMap vel_flat(vel.data() + offset * 3, fib.n_nodes_ * 3);
         vel_flat -= fib.stokeslet_ * wf_flat;
@@ -637,8 +638,7 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
     MatrixXd fw(3, x_all.size() / 4);
 
     size_t offset = 0;
-    for (size_t ifib = 0; ifib < fibers.size(); ++ifib) {
-        const auto &fib = fibers[ifib];
+    for (const auto & fib : fibers) {
         const int np = fib.n_nodes_;
         auto force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
         fw.block(0, offset, 1, np) = force_fibers.segment(0 * np, np).transpose();
@@ -708,7 +708,7 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
 
         if (i_fib >= i_fib_low && i_fib < i_fib_high) {
             toml::table *fiber_table = fiber_tables->get_as<toml::table>(i_fib);
-            fibers.emplace_back(Fiber(fiber_table, params.eta));
+            fibers.emplace_back(fiber_table, params.eta);
 
             auto &fib = fibers.back();
             spdlog::info("Fiber {}: {} {} {}", i_fib, fib.n_nodes_, fib.bending_rigidity_, fib.length_);

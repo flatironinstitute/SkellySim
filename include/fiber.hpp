@@ -5,10 +5,11 @@
 
 #include <Eigen/LU>
 #include <unordered_map>
-#include <vector>
+#include <list>
 
 #include <kernels.hpp>
 #include <params.hpp>
+
 
 /// @brief Class to represent a single flexible filament
 ///
@@ -132,7 +133,7 @@ class Fiber {
 /// is ill-advised.
 class FiberContainer {
   public:
-    std::vector<Fiber> fibers; ///< Array of fibers local to this MPI rank
+    std::list<Fiber> fibers; ///< Array of fibers local to this MPI rank
     /// pointer to FMM object (pointer to avoid constructing fmm_ with default FiberContainer)
     std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> fmm_;
 

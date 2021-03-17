@@ -252,8 +252,8 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_co
     Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
 
     int xt_offset = 0;
-    for (size_t i_fib = 0; i_fib < fc.fibers.size(); ++i_fib) {
-        const auto &fib = fc.fibers[i_fib];
+    int i_fib = 0;
+    for (const auto &fib : fc.fibers) {
         const auto &fib_mats = fib.matrices_.at(fib.n_nodes_);
         const int n_pts = fib.n_nodes_;
 
@@ -314,6 +314,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_co
         velocities_on_fiber(3, i_fib) = tension_condition;
         velocities_on_fiber.block(4, i_fib, 3, 1) = w_fiber;
 
+        i_fib++;
         xt_offset += 4 * n_pts;
     }
 
