@@ -135,11 +135,11 @@ class FiberContainer {
   public:
     std::list<Fiber> fibers; ///< Array of fibers local to this MPI rank
     /// pointer to FMM object (pointer to avoid constructing fmm_ with default FiberContainer)
-    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> fmm_;
+    std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> fmm_;
 
     /// Empty container constructor to avoid initialization list complications. No way to
     /// initialize after using this constructor, so overwrite objects with full constructor.
-    FiberContainer(){};
+    FiberContainer() = default;
     FiberContainer(toml::array *fiber_tables, Params &params);
 
     void update_derivatives();

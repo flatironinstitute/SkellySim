@@ -13,6 +13,10 @@ class System {
     FiberContainer fc_;
     BodyContainer bc_;
     Periphery shell_;
+
+    FiberContainer fc_bak_;
+    BodyContainer bc_bak_;
+    Periphery shell_bak_;
     int rank_;
     toml::table param_table_;
 
@@ -20,6 +24,9 @@ class System {
         static System instance(input_file);
         return instance;
     };
+
+    void backup_impl();
+    void restore_impl();
 
     System(std::string *input_file = nullptr);
 
@@ -38,6 +45,8 @@ class System {
     static Eigen::VectorXd apply_preconditioner(VectorRef &x);
     static Eigen::VectorXd apply_matvec(VectorRef &x);
     static void step();
+    static void backup() { System::get_instance_impl().backup_impl(); };
+    static void restore() { System::get_instance_impl().restore_impl(); };
 };
 
 #endif

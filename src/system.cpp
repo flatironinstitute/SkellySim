@@ -495,6 +495,18 @@ void System::step() {
     }
 }
 
+void System::backup_impl() {
+    fc_bak_ = fc_;
+    bc_bak_ = bc_;
+    shell_bak_ = shell_;
+}
+
+void System::restore_impl() {
+    fc_ = fc_bak_;
+    bc_ = bc_bak_;
+    shell_ = shell_bak_;
+}
+
 System::System(std::string *input_file) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     spdlog::logger sink = rank_ == 0

@@ -14,7 +14,7 @@ class Body {
 
     Eigen::Vector3d position_;       ///< Instantaneous lab frame position of body, usually the centroid
     Eigen::Quaterniond orientation_; ///< Instantaneous orientation of body
-    const Eigen::Quaterniond orientation_ref_ = {1.0, 0.0, 0.0, 0.0}; ///< Reference orientation of body
+    Eigen::Quaterniond orientation_ref_ = {1.0, 0.0, 0.0, 0.0}; ///< Reference orientation of body
     Eigen::Vector3d velocity_;                                        ///<  Net instantaneous lab frame velocity of body
     Eigen::Vector3d angular_velocity_;         ///< Net instantaneous lab frame angular velocity of body
     Eigen::Matrix<double, 6, 1> force_torque_; ///< Net force+torque vector [fx,fy,fz,tx,ty,tz] about centroid
@@ -65,9 +65,9 @@ class BodyContainer {
     BodyContainer(toml::array *body_tables, Params &params);
 
     /// Pointer to FMM stresslet kernel (Stokes)
-    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> stresslet_kernel_;
+    std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> stresslet_kernel_;
     /// Pointer to FMM oseen kernel (PVel)
-    std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>> oseen_kernel_;
+    std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> oseen_kernel_;
 
     /// @brief Get total number of nodes associated with body
     ///
