@@ -14,10 +14,9 @@
 
 #include <mpi.h>
 
-#include <spdlog/spdlog.h>
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/null_sink.h>
-
+#include <spdlog/spdlog.h>
 
 // TODO: Refactor all preprocess stuff. It's awful
 
@@ -435,12 +434,13 @@ Eigen::VectorXd System::apply_matvec(VectorRef &x) {
 
 void System::step() {
     using Eigen::MatrixXd;
+    System &system = System::get_instance();
     Params &params = System::get_params();
     Periphery &shell = System::get_shell();
     FiberContainer &fc = System::get_fiber_container();
     BodyContainer &bc = System::get_body_container();
     const double eta = params.eta;
-    const double dt = params.dt;
+    const double dt = system.properties.dt;
     const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
 
     MatrixXd r_trg_external(3, shell_node_count + body_node_count);
@@ -498,19 +498,17 @@ void System::step() {
 void System::backup_impl() {
     fc_bak_ = fc_;
     bc_bak_ = bc_;
-    shell_bak_ = shell_;
 }
 
 void System::restore_impl() {
     fc_ = fc_bak_;
     bc_ = bc_bak_;
-    shell_ = shell_bak_;
 }
 
 void System::run() {
     System &system = System::get_instance();
     Params &params = System::get_params();
-    while (system.time < params.t_final) {
+    while (system.properties.time < params.t_final) {
         System::backup();
         System::step();
         double fiber_error = 0.0;
@@ -520,9 +518,44 @@ void System::run() {
             for (int i = 0; i < fib.n_nodes_; ++i)
                 fiber_error = std::max(fabs(sqrt(xs.col(i).norm()) - 1.0), fiber_error);
         }
-        MPI_Reduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+        MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
+        double dt_new = system.properties.dt;
+        bool accept;
+        if (fiber_error <= params.tol_tstep) {
+            accept = true;
+            const double tol_window = 0.9 * params.tol_tstep;
+            if (fiber_error <= tol_window)
+                dt_new = std::min(params.dt_max, system.properties.dt * params.beta_up);
+        } else {
+            dt_new = system.properties.dt * params.beta_down;
+            accept = false;
+        }
+
+        if (System::check_collision()) {
+            spdlog::info("Collision detected, rejecting solution and taking a smaller timestep");
+            dt_new = system.properties.dt * 0.5;
+            accept = false;
+        }
+
+        if (dt_new < params.dt_min) {
+            spdlog::info("Timestep smaller than minimum allowed, moving on with dt_min");
+            dt_new = params.dt_min;
+            accept = true;
+        }
+
+        if (accept) {
+            system.properties.time += system.properties.dt;
+        } else {
+            System::restore();
+        }
+        system.properties.dt = dt_new;
+        spdlog::info("System time, dt: {}, {}", system.properties.time, dt_new);
     }
 }
+
+// FIXME: check_collision() is just a stub
+bool System::check_collision() { return false; }
 
 System::System(std::string *input_file) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
@@ -542,4 +575,5 @@ System::System(std::string *input_file) {
     fc_ = FiberContainer(param_table_.get_as<toml::array>("fibers"), params_);
     shell_ = params_.shell_precompute_file.length() ? Periphery(params_.shell_precompute_file) : Periphery();
     bc_ = BodyContainer(param_table_.get_as<toml::array>("bodies"), params_);
+    properties.dt = params_.dt_initial;
 }

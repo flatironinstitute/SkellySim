@@ -16,13 +16,16 @@ class System {
 
     FiberContainer fc_bak_;
     BodyContainer bc_bak_;
-    Periphery shell_bak_;
     int rank_;
     toml::table param_table_;
 
-    double time = 0.0;
+    struct {
+        double dt;
+        double time = 0.0;
+    } properties;
 
-    static System &get_instance_impl(std::string *const input_file = nullptr) {
+    static System &
+    get_instance_impl(std::string *const input_file = nullptr) {
         static System instance(input_file);
         return instance;
     };
@@ -48,6 +51,7 @@ class System {
     static Eigen::VectorXd apply_matvec(VectorRef &x);
     static void step();
     static void run();
+    static bool check_collision();
     static void backup() { System::get_instance_impl().backup_impl(); };
     static void restore() { System::get_instance_impl().restore_impl(); };
 };
