@@ -507,6 +507,23 @@ void System::restore_impl() {
     shell_ = shell_bak_;
 }
 
+void System::run() {
+    System &system = System::get_instance();
+    Params &params = System::get_params();
+    while (system.time < params.t_final) {
+        System::backup();
+        System::step();
+        double fiber_error = 0.0;
+        for (const auto &fib : system.fc_.fibers) {
+            const auto &mats = fib.matrices_.at(fib.n_nodes_);
+            const Eigen::MatrixXd xs = std::pow(2.0 / fib.length_, 1) * fib.x_ * mats.D_1_0;
+            for (int i = 0; i < fib.n_nodes_; ++i)
+                fiber_error = std::max(fabs(sqrt(xs.col(i).norm()) - 1.0), fiber_error);
+        }
+        MPI_Reduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    }
+}
+
 System::System(std::string *input_file) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     spdlog::logger sink = rank_ == 0

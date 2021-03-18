@@ -9,6 +9,7 @@ class Params {
     double eta;
     double dt;
     double gmres_tol;
+    double t_final;
     unsigned long seed;
 
     std::string shell_precompute_file;

@@ -20,6 +20,8 @@ class System {
     int rank_;
     toml::table param_table_;
 
+    double time = 0.0;
+
     static System &get_instance_impl(std::string *const input_file = nullptr) {
         static System instance(input_file);
         return instance;
@@ -45,6 +47,7 @@ class System {
     static Eigen::VectorXd apply_preconditioner(VectorRef &x);
     static Eigen::VectorXd apply_matvec(VectorRef &x);
     static void step();
+    static void run();
     static void backup() { System::get_instance_impl().backup_impl(); };
     static void restore() { System::get_instance_impl().restore_impl(); };
 };
