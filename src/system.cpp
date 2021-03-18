@@ -483,14 +483,14 @@ void System::step() {
 
     for (int i = 0; i < bc.bodies.size(); ++i) {
         auto &body = bc.bodies[i];
-        Eigen::Vector3d x_new = body.position_ + body_velocities.col(i).segment(0, 3) * dt;
+        Eigen::Vector3d x_new = body->position_ + body_velocities.col(i).segment(0, 3) * dt;
         Eigen::Vector3d phi = body_velocities.col(i).segment(3, 3) * dt;
         double phi_norm = phi.norm();
         if (phi_norm) {
             double s = std::cos(0.5 * phi_norm);
             Eigen::Vector3d p = std::sin(0.5 * phi_norm) * phi / phi_norm;
-            Eigen::Quaterniond orientation_new = Eigen::Quaterniond(s, p[0], p[1], p[2]) * body.orientation_;
-            body.move(x_new, orientation_new);
+            Eigen::Quaterniond orientation_new = Eigen::Quaterniond(s, p[0], p[1], p[2]) * body->orientation_;
+            body->move(x_new, orientation_new);
         }
     }
 }

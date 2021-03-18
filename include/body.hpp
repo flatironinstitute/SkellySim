@@ -51,23 +51,52 @@ class Body {
     void load_precompute_data(const std::string &input_file);
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
 
+    virtual std::unique_ptr<Body> clone() const { return std::make_unique<Body>(*this); }
+
     // For structures with fixed size Eigen::Vector types, this ensures alignment if the
     // structure is allocated via `new`
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 class BodyContainer {
+  private:
+    int world_rank_ = 0;
+    int world_size_;
   public:
-    std::vector<Body> bodies;
-    /// Empty container constructor to avoid initialization list complications. No way to
-    /// initialize after using this constructor, so overwrite objects with full constructor.
-    BodyContainer(){};
-    BodyContainer(toml::array *body_tables, Params &params);
+    /// Vector of body pointers
+    std::vector<std::unique_ptr<Body>> bodies;
 
     /// Pointer to FMM stresslet kernel (Stokes)
     std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> stresslet_kernel_;
     /// Pointer to FMM oseen kernel (PVel)
     std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> oseen_kernel_;
+
+    /// Empty container constructor to avoid initialization list complications. No way to
+    /// initialize after using this constructor, so overwrite objects with full constructor.
+    BodyContainer(){};
+    BodyContainer(toml::array *body_tables, Params &params);
+
+    // FIXME: remove redundant code in =/copy
+    BodyContainer(const BodyContainer &orig) {
+        for (auto &body : orig.bodies) {
+            bodies.push_back(body->clone());
+        }
+        world_rank_ = orig.world_rank_;
+        world_size_ = orig.world_size_;
+        stresslet_kernel_ = orig.stresslet_kernel_;
+        oseen_kernel_ = orig.oseen_kernel_;
+    };
+
+    BodyContainer &operator=(const BodyContainer orig) {
+        for (auto &body : orig.bodies) {
+            bodies.push_back(body->clone());
+        }
+        world_rank_ = orig.world_rank_;
+        world_size_ = orig.world_size_;
+        stresslet_kernel_ = orig.stresslet_kernel_;
+        oseen_kernel_ = orig.oseen_kernel_;
+        return *this;
+    }
 
     /// @brief Get total number of nodes associated with body
     ///
@@ -78,7 +107,7 @@ class BodyContainer {
 
         int tot = 0;
         for (const auto &body : bodies)
-            tot += body.n_nodes_;
+            tot += body->n_nodes_;
         return tot;
     }
 
@@ -101,7 +130,7 @@ class BodyContainer {
 
         Eigen::MatrixXd centers(3, bodies.size());
         for (size_t i = 0; i < bodies.size(); ++i) {
-            centers.block(0, i, 3, 1) = bodies[i].position_;
+            centers.block(0, i, 3, 1) = bodies[i]->position_;
         }
 
         return centers;
@@ -118,23 +147,19 @@ class BodyContainer {
 
     void update_cache_variables(double eta) {
         for (auto &body : bodies)
-            body.update_cache_variables(eta);
+            body->update_cache_variables(eta);
     }
 
     Eigen::Vector3d get_nucleation_site(int i_body, int j_site) const {
-        return bodies[i_body].nucleation_sites_.col(j_site);
+        return bodies[i_body]->nucleation_sites_.col(j_site);
     };
 
-    const Body &at(size_t i) const { return bodies.at(i); };
+    const Body &at(size_t i) const { return *bodies.at(i); };
 
     /// @brief return number of bodies relevant for local calculations
     size_t get_local_count() const { return (world_rank_ == 0) ? bodies.size() : 0; };
     /// @brief return number of bodies relevant for global calculations
     size_t get_global_count() const { return bodies.size(); };
-
-  private:
-    int world_rank_ = 0;
-    int world_size_;
 };
 
 #endif

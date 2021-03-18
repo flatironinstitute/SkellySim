@@ -176,8 +176,8 @@ void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {
         return;
     int offset = 0;
     for (auto &body : bodies) {
-        body.update_RHS(v_on_bodies.block(0, offset, 3, body.n_nodes_));
-        offset += body.n_nodes_ + 6;
+        body->update_RHS(v_on_bodies.block(0, offset, 3, body->n_nodes_));
+        offset += body->n_nodes_ + 6;
     }
 }
 
@@ -187,8 +187,8 @@ Eigen::VectorXd BodyContainer::get_RHS() const {
     if (world_rank_ == 0) {
         int offset = 0;
         for (const auto &body : bodies) {
-            RHS.segment(offset, body.RHS_.size()) = body.RHS_;
-            offset += body.RHS_.size();
+            RHS.segment(offset, body->RHS_.size()) = body->RHS_;
+            offset += body->RHS_.size();
         }
     }
     return RHS;
@@ -203,8 +203,8 @@ Eigen::MatrixXd BodyContainer::get_local_node_positions() const {
         r_body_nodes.resize(3, n_nodes);
         int offset = 0;
         for (const auto &body : bodies) {
-            r_body_nodes.block(0, offset, 3, body.n_nodes_) = body.node_positions_;
-            offset += body.n_nodes_;
+            r_body_nodes.block(0, offset, 3, body->n_nodes_) = body->node_positions_;
+            offset += body->n_nodes_;
         }
     }
 
@@ -219,8 +219,8 @@ Eigen::MatrixXd BodyContainer::get_node_normals() const {
         r_body_nodes.resize(3, n_nodes);
         int offset = 0;
         for (const auto &body : bodies) {
-            r_body_nodes.block(0, offset, 3, body.n_nodes_) = body.node_normals_;
-            offset += body.n_nodes_;
+            r_body_nodes.block(0, offset, 3, body->n_nodes_) = body->node_normals_;
+            offset += body->n_nodes_;
         }
     }
 
@@ -235,7 +235,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> BodyContainer::unpack_solution_vecto
     if (world_rank_ == 0) {
         int offset = 0;
         for (int i = 0; i < n_bodies_global; ++i) {
-            for (int j = 0; j < bodies[i].n_nodes_; ++j) {
+            for (int j = 0; j < bodies[i]->n_nodes_; ++j) {
                 body_densities.col(j) = x.segment(offset, 3);
                 offset += 3;
             }
@@ -298,29 +298,29 @@ Eigen::VectorXd BodyContainer::matvec(MatrixRef &v_bodies, MatrixRef &body_densi
 
         for (size_t i_body = 0; i_body < bodies.size(); ++i_body) {
             const auto &body = bodies[i_body];
-            VectorMap res_nodes(res.data() + node_offset + i_body * 6, body.n_nodes_ * 3);
-            VectorMap res_com(res.data() + node_offset + i_body * 6 + body.n_nodes_ * 3, 6);
+            VectorMap res_nodes(res.data() + node_offset + i_body * 6, body->n_nodes_ * 3);
+            VectorMap res_com(res.data() + node_offset + i_body * 6 + body->n_nodes_ * 3, 6);
 
-            CMatrixMap d(body_densities.data() + node_offset, 3, body.n_nodes_);
+            CMatrixMap d(body_densities.data() + node_offset, 3, body->n_nodes_);
             CVectorMap U(body_velocities.data() + 6 * i_body, 6);
 
-            VectorXd cx(3 * body.n_nodes_), cy(3 * body.n_nodes_), cz(3 * body.n_nodes_);
+            VectorXd cx(3 * body->n_nodes_), cy(3 * body->n_nodes_), cz(3 * body->n_nodes_);
             cx.setZero();
             cy.setZero();
             cz.setZero();
-            for (int i = 0; i < body.n_nodes_; ++i) {
-                cx.segment(i * 3, 3) += d(0, i) / body.node_weights_(i) * body.ex_.col(i);
-                cy.segment(i * 3, 3) += d(1, i) / body.node_weights_(i) * body.ey_.col(i);
-                cz.segment(i * 3, 3) += d(2, i) / body.node_weights_(i) * body.ez_.col(i);
+            for (int i = 0; i < body->n_nodes_; ++i) {
+                cx.segment(i * 3, 3) += d(0, i) / body->node_weights_(i) * body->ex_.col(i);
+                cy.segment(i * 3, 3) += d(1, i) / body->node_weights_(i) * body->ey_.col(i);
+                cz.segment(i * 3, 3) += d(2, i) / body->node_weights_(i) * body->ez_.col(i);
             }
 
-            VectorXd KU = body.K_ * U;
-            VectorXd KTLambda = body.K_.transpose() * CVectorMap(d.data(), 3 * body.n_nodes_);
+            VectorXd KU = body->K_ * U;
+            VectorXd KTLambda = body->K_.transpose() * CVectorMap(d.data(), 3 * body->n_nodes_);
 
-            res_nodes = -(cx + cy + cz) - KU + CVectorMap(v_bodies.data() + node_offset * 3, body.n_nodes_ * 3);
+            res_nodes = -(cx + cy + cz) - KU + CVectorMap(v_bodies.data() + node_offset * 3, body->n_nodes_ * 3);
             res_com = -KTLambda + U;
 
-            node_offset += 3 * body.n_nodes_;
+            node_offset += 3 * body->n_nodes_;
         }
     }
     return res;
@@ -331,8 +331,8 @@ Eigen::VectorXd BodyContainer::apply_preconditioner(VectorRef &X) const {
     if (world_rank_ == 0) {
         int offset = 0;
         for (const auto &b : bodies) {
-            res.segment(offset, b.n_nodes_ * 3 + 6) = b.A_LU_.solve(X.segment(offset, b.n_nodes_ * 3 + 6));
-            offset += b.n_nodes_ * 3 + 6;
+            res.segment(offset, b->n_nodes_ * 3 + 6) = b->A_LU_.solve(X.segment(offset, b->n_nodes_ * 3 + 6));
+            offset += b->n_nodes_ * 3 + 6;
         }
     }
     return res;
@@ -360,11 +360,11 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
 
     for (int i_body = 0; i_body < n_bodies_tot; ++i_body) {
         toml::table *body_table = body_tables->get_as<toml::table>(i_body);
-        bodies.emplace_back(Body(body_table, params));
+        bodies.emplace_back(new Body(body_table, params));
 
         auto &body = bodies.back();
         if (world_rank_ == 0)
-            spdlog::info("Body {}: {} [ {}, {}, {} ]", i_body, body.node_weights_.size(), body.position_[0],
-                         body.position_[1], body.position_[2]);
+            spdlog::info("Body {}: {} [ {}, {}, {} ]", i_body, body->node_weights_.size(), body->position_[0],
+                         body->position_[1], body->position_[2]);
     }
 }

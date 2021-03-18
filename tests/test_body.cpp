@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     BodyContainer &bc = System::get_body_container();
     for (auto &fiber : fc.fibers) {
         auto [i_body, i_site] = fiber.binding_site_;
-        auto &body = bc.bodies[i_body];
+        auto &body = *bc.bodies[i_body];
 
         if (i_site > 0)
             std::cout << i_body << " " << i_site << " [" << body.nucleation_sites_ref_.col(i_site).transpose() << "] ["
