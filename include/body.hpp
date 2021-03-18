@@ -88,6 +88,7 @@ class BodyContainer {
     };
 
     BodyContainer &operator=(const BodyContainer orig) {
+        bodies.clear();
         for (auto &body : orig.bodies) {
             bodies.push_back(body->clone());
         }
