@@ -20,6 +20,12 @@ body_quadrature_radius_offset_low = 0.1
 body_quadrature_radius_offset_high = 0.2
 body_quadrature_radius_threshold = 2.0
 
+
+# There are two effective 'radii' for periphery: the attachment radius (where fibers attach),
+# and the actual node positions. For the periphery, the node radius is scaled relative to the
+# input attachment radius (or other geometrical parameters) by this factor
+periphery_node_scale_factor = 1.04
+
 def precompute_periphery(config):
     if 'periphery' not in config:
         return
@@ -30,7 +36,7 @@ def precompute_periphery(config):
 
     # Build shape
     if periphery_type == 'sphere':
-        periphery_radius = config['periphery']['radius']
+        periphery_radius = config['periphery']['radius'] * periphery_node_scale_factor
         nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
             shape_gallery.shape_gallery(
                 periphery_type,
@@ -38,9 +44,9 @@ def precompute_periphery(config):
                 radius=periphery_radius,
             )
     elif periphery_type == 'ellipsoid':
-        periphery_a = config['periphery']['a']
-        periphery_b = config['periphery']['b']
-        periphery_c = config['periphery']['c']
+        periphery_a = config['periphery']['a'] * periphery_node_scale_factor
+        periphery_b = config['periphery']['b'] * periphery_node_scale_factor
+        periphery_c = config['periphery']['c'] * periphery_node_scale_factor
 
         nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
             shape_gallery.shape_gallery(
