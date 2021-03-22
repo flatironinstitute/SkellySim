@@ -14,7 +14,7 @@
 /// discretized nodes, is distributed across all MPI ranks.
 class Periphery {
   public:
-    Periphery(){};
+    Periphery() = default;
     Periphery(const std::string &precompute_file);
 
     Eigen::MatrixXd flow(MatrixRef &trg, MatrixRef &density, double eta) const;

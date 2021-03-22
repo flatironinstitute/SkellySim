@@ -571,7 +571,9 @@ System::System(std::string *input_file) {
     preprocess(param_table_, params_.seed);
 
     fc_ = FiberContainer(param_table_.get_as<toml::array>("fibers"), params_);
-    shell_ = params_.shell_precompute_file.length() ? Periphery(params_.shell_precompute_file) : Periphery();
+    shell_ = std::make_unique<Periphery>(
+        params_.shell_precompute_file.length() ? Periphery(params_.shell_precompute_file) : Periphery());
+
     bc_ = BodyContainer(param_table_.get_as<toml::array>("bodies"), params_);
     properties.dt = params_.dt_initial;
 }

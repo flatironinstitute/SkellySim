@@ -12,7 +12,7 @@ class System {
     Params params_;
     FiberContainer fc_;
     BodyContainer bc_;
-    Periphery shell_;
+    std::unique_ptr<Periphery> shell_;
 
     FiberContainer fc_bak_;
     BodyContainer bc_bak_;
@@ -41,7 +41,7 @@ class System {
     static Params &get_params() { return get_instance_impl().params_; };
     static FiberContainer &get_fiber_container() { return get_instance_impl().fc_; };
     static BodyContainer &get_body_container() { return get_instance_impl().bc_; };
-    static Periphery &get_shell() { return get_instance_impl().shell_; };
+    static Periphery &get_shell() { return *get_instance_impl().shell_; };
     static toml::table &get_param_table() { return get_instance_impl().param_table_; };
     static int get_rank() { return get_instance_impl().rank_; };
     static std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
