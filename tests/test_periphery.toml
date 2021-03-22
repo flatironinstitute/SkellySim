@@ -1,8 +1,0 @@
-[params]
-eta = 10.0
-shell_precompute_file = "test_periphery.npz"
-
-[periphery]
-shape = 'sphere'
-n_nodes = 200
-radius = 5.0

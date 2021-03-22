@@ -571,8 +571,21 @@ System::System(std::string *input_file) {
     preprocess(param_table_, params_.seed);
 
     fc_ = FiberContainer(param_table_.get_as<toml::array>("fibers"), params_);
-    shell_ = std::make_unique<Periphery>(
-        params_.shell_precompute_file.length() ? Periphery(params_.shell_precompute_file) : Periphery());
+
+    const toml::table *periphery_table = param_table_.get_as<toml::table>("periphery");
+    if (!!periphery_table) {
+        if (!params_.shell_precompute_file.length())
+            throw std::runtime_error("Periphery specified, but no precompute file. Set [params] shell_precompute_file "
+                                     "in your input config and run the precompute script.");
+        if ((*periphery_table)["shape"].as_string()->value_or("") == std::string("sphere"))
+            shell_ = std::make_unique<SphericalPeriphery>(
+                SphericalPeriphery(params_.shell_precompute_file, periphery_table));
+        else {
+            throw std::runtime_error("Unknown shape for periphery set in input file. Valid values are 'sphere'");
+        }
+    } else {
+        shell_ = std::make_unique<Periphery>(Periphery());
+    }
 
     bc_ = BodyContainer(param_table_.get_as<toml::array>("bodies"), params_);
     properties.dt = params_.dt_initial;

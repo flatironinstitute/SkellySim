@@ -5,7 +5,6 @@ file(GLOB files "test_*.cpp")
 
 configure_file("np_fib.npz" "np_fib.npz" COPYONLY)
 configure_file("2K_MTs_onCortex_R5_L1.toml" "2K_MTs_onCortex_R5_L1.toml" COPYONLY)
-configure_file("test_periphery.toml" "test_periphery.toml" COPYONLY)
 configure_file("test_body.toml" "test_body.toml" COPYONLY)
 configure_file("test_gmres.toml" "test_gmres.toml" COPYONLY)
 

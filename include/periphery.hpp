@@ -8,6 +8,8 @@
 
 #include <kernels.hpp>
 
+#include <spdlog/spdlog.h>
+
 /// Class to represent the containing boundary of the simulated system
 ///
 /// There should be only periphery per system. The periphery, which is composed of smaller
@@ -15,7 +17,7 @@
 class Periphery {
   public:
     Periphery() = default;
-    Periphery(const std::string &precompute_file);
+    Periphery(const std::string &precompute_file, const toml::table *body_table);
 
     Eigen::MatrixXd flow(MatrixRef &trg, MatrixRef &density, double eta) const;
 
@@ -60,6 +62,16 @@ class Periphery {
   private:
     int world_size_;
     int world_rank_ = -1;
+};
+
+class SphericalPeriphery : public Periphery {
+  public:
+    double radius_;
+    SphericalPeriphery(const std::string &precompute_file, const toml::table *body_table)
+        : Periphery(precompute_file, body_table) {
+        radius_ = body_table->get_as<double>("radius")->value_or(0.0);
+        spdlog::info("Initializing spherical periphery with radius {}", radius_);
+    };
 };
 
 #endif

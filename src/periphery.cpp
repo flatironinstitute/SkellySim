@@ -23,7 +23,6 @@ Eigen::VectorXd Periphery::matvec(VectorRef &x_local, MatrixRef &v_local) const 
     return stresslet_plus_complementary_ * x_shell + CVectorMap(v_local.data(), v_local.size());
 }
 
-
 Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta) const {
     // Calculate velocity at target coordinates due to the periphery.
     // Input:
@@ -60,7 +59,7 @@ void Periphery::update_RHS(MatrixRef &v_on_shell) {
     RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size());
 }
 
-Periphery::Periphery(const std::string &precompute_file) {
+Periphery::Periphery(const std::string &precompute_file, const toml::table *body_table) {
     {
         using namespace kernels;
         using namespace stkfmm;
@@ -140,5 +139,5 @@ Periphery::Periphery(const std::string &precompute_file) {
 
     n_nodes_global_ = n_nodes;
 
-    spdlog::info("Done initializing periphery");
+    spdlog::info("Done initializing base periphery");
 }
