@@ -8,7 +8,7 @@
 
 #include <kernels.hpp>
 
-#include <spdlog/spdlog.h>
+class SphericalBody;
 
 /// Class to represent the containing boundary of the simulated system
 ///
@@ -58,6 +58,16 @@ class Periphery {
     /// MPI_WORLD_SIZE+1 array that specifies row displacements. Is essentially the CDF of row_counts_
     Eigen::VectorXi row_displs_;
 
+    virtual bool check_collision(const SphericalBody &body) const {
+        // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
+        // you make this a pure virtual function, so instead we just throw an error.
+        throw std::runtime_error("Collision undefined on base Periphery class\n");
+    };
+
+    virtual bool check_collision(const MatrixRef &point_cloud) const {
+        throw std::runtime_error("Collision undefined on base Periphery class\n");
+    };
+
     int n_nodes_global_ = 0; ///< Number of nodes across ALL MPI ranks
   private:
     int world_size_;
@@ -67,11 +77,13 @@ class Periphery {
 class SphericalPeriphery : public Periphery {
   public:
     double radius_;
-    SphericalPeriphery(const std::string &precompute_file, const toml::table *body_table)
-        : Periphery(precompute_file, body_table) {
-        radius_ = body_table->get_as<double>("radius")->value_or(0.0);
-        spdlog::info("Initializing spherical periphery with radius {}", radius_);
+    SphericalPeriphery(const std::string &precompute_file, const toml::table *periphery_table)
+        : Periphery(precompute_file, periphery_table) {
+        radius_ = periphery_table->get_as<double>("radius")->value_or(0.0);
     };
+
+    virtual bool check_collision(const SphericalBody &body) const;
+    virtual bool check_collision(const MatrixRef &point_cloud) const;
 };
 
 #endif

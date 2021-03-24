@@ -7,6 +7,8 @@
 #include <kernels.hpp>
 #include <params.hpp>
 
+class Periphery;
+
 /// Class for "small" bodies such as MTOCs
 class Body {
   public:
@@ -15,7 +17,7 @@ class Body {
     Eigen::Vector3d position_;       ///< Instantaneous lab frame position of body, usually the centroid
     Eigen::Quaterniond orientation_; ///< Instantaneous orientation of body
     Eigen::Quaterniond orientation_ref_ = {1.0, 0.0, 0.0, 0.0}; ///< Reference orientation of body
-    Eigen::Vector3d velocity_;                                        ///<  Net instantaneous lab frame velocity of body
+    Eigen::Vector3d velocity_;                                  ///<  Net instantaneous lab frame velocity of body
     Eigen::Vector3d angular_velocity_;         ///< Net instantaneous lab frame angular velocity of body
     Eigen::Matrix<double, 6, 1> force_torque_; ///< Net force+torque vector [fx,fy,fz,tx,ty,tz] about centroid
     Eigen::VectorXd RHS_;                      ///< Current 'right-hand-side' for matrix formulation of solver
@@ -53,6 +55,16 @@ class Body {
 
     virtual std::unique_ptr<Body> clone() const { return std::make_unique<Body>(*this); }
 
+    virtual bool check_collision(const Periphery &periphery) const {
+        // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
+        // you make this a pure virtual function, so instead we just throw an error.
+        throw std::runtime_error("Collision undefined on base Body class\n");
+    };
+
+    virtual bool check_collision(const Body &body) const {
+        throw std::runtime_error("Collision undefined on base Body class\n");
+    };
+
     // For structures with fixed size Eigen::Vector types, this ensures alignment if the
     // structure is allocated via `new`
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -62,6 +74,7 @@ class BodyContainer {
   private:
     int world_rank_ = 0;
     int world_size_;
+
   public:
     /// Vector of body pointers
     std::vector<std::unique_ptr<Body>> bodies;
@@ -161,6 +174,19 @@ class BodyContainer {
     size_t get_local_count() const { return (world_rank_ == 0) ? bodies.size() : 0; };
     /// @brief return number of bodies relevant for global calculations
     size_t get_global_count() const { return bodies.size(); };
+};
+
+class SphericalBody : public Body {
+  public:
+    SphericalBody(const toml::table *body_table, const Params &params) : Body(body_table, params) {
+        radius_ = body_table->get_as<double>("radius")->value_or(0.0);
+    };
+    std::unique_ptr<Body> clone() const override { return std::make_unique<SphericalBody>(*this); };
+    double radius_;
+
+    bool check_collision(const Periphery &periphery) const override;
+    bool check_collision(const Body &body) const override;
+    bool check_collision(const SphericalBody &body) const;
 };
 
 #endif

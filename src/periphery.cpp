@@ -1,3 +1,4 @@
+#include <body.hpp>
 #include <cnpy.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
@@ -57,6 +58,20 @@ void Periphery::update_RHS(MatrixRef &v_on_shell) {
     // Input:
     //    const v_on_shell [3xn_nodes_local]: Velocity at shell nodes on local MPI rank
     RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size());
+}
+
+bool SphericalPeriphery::check_collision(const SphericalBody &body) const {
+    const double max_distance = body.position_.norm() + body.radius_;
+    return max_distance > radius_;
+}
+
+bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud) const {
+    const double r2 = radius_ * radius_;
+    for (int i = 0; i < point_cloud.cols(); ++i) {
+        if (point_cloud.col(i).squaredNorm() >= r2)
+            return true;
+    }
+    return false;
 }
 
 Periphery::Periphery(const std::string &precompute_file, const toml::table *body_table) {

@@ -2,6 +2,7 @@
 #include <cnpy.hpp>
 #include <kernels.hpp>
 #include <parse_util.hpp>
+#include <periphery.hpp>
 #include <skelly_sim.hpp>
 
 #include <spdlog/spdlog.h>
@@ -169,6 +170,13 @@ Body::Body(const toml::table *body_table, const Params &params) {
     move(position_, orientation_);
 
     update_cache_variables(params.eta);
+}
+
+bool SphericalBody::check_collision(const Periphery &periphery) const { return periphery.check_collision(*this); }
+bool SphericalBody::check_collision(const Body &body) const { return body.check_collision(*this); }
+bool SphericalBody::check_collision(const SphericalBody &body) const {
+    const double dr2 = (this->position_ - body.position_).squaredNorm();
+    return (dr2 < pow(this->radius_ + body.radius_, 2));
 }
 
 void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {
@@ -360,7 +368,7 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
 
     for (int i_body = 0; i_body < n_bodies_tot; ++i_body) {
         toml::table *body_table = body_tables->get_as<toml::table>(i_body);
-        bodies.emplace_back(new Body(body_table, params));
+        bodies.emplace_back(new SphericalBody(body_table, params));
 
         auto &body = bodies.back();
         if (world_rank_ == 0)
