@@ -55,13 +55,13 @@ class Body {
 
     virtual std::unique_ptr<Body> clone() const { return std::make_unique<Body>(*this); }
 
-    virtual bool check_collision(const Periphery &periphery) const {
+    virtual bool check_collision(const Periphery &periphery, double threshold) const {
         // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
         // you make this a pure virtual function, so instead we just throw an error.
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
 
-    virtual bool check_collision(const Body &body) const {
+    virtual bool check_collision(const Body &body, double threshold) const {
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
 
@@ -184,9 +184,9 @@ class SphericalBody : public Body {
     std::unique_ptr<Body> clone() const override { return std::make_unique<SphericalBody>(*this); };
     double radius_;
 
-    bool check_collision(const Periphery &periphery) const override;
-    bool check_collision(const Body &body) const override;
-    bool check_collision(const SphericalBody &body) const;
+    bool check_collision(const Periphery &periphery, double threshold) const override;
+    bool check_collision(const Body &body, double threshold) const override;
+    bool check_collision(const SphericalBody &body, double threshold) const;
 };
 
 #endif

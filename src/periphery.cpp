@@ -60,17 +60,17 @@ void Periphery::update_RHS(MatrixRef &v_on_shell) {
     RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size());
 }
 
-bool SphericalPeriphery::check_collision(const SphericalBody &body) const {
+bool SphericalPeriphery::check_collision(const SphericalBody &body, double threshold) const {
     const double max_distance = body.position_.norm() + body.radius_;
-    return max_distance > radius_;
+    return max_distance > (radius_ - threshold);
 }
 
-bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud) const {
-    const double r2 = radius_ * radius_;
-    for (int i = 0; i < point_cloud.cols(); ++i) {
+bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {
+    const double r2 = pow(radius_ - threshold, 2);
+    for (int i = 0; i < point_cloud.cols(); ++i)
         if (point_cloud.col(i).squaredNorm() >= r2)
             return true;
-    }
+
     return false;
 }
 

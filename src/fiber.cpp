@@ -6,6 +6,7 @@
 
 #include <fiber.hpp>
 #include <kernels.hpp>
+#include <periphery.hpp>
 #include <utils.hpp>
 
 #include <spdlog/spdlog.h>
@@ -18,6 +19,8 @@ using Eigen::ArrayXXd;
 using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
+
+const std::string Fiber::BC_name[] = {"Force", "Torque", "Velocity", "AngularVelocity", "Position", "Angle"};
 
 /// @brief Fiber constructor. Duh.
 /// This is the preferred way to initialize a fiber.
@@ -40,6 +43,23 @@ Fiber::Fiber(toml::table *fiber_table, double eta) {
     force_scale_ = parse_val_key<double>(fiber_table, "force_scale", 0.0);
     binding_site_.first = (*fiber_table)["parent_body"].value_or(-1);
     binding_site_.second = (*fiber_table)["parent_site"].value_or(-1);
+}
+
+/// @brief Check if fiber is within some threshold distance of the cortex attachment radius
+///
+/// Updates: flag Fiber::at_surface_
+/// @param[in] Periphery object
+void FiberContainer::update_boundary_conditions(Periphery &shell) {
+    /// FIXME: magic number in cortex interaction
+    const double threshold = 0.75;
+    for (auto &fib : fibers) {
+        fib.bc_minus_ = fib.attached_to_body()
+                            ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
+                            : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
+        fib.bc_plus_ = shell.check_collision(fib.x_, threshold)
+                           ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
+                           : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
+    }
 }
 
 /// @brief Update stokeslet for points along fiber
@@ -284,7 +304,7 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     RHS_.segment(0, 4 * np - 14) = mats.P_downsample_bc * RHS_;
     Eigen::VectorXd::SegmentReturnType B_RHS = RHS_.segment(4 * np - 14, 14);
     B_RHS.setZero();
-    Eigen::MatrixXd::BlockXpr B = A_.block(4 * np - 14, 0, 14, 4 * np);
+    Eigen::Block<Eigen::MatrixXd> B = A_.block(4 * np - 14, 0, 14, 4 * np);
     B.setZero();
 
     switch (bc_minus_.first) {
@@ -310,8 +330,9 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         break;
     }
     default: {
-        std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
-        exit(1);
+        spdlog::critical("Unimplemented BC encountered in first minus end of apply_bc_rectangular [{}, {}]",
+                         BC_name[bc_minus_.first], BC_name[bc_minus_.second]);
+        throw std::runtime_error("Unimplemented BC error");
     }
     }
 
@@ -328,34 +349,36 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         break;
     }
     default: {
-        std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
-        exit(1);
+        spdlog::critical("Unimplemented BC encountered in second minus end of apply_bc_rectangular [{}, {}]",
+                         BC_name[bc_minus_.first], BC_name[bc_minus_.second]);
+        throw std::runtime_error("Unimplemented BC error");
     }
     }
 
     switch (bc_plus_.first) {
     // FIXME: implement more BC
-    // case BC::Velocity:
-    //     B(7, 4 * np - 1) = beta_tstep_ / dt;
-    //     B(8, 4 * np - 1) = beta_tstep_ / dt;
-    //     B(9, 4 * np - 1) = beta_tstep_ / dt;
-    //     int endc = xss_.cols() - 1;
-    //     int endr = D_3.rows() - 1;
-    //     B.block(10, 0 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(0, endc) * D_3.row(endr);
-    //     B.block(10, 1 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(1, endc) * D_3.row(endr);
-    //     B.block(10, 2 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(2, endc) * D_3.row(endr);
-    //     B.block(10, 3 * np, 1, np) = (2.0 * c_0_) * D_1.row(endr);
+    case BC::Velocity: {
+        B(7, 4 * np - 1) = beta_tstep_ / dt;
+        B(8, 4 * np - 1) = beta_tstep_ / dt;
+        B(9, 4 * np - 1) = beta_tstep_ / dt;
+        int endc = xss_.cols() - 1;
+        int endr = D_3.rows() - 1;
+        B.block(10, 0 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(0, endc) * D_3.row(endr);
+        B.block(10, 1 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(1, endc) * D_3.row(endr);
+        B.block(10, 2 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(2, endc) * D_3.row(endr);
+        B.block(10, 3 * np, 1, np) = (2.0 * c_0_) * D_1.row(endr);
 
-    //     // FIXME: Tag fibers with BC_plus_vec[2]
-    //     Vector3d BC_plus_vec_0({0.0, 0.0, 0.0});
-    //     B_RHS.segment(7, 3) = x_.col(0) / dt + BC_plus_vec_0;
-    //     B_RHS(10) = 0.0;
+        // FIXME: Tag fibers with BC_plus_vec[2]
+        Vector3d BC_plus_vec_0{0.0, 0.0, 0.0};
+        B_RHS.segment(7, 3) = x_.col(0) / dt + BC_plus_vec_0;
+        B_RHS(10) = 0.0;
 
-    //     if (v_on_fiber.size())
-    //         B_RHS(10) -= xs_.col(xs_.cols() - 1).dot(v_on_fiber.col(v_on_fiber.cols() - 1));
-    //     if (f_on_fiber.size())
-    //         B_RHS(10) -= 2 * c_0_ * xs_.col(xs_.cols() - 1).dot(f_on_fiber.col(f_on_fiber.cols() - 1));
-    //     break;
+        if (v_on_fiber.size())
+            B_RHS(10) -= xs_.col(xs_.cols() - 1).dot(v_on_fiber.col(v_on_fiber.cols() - 1));
+        if (f_on_fiber.size())
+            B_RHS(10) -= 2 * c_0_ * xs_.col(xs_.cols() - 1).dot(f_on_fiber.col(f_on_fiber.cols() - 1));
+        break;
+    }
     case BC::Force: {
         B.block(7, 0, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
         B(7, 4 * np - 1) = xs_(0, xs_.cols() - 1);
@@ -377,8 +400,9 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         break;
     }
     default: {
-        std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
-        exit(1);
+        spdlog::critical("Unimplemented BC encountered in first plus end of apply_bc_rectangular [{}, {}]",
+                         BC_name[bc_plus_.first], BC_name[bc_plus_.second]);
+        throw std::runtime_error("Unimplemented BC error\n");
     }
     }
 
@@ -394,8 +418,9 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         break;
     }
     default: {
-        std::cerr << "Unimplemented BC encountered in apply_bc_rectangular\n";
-        exit(1);
+        spdlog::critical("Unimplemented BC encountered in second plus end of apply_bc_rectangular [{}, {}]",
+                         BC_name[bc_plus_.first], BC_name[bc_plus_.second]);
+        throw std::runtime_error("Unimplemented BC error\n");
     }
     }
 }
@@ -638,7 +663,7 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
     MatrixXd fw(3, x_all.size() / 4);
 
     size_t offset = 0;
-    for (const auto & fib : fibers) {
+    for (const auto &fib : fibers) {
         const int np = fib.n_nodes_;
         auto force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
         fw.block(0, offset, 1, np) = force_fibers.segment(0 * np, np).transpose();

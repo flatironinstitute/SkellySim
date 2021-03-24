@@ -4,12 +4,13 @@
 #include <skelly_sim.hpp>
 
 #include <Eigen/LU>
-#include <unordered_map>
 #include <list>
+#include <unordered_map>
 
 #include <kernels.hpp>
 #include <params.hpp>
 
+class Periphery;
 
 /// @brief Class to represent a single flexible filament
 ///
@@ -18,6 +19,7 @@
 class Fiber {
   public:
     enum BC { Force, Torque, Velocity, AngularVelocity, Position, Angle };
+    static const std::string BC_name[];
 
     int n_nodes_;                  ///< number of nodes representing the fiber
     double length_;                ///< length of fiber
@@ -119,6 +121,7 @@ class Fiber {
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
     void update_stokeslet(double);
+    bool attached_to_body() { return binding_site_.first >= 0; };
 };
 
 /// Class to hold the fiber objects.
@@ -178,6 +181,8 @@ class FiberContainer {
     Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
+
+    void update_boundary_conditions(Periphery &shell);
 
   private:
     int world_size_ = -1;

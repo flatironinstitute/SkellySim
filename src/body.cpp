@@ -172,11 +172,11 @@ Body::Body(const toml::table *body_table, const Params &params) {
     update_cache_variables(params.eta);
 }
 
-bool SphericalBody::check_collision(const Periphery &periphery) const { return periphery.check_collision(*this); }
-bool SphericalBody::check_collision(const Body &body) const { return body.check_collision(*this); }
-bool SphericalBody::check_collision(const SphericalBody &body) const {
+bool SphericalBody::check_collision(const Periphery &periphery, double threshold) const { return periphery.check_collision(*this, threshold); }
+bool SphericalBody::check_collision(const Body &body, double threshold) const { return body.check_collision(*this, threshold); }
+bool SphericalBody::check_collision(const SphericalBody &body, double threshold) const {
     const double dr2 = (this->position_ - body.position_).squaredNorm();
-    return (dr2 < pow(this->radius_ + body.radius_, 2));
+    return (dr2 < pow(this->radius_ + body.radius_ + threshold, 2));
 }
 
 void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {

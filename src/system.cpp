@@ -446,10 +446,12 @@ void System::step() {
     r_trg_external.block(0, shell_node_count, 3, body_node_count) = bc.get_local_node_positions();
 
     fc.update_cache_variables(dt, eta);
+
     MatrixXd f_on_fibers = fc.generate_constant_force();
     MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
 
     fc.update_RHS(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
+    fc.update_boundary_conditions(shell);
     fc.apply_BC_rectangular(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
 
     shell.update_RHS(v_fib2all.block(0, fib_node_count, 3, shell_node_count));
@@ -556,20 +558,20 @@ bool System::check_collision() {
     BodyContainer &bc = System::get_body_container();
     FiberContainer &fc = System::get_fiber_container();
     Periphery &shell = System::get_shell();
-
+    const double threshold = 0.0;
     using Eigen::VectorXd;
 
     for (const auto &body : bc.bodies)
-        if (body->check_collision(shell))
+        if (body->check_collision(shell, threshold))
             return true;
 
     for (const auto &fiber : fc.fibers)
-        if (shell.check_collision(fiber.x_))
+        if (shell.check_collision(fiber.x_, threshold))
             return true;
 
     for (auto &body1 : bc.bodies)
         for (auto &body2 : bc.bodies)
-            if (body1 != body2 && body1->check_collision(*body2))
+            if (body1 != body2 && body1->check_collision(*body2, threshold))
                 return true;
 
     return false;
