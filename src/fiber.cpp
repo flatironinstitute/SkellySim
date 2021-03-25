@@ -121,58 +121,63 @@ void Fiber::update_linear_operator(double dt, double eta) {
     submat_t A_TZ = A_.block(3 * n_nodes_up, 2 * n_nodes_down, n_nodes_up, n_nodes_down);
     submat_t A_TT = A_.block(3 * n_nodes_up, 3 * n_nodes_down, n_nodes_up, n_nodes_down);
 
-    VectorXd I_vec = VectorXd::Ones(n_nodes_);
+    ArrayXd I_vec = VectorXd::Ones(n_nodes_);
 
-    ArrayXd xs_x = xs_.block(0, 0, 1, n_nodes_).transpose().array();
-    ArrayXd xs_y = xs_.block(1, 0, 1, n_nodes_).transpose().array();
-    ArrayXd xs_z = xs_.block(2, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xs_x = xs_.row(0);
+    ArrayXd xs_y = xs_.row(1);
+    ArrayXd xs_z = xs_.row(2);
 
-    ArrayXd xss_x = xss_.block(0, 0, 1, n_nodes_).transpose().array();
-    ArrayXd xss_y = xss_.block(1, 0, 1, n_nodes_).transpose().array();
-    ArrayXd xss_z = xss_.block(2, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xss_x = xss_.row(0);
+    ArrayXd xss_y = xss_.row(1);
+    ArrayXd xss_z = xss_.row(2);
 
-    ArrayXd xsss_x = xsss_.block(0, 0, 1, n_nodes_).transpose().array();
-    ArrayXd xsss_y = xsss_.block(1, 0, 1, n_nodes_).transpose().array();
-    ArrayXd xsss_z = xsss_.block(2, 0, 1, n_nodes_).transpose().array();
+    ArrayXd xsss_x = xsss_.row(0);
+    ArrayXd xsss_y = xsss_.row(1);
+    ArrayXd xsss_z = xsss_.row(2);
 
-    A_XX = beta_tstep_ / dt * I_vec.asDiagonal();
-    A_XX += bending_rigidity_ * (c_0_) * (D_4.colwise() * (I_vec.array() + xs_x.pow(2))).matrix();
-    A_XX += bending_rigidity_ * (c_1_) * (D_4.colwise() * (I_vec.array() - xs_x.pow(2))).matrix();
+    Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(n_nodes_up, n_nodes_down);
+
+    A_XX = beta_tstep_ / dt * identity +
+           bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_x.pow(2))).matrix() +
+           bending_rigidity_ * c_1_ * (D_4.colwise() * (I_vec - xs_x.pow(2))).matrix();
     A_XY = bending_rigidity_ * (c_0_ - c_1_) * (D_4.colwise() * (xs_x * xs_y)).matrix();
     A_XZ = bending_rigidity_ * (c_0_ - c_1_) * (D_4.colwise() * (xs_x * xs_z)).matrix();
 
     A_YX = A_XY;
-    A_YY = beta_tstep_ / dt * I_vec.asDiagonal();
-    A_YY += bending_rigidity_ * (c_0_) * (D_4.colwise() * (I_vec.array() + xs_y.pow(2))).matrix();
-    A_YY += bending_rigidity_ * (c_1_) * (D_4.colwise() * (I_vec.array() - xs_y.pow(2))).matrix();
+    A_YY = beta_tstep_ / dt * identity +
+           bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_y.pow(2))).matrix() +
+           bending_rigidity_ * c_1_ * (D_4.colwise() * (I_vec - xs_y.pow(2))).matrix();
     A_YZ = bending_rigidity_ * (c_0_ - c_1_) * (D_4.colwise() * (xs_y * xs_z)).matrix();
 
     A_ZX = A_XZ;
     A_ZY = A_YZ;
-    A_ZZ = beta_tstep_ / dt * I_vec.asDiagonal();
-    A_ZZ += bending_rigidity_ * (c_0_) * (D_4.colwise() * (I_vec.array() + xs_z.pow(2))).matrix();
-    A_ZZ += bending_rigidity_ * (c_1_) * (D_4.colwise() * (I_vec.array() - xs_z.pow(2))).matrix();
+    A_ZZ = beta_tstep_ / dt * identity +
+           bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_z.pow(2))).matrix() +
+           bending_rigidity_ * c_1_ * (D_4.colwise() * (I_vec - xs_z.pow(2))).matrix();
 
     A_XT = -(c_0_ * 2.0) * (D_1.colwise() * xs_x);
     A_XT += -(c_0_ + c_1_) * xss_x.matrix().asDiagonal();
 
     A_YT = -(c_0_ * 2.0) * (D_1.colwise() * xs_y);
-    A_YT += -(c_0_ * 2.0 + c_1_) * xss_y.matrix().asDiagonal();
+    A_YT += -(c_0_ + c_1_) * xss_y.matrix().asDiagonal();
 
     A_ZT = -(c_0_ * 2.0) * (D_1.colwise() * xs_z);
-    A_ZT += -(c_0_ * 2.0 + c_1_) * xss_z.matrix().asDiagonal();
+    A_ZT += -(c_0_ + c_1_) * xss_z.matrix().asDiagonal();
 
-    A_TX = (-c_1_ + 7.0 * c_0_) * bending_rigidity_ * (D_4.colwise() * xss_x);
-    A_TX -= 6.0 * c_0_ * bending_rigidity_ * (D_3.colwise() * xsss_x).matrix();
-    A_TX -= penalty_param_ * (D_1.colwise() * xs_x).matrix();
+    // A_TX = -(self.c_1 + 7.0 * self.c_0) * self.E * (D_4.T * xss[:, 0]).T - 6.0 * self.c_0 * self.E * (
+    //         D_3.T * xsss[:, 0]).T - self.penalty_param * (D_1.T * xs[:, 0]).T
 
-    A_TY = (-c_1_ + 7.0 * c_0_) * bending_rigidity_ * (D_4.colwise() * xss_y);
-    A_TY -= 6.0 * c_0_ * bending_rigidity_ * (D_3.colwise() * xsss_y).matrix();
-    A_TY -= penalty_param_ * (D_1.colwise() * xs_y).matrix();
+    A_TX = -(c_1_ + 7.0 * c_0_) * bending_rigidity_ * (D_4.colwise() * xss_x).matrix() -
+           6.0 * c_0_ * bending_rigidity_ * (D_3.colwise() * xsss_x).matrix() -
+           penalty_param_ * (D_1.colwise() * xs_x).matrix();
 
-    A_TZ = (-c_1_ + 7.0 * c_0_) * bending_rigidity_ * (D_4.colwise() * xss_z);
-    A_TZ -= 6.0 * c_0_ * bending_rigidity_ * (D_3.colwise() * xsss_z).matrix();
-    A_TZ -= penalty_param_ * (D_1.colwise() * xs_z).matrix();
+    A_TY = -(c_1_ + 7.0 * c_0_) * bending_rigidity_ * (D_4.colwise() * xss_y).matrix() -
+           6.0 * c_0_ * bending_rigidity_ * (D_3.colwise() * xsss_y).matrix() -
+           penalty_param_ * (D_1.colwise() * xs_y).matrix();
+
+    A_TZ = -(c_1_ + 7.0 * c_0_) * bending_rigidity_ * (D_4.colwise() * xss_z).matrix() -
+           6.0 * c_0_ * bending_rigidity_ * (D_3.colwise() * xsss_z).matrix() -
+           penalty_param_ * (D_1.colwise() * xs_z).matrix();
 
     A_TT = -2.0 * c_0_ * D_2;
     A_TT += (c_0_ + c_1_) * (xss_x.pow(2) + xss_y.pow(2) + xss_z.pow(2)).matrix().asDiagonal();
@@ -362,14 +367,14 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     switch (bc_plus_.first) {
     // FIXME: implement more BC
     case BC::Velocity: {
+        int endc = xss_.cols() - 1;
+        int endr = D_3.rows() - 1;
         B(7, 1 * np - 1) = beta_tstep_ / dt;
         B(8, 2 * np - 1) = beta_tstep_ / dt;
         B(9, 3 * np - 1) = beta_tstep_ / dt;
-        int endc = xss_.cols() - 1;
-        int endr = D_3.rows() - 1;
-        B.block(10, 0 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(0, endc) * D_3.row(endr);
-        B.block(10, 1 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(1, endc) * D_3.row(endr);
-        B.block(10, 2 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(2, endc) * D_3.row(endr);
+        B.block(10, 0 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * D_3.row(endr) * xss_(0, endc);
+        B.block(10, 1 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * D_3.row(endr) * xss_(1, endc);
+        B.block(10, 2 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * D_3.row(endr) * xss_(2, endc);
         B.block(10, 3 * np, 1, np) = (2.0 * c_0_) * D_1.row(endr);
 
         // FIXME: Tag fibers with BC_plus_vec[2]
@@ -384,15 +389,18 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         break;
     }
     case BC::Force: {
-        B.block(7, 0, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
-        B(7, 4 * np - 1) = xs_(0, xs_.cols() - 1);
-        B.block(8, np, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
-        B(8, 4 * np - 1) = xs_(1, xs_.cols() - 1);
-        B.block(9, 2 * np, 1, np) = -bending_rigidity_ * D_3.row(D_3.rows() - 1);
-        B(9, 4 * np - 1) = xs_(2, xs_.cols() - 1);
-        B.block(10, 0 * np, 1, np) = bending_rigidity_ * D_2.row(D_2.rows() - 1) * xss_(0, xss_.rows() - 1);
-        B.block(10, 1 * np, 1, np) = bending_rigidity_ * D_2.row(D_2.rows() - 1) * xss_(1, xss_.rows() - 1);
-        B.block(10, 2 * np, 1, np) = bending_rigidity_ * D_2.row(D_2.rows() - 1) * xss_(2, xss_.rows() - 1);
+        int endc = xss_.cols() - 1;
+        int endr = D_2.rows() - 1;
+
+        B.block(7, 0, 1, np) = -bending_rigidity_ * D_3.row(endr);
+        B(7, 4 * np - 1) = xs_(0, endc);
+        B.block(8, np, 1, np) = -bending_rigidity_ * D_3.row(endr);
+        B(8, 4 * np - 1) = xs_(1, endc);
+        B.block(9, 2 * np, 1, np) = -bending_rigidity_ * D_3.row(endr);
+        B(9, 4 * np - 1) = xs_(2, endc);
+        B.block(10, 0 * np, 1, np) = bending_rigidity_ * D_2.row(endr) * xss_(0, endc);
+        B.block(10, 1 * np, 1, np) = bending_rigidity_ * D_2.row(endr) * xss_(1, endc);
+        B.block(10, 2 * np, 1, np) = bending_rigidity_ * D_2.row(endr) * xss_(2, endc);
         B(10, 4 * np - 1) = 1.0;
 
         Vector3d BC_plus_vec_0 = {0.0, 0.0, 0.0};
@@ -698,7 +706,7 @@ void FiberContainer::update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_
     }
 }
 
-void FiberContainer::apply_BC_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+void FiberContainer::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
     size_t offset = 0;
     for (auto &fib : fibers) {
         fib.apply_bc_rectangular(dt, v_on_fibers.block(0, offset, 3, fib.n_nodes_),

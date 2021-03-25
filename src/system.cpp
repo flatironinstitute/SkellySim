@@ -430,7 +430,7 @@ Eigen::VectorXd System::apply_matvec(VectorRef &x) {
     return res;
 }
 
-void System::step() {
+bool System::step() {
     using Eigen::MatrixXd;
     System &system = System::get_instance();
     Params &params = System::get_params();
@@ -452,7 +452,7 @@ void System::step() {
 
     fc.update_RHS(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
     fc.update_boundary_conditions(shell);
-    fc.apply_BC_rectangular(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
+    fc.apply_bc_rectangular(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
 
     shell.update_RHS(v_fib2all.block(0, fib_node_count, 3, shell_node_count));
 
@@ -461,7 +461,7 @@ void System::step() {
 
     Solver<P_inv_hydro, A_fiber_hydro> solver_;
     solver_.set_RHS();
-    solver_.solve();
+    bool converged = solver_.solve();
     CVectorMap sol = solver_.get_solution();
 
     double residual = solver_.get_residual();
@@ -493,6 +493,8 @@ void System::step() {
             body->move(x_new, orientation_new);
         }
     }
+
+    return converged;
 }
 
 void System::backup_impl() {
@@ -510,7 +512,7 @@ void System::run() {
     Params &params = System::get_params();
     while (system.properties.time < params.t_final) {
         System::backup();
-        System::step();
+        bool converged = System::step();
         double fiber_error = 0.0;
         for (const auto &fib : system.fc_.fibers) {
             const auto &mats = fib.matrices_.at(fib.n_nodes_);
@@ -521,8 +523,8 @@ void System::run() {
         MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
         double dt_new = system.properties.dt;
-        bool accept;
-        if (fiber_error <= params.tol_tstep) {
+        bool accept = false;
+        if (converged && fiber_error <= params.tol_tstep) {
             accept = true;
             const double tol_window = 0.9 * params.tol_tstep;
             if (fiber_error <= tol_window)
@@ -532,21 +534,22 @@ void System::run() {
             accept = false;
         }
 
-        if (System::check_collision()) {
+        if (converged && System::check_collision()) {
             spdlog::info("Collision detected, rejecting solution and taking a smaller timestep");
             dt_new = system.properties.dt * 0.5;
             accept = false;
         }
 
         if (dt_new < params.dt_min) {
-            spdlog::info("Timestep smaller than minimum allowed, moving on with dt_min");
-            dt_new = params.dt_min;
-            accept = true;
+            spdlog::critical("Timestep smaller than minimum allowed");
+            throw std::runtime_error("Timestep smaller than dt_min");
         }
 
         if (accept) {
+            spdlog::info("Accepting timestep and advancing time");
             system.properties.time += system.properties.dt;
         } else {
+            spdlog::info("Rejecting timestep");
             System::restore();
         }
         system.properties.dt = dt_new;

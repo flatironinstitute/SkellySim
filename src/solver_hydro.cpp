@@ -61,7 +61,7 @@ void Solver<P_inv_hydro, A_fiber_hydro>::set_RHS() {
 }
 
 template <>
-void Solver<P_inv_hydro, A_fiber_hydro>::solve() {
+bool Solver<P_inv_hydro, A_fiber_hydro>::solve() {
     const int rank = comm_->getRank();
     Belos::LinearProblem<ST, MV, OP> problem(matvec_, X_, RHS_);
     problem.setRightPrec(preconditioner_);
@@ -83,4 +83,6 @@ void Solver<P_inv_hydro, A_fiber_hydro>::solve() {
     } else {
         spdlog::info("Solver failed to converge");
     }
+
+    return ret == Belos::Converged;
 }

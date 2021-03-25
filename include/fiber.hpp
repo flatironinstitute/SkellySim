@@ -150,7 +150,7 @@ class FiberContainer {
     void update_linear_operators(double dt, double eta);
     void update_cache_variables(double dt, double eta);
     void update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
-    void apply_BC_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
+    void apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
 
     /// @brief get total number of nodes across fibers in the container
     /// Usually you need this to form arrays used as input later

@@ -26,7 +26,7 @@ class Solver {
         RHS_ = rcp(new SV(map_));
     };
     void set_RHS();
-    void solve();
+    bool solve();
     void apply_preconditioner();
     CVectorMap get_solution() { return CVectorMap(X_->getData(0).getRawPtr(), X_->getLocalLength()); };
     double get_residual() {
