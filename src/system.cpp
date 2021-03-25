@@ -550,7 +550,7 @@ void System::run() {
             System::restore();
         }
         system.properties.dt = dt_new;
-        spdlog::info("System time, dt: {}, {}", system.properties.time, dt_new);
+        spdlog::info("System time, dt, fiber_error: {}, {}, {}", system.properties.time, dt_new, fiber_error);
     }
 }
 

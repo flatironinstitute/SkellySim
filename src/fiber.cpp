@@ -49,6 +49,7 @@ Fiber::Fiber(toml::table *fiber_table, double eta) {
 ///
 /// Updates: flag Fiber::at_surface_
 /// @param[in] Periphery object
+/// FIXME: should respect some sort of cortical sliding parameter to decide plus end BC
 void FiberContainer::update_boundary_conditions(Periphery &shell) {
     /// FIXME: magic number in cortex interaction
     const double threshold = 0.75;
@@ -59,6 +60,9 @@ void FiberContainer::update_boundary_conditions(Periphery &shell) {
         fib.bc_plus_ = shell.check_collision(fib.x_, threshold)
                            ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
                            : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
+        spdlog::debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)&fib, fib.BC_name[fib.bc_minus_.first],
+                      fib.BC_name[fib.bc_minus_.second], fib.BC_name[fib.bc_plus_.first],
+                      fib.BC_name[fib.bc_plus_.second]);
     }
 }
 
@@ -358,9 +362,9 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     switch (bc_plus_.first) {
     // FIXME: implement more BC
     case BC::Velocity: {
-        B(7, 4 * np - 1) = beta_tstep_ / dt;
-        B(8, 4 * np - 1) = beta_tstep_ / dt;
-        B(9, 4 * np - 1) = beta_tstep_ / dt;
+        B(7, 1 * np - 1) = beta_tstep_ / dt;
+        B(8, 2 * np - 1) = beta_tstep_ / dt;
+        B(9, 3 * np - 1) = beta_tstep_ / dt;
         int endc = xss_.cols() - 1;
         int endr = D_3.rows() - 1;
         B.block(10, 0 * np, 1, np) = (6.0 * bending_rigidity_ * c_0_) * xss_(0, endc) * D_3.row(endr);
