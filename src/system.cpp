@@ -521,7 +521,7 @@ void System::run() {
             const auto &mats = fib.matrices_.at(fib.n_nodes_);
             const Eigen::MatrixXd xs = std::pow(2.0 / fib.length_, 1) * fib.x_ * mats.D_1_0;
             for (int i = 0; i < fib.n_nodes_; ++i)
-                fiber_error = std::max(fabs(sqrt(xs.col(i).norm()) - 1.0), fiber_error);
+                fiber_error = std::max(fabs(xs.col(i).norm() - 1.0), fiber_error);
         }
         MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
