@@ -137,22 +137,19 @@ void Fiber::update_linear_operator(double dt, double eta) {
 
     Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(n_nodes_up, n_nodes_down);
 
-    A_XX = beta_tstep_ / dt * identity +
-           bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_x.pow(2))).matrix() +
+    A_XX = beta_tstep_ / dt * identity + bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_x.pow(2))).matrix() +
            bending_rigidity_ * c_1_ * (D_4.colwise() * (I_vec - xs_x.pow(2))).matrix();
     A_XY = bending_rigidity_ * (c_0_ - c_1_) * (D_4.colwise() * (xs_x * xs_y)).matrix();
     A_XZ = bending_rigidity_ * (c_0_ - c_1_) * (D_4.colwise() * (xs_x * xs_z)).matrix();
 
     A_YX = A_XY;
-    A_YY = beta_tstep_ / dt * identity +
-           bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_y.pow(2))).matrix() +
+    A_YY = beta_tstep_ / dt * identity + bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_y.pow(2))).matrix() +
            bending_rigidity_ * c_1_ * (D_4.colwise() * (I_vec - xs_y.pow(2))).matrix();
     A_YZ = bending_rigidity_ * (c_0_ - c_1_) * (D_4.colwise() * (xs_y * xs_z)).matrix();
 
     A_ZX = A_XZ;
     A_ZY = A_YZ;
-    A_ZZ = beta_tstep_ / dt * identity +
-           bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_z.pow(2))).matrix() +
+    A_ZZ = beta_tstep_ / dt * identity + bending_rigidity_ * c_0_ * (D_4.colwise() * (I_vec + xs_z.pow(2))).matrix() +
            bending_rigidity_ * c_1_ * (D_4.colwise() * (I_vec - xs_z.pow(2))).matrix();
 
     A_XT = -(c_0_ * 2.0) * (D_1.colwise() * xs_x);
@@ -338,6 +335,24 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
 
         break;
     }
+    case BC::Force: {
+        B.block(0, 0 * np, 1, np) = bending_rigidity_ * D_3.row(0);
+        B(0, 3 * np) = -xs_(0, 0);
+        B.block(1, 1 * np, 1, np) = bending_rigidity_ * D_3.row(0);
+        B(1, 3 * np) = -xs_(1, 0);
+        B.block(2, 2 * np, 1, np) = bending_rigidity_ * D_3.row(0);
+        B(2, 3 * np) = -xs_(2, 0);
+        B.block(3, 0 * np, 1, np) = -bending_rigidity_ * D_2.row(0) * xss_(0, 0);
+        B.block(3, 1 * np, 1, np) = -bending_rigidity_ * D_2.row(0) * xss_(1, 0);
+        B.block(3, 2 * np, 1, np) = -bending_rigidity_ * D_2.row(0) * xss_(2, 0);
+        B(3, 3 * np) = -1;
+
+        Vector3d BC_start_vec_0{0.0, 0.0, 0.0};
+        B_RHS.segment(0, 3) = BC_start_vec_0;
+        B_RHS(3) = BC_start_vec_0.dot(xs_.col(0));
+
+        break;
+    }
     default: {
         spdlog::critical("Unimplemented BC encountered in first minus end of apply_bc_rectangular [{}, {}]",
                          BC_name[bc_minus_.first], BC_name[bc_minus_.second]);
@@ -355,6 +370,15 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         Vector3d BC_minus_vec_1({0.0, 0.0, 0.0});
         B_RHS.segment(4, 3) = xs_.col(0) / dt + BC_minus_vec_1;
 
+        break;
+    }
+    case BC::Torque: {
+        B.block(4, 0 * np, 1, np) = D_2.row(0);
+        B.block(5, 1 * np, 1, np) = D_2.row(0);
+        B.block(6, 2 * np, 1, np) = D_2.row(0);
+
+        Vector3d BC_start_vec_1{0.0, 0.0, 0.0};
+        B_RHS.segment(4, 3) = BC_start_vec_1;
         break;
     }
     default: {
