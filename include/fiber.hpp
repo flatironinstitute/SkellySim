@@ -42,7 +42,7 @@ class Fiber {
     double c_1_;
 
     /// (body, site) pair for minus end binding. -1 implies unbound
-    std::pair<int, int> binding_site_;
+    std::pair<int, int> binding_site_{-1, -1};
 
     /// Boundary condition pair for minus end of fiber
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
