@@ -6,6 +6,9 @@
 #endif
 #include <toml.hpp>
 
+#define EIGEN_USE_MKL_ALL
+#define MKL_DIRECT_CALL
+
 #include <Eigen/Core>
 typedef Eigen::Map<Eigen::VectorXd> VectorMap;
 typedef Eigen::Map<const Eigen::VectorXd> CVectorMap;
