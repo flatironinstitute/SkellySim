@@ -379,13 +379,13 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
 
         // FIXME: Tag fibers with BC_plus_vec[2]
         Vector3d BC_plus_vec_0{0.0, 0.0, 0.0};
-        B_RHS.segment(7, 3) = x_.col(0) / dt + BC_plus_vec_0;
+        B_RHS.segment(7, 3) = x_.col(endc) / dt + BC_plus_vec_0;
         B_RHS(10) = 0.0;
 
         if (v_on_fiber.size())
-            B_RHS(10) -= xs_.col(xs_.cols() - 1).dot(v_on_fiber.col(v_on_fiber.cols() - 1));
+            B_RHS(10) -= xs_.col(endc).dot(v_on_fiber.col(endc));
         if (f_on_fiber.size())
-            B_RHS(10) -= 2 * c_0_ * xs_.col(xs_.cols() - 1).dot(f_on_fiber.col(f_on_fiber.cols() - 1));
+            B_RHS(10) -= 2 * c_0_ * xs_.col(endc).dot(f_on_fiber.col(endc));
         break;
     }
     case BC::Force: {
