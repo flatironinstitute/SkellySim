@@ -116,8 +116,11 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
         int i_site = (*fiber_table)["parent_site"].value_or(-1);
 
         // unattached or site already assigned. move to next fiber
-        if (i_body < 0 || i_site >= 0)
+        if (i_body < 0 || i_site >= 0) {
+            Eigen::Vector3d origin{0.0, 0.0, 0.0};
+            resolve_fiber_position(fiber_table, origin);
             continue;
+        }
 
         // Find an empty site
         while (occupied.count(make_pair(i_body, test_site[i_body])) != 0)
