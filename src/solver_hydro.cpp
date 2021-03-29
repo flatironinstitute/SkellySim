@@ -1,5 +1,6 @@
 #include <solver_hydro.hpp>
 #include <system.hpp>
+#include <utils.hpp>
 
 #include <Teuchos_ParameterList.hpp>
 
@@ -68,20 +69,31 @@ bool Solver<P_inv_hydro, A_fiber_hydro>::solve() {
     bool set = problem.setProblem();
 
     Teuchos::ParameterList belosList;
-    belosList.set("Block Size", 1);                                         // Blocksize to be used by iterative solver
-    belosList.set("Maximum Iterations", 100);                               // Maximum number of iterations allowed
+    // belosList.set("Block Size", 1);                                         // Blocksize to be used by iterative
+    // solver belosList.set("Maximum Iterations", 100);                               // Maximum number of iterations
+    // allowed
     belosList.set("Convergence Tolerance", System::get_params().gmres_tol); // Relative convergence tolerance requested
     belosList.set("Orthogonalization", "DGKS");                             // Orthogonalization type
+    belosList.set("Explicit Residual Scaling", "Norm of Preconditioned Initial Residual");
+    belosList.set("Verbosity",
+                  Belos::MsgType::IterationDetails + Belos::MsgType::FinalSummary + Belos::MsgType::StatusTestDetails);
+    belosList.set("Output Frequency", 1);
+    belosList.set("Output Style", Belos::OutputType::General);
 
     Belos::BlockGmresSolMgr<ST, MV, OP> solver(rcpFromRef(problem), rcpFromRef(belosList));
+    utils::LoggerRedirect redirect(std::cout);
 
     double st = omp_get_wtime();
     Belos::ReturnType ret = solver.solve();
+    redirect.flush(spdlog::level::debug);
+
     if (ret == Belos::Converged) {
         spdlog::info("Solver converged with parameters: iters {}, time {}, achieved tolerance {}", solver.getNumIters(),
                      omp_get_wtime() - st, solver.achievedTol());
     } else {
-        spdlog::info("Solver failed to converge");
+        spdlog::info("Solver failed to converge with parameters: iters {}, time {}, achieved tolerance {}",
+                     solver.getNumIters(), omp_get_wtime() - st, solver.achievedTol());
+        spdlog::info("loss of accuracy: {}", solver.isLOADetected());
     }
 
     return ret == Belos::Converged;
