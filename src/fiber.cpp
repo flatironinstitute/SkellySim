@@ -669,7 +669,9 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
     if (n_trg_external)
         r_trg.block(0, n_src, 3, n_trg_external) = r_trg_external;
     MatrixXd r_dl_dummy, f_dl_dummy;
+    utils::LoggerRedirect redirect(std::cout);
     MatrixXd vel = (*fmm_)(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
+    redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Subtract self term
     // FIXME: Subtracting self flow only works when system has only fibers
@@ -753,7 +755,7 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
         utils::LoggerRedirect redirect(std::cout);
         fmm_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
             8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
-        redirect.flush(spdlog::level::debug);
+        redirect.flush(spdlog::level::debug, "STKFMM");
     }
 
     const int n_fibs_tot = fiber_tables->size();

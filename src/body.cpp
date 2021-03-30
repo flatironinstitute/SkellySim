@@ -264,6 +264,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> BodyContainer::unpack_solution_vecto
 
 Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, MatrixRef &forces_torques,
                                     double eta) const {
+    utils::LoggerRedirect redirect(std::cout);
     if (!bodies.size())
         return Eigen::MatrixXd::Zero(3, r_trg.cols());
     const int n_nodes = get_local_node_count(); //< Distributed node counts for fmm calls
@@ -285,11 +286,13 @@ Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, Matr
 
     Eigen::MatrixXd v_bdy2all =
         (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, n_trg) / eta;
+    redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Section: Oseen kernel
     Eigen::MatrixXd center_positions = get_local_center_positions(); //< Distributed center positions for FMM calls
     Eigen::MatrixXd forces = forces_torques.block(0, 0, 3, center_positions.cols());
     v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
+    redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
     // rank gets the body centers and calculates the center->target rotlet
@@ -365,10 +368,10 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
         utils::LoggerRedirect redirect(std::cout);
         stresslet_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
             8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm));
-        redirect.flush(spdlog::level::debug);
+        redirect.flush(spdlog::level::debug, "STKFMM");
         oseen_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
             8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
-        redirect.flush(spdlog::level::debug);
+        redirect.flush(spdlog::level::debug, "STKFMM");
     }
 
     const int n_bodies_tot = body_tables->size();

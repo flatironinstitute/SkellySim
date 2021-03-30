@@ -15,6 +15,7 @@
 #include <mpi.h>
 
 #include <spdlog/cfg/env.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -589,6 +590,8 @@ System::System(std::string *input_file) {
                               ? spdlog::logger("status", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
                               : spdlog::logger("status", std::make_shared<spdlog::sinks::null_sink_st>());
     spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
+    spdlog::stdout_color_mt("STKFMM");
+    spdlog::stdout_color_mt("Belos");
     spdlog::cfg::load_env_levels();
 
     if (input_file == nullptr)

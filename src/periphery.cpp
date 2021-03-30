@@ -33,7 +33,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
     //    eta: Fluid viscosity
     // Output:
     //    vel [3xn_trg_local]: velocity at target coordinates
-
+    utils::LoggerRedirect redirect(std::cout);
     const int n_dl = density.size() / 3;
     const int n_trg = r_trg.size() / 3;
     Eigen::MatrixXd f_dl(9, n_dl);
@@ -49,6 +49,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
     Eigen::MatrixXd r_sl, f_sl; // dummy SL positions/values
     Eigen::MatrixXd pvel = (*fmm_)(r_sl, node_pos_, r_trg, f_sl, f_dl);
     Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg) / eta;
+    redirect.flush(spdlog::level::debug, "STKFMM");
 
     return vel;
 }
@@ -84,7 +85,7 @@ Periphery::Periphery(const std::string &precompute_file, const toml::table *body
         utils::LoggerRedirect redirect(std::cout);
         fmm_ = std::unique_ptr<FMM<Stk3DFMM>>(
             new FMM<Stk3DFMM>(order, maxpts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm));
-        redirect.flush(spdlog::level::debug);
+        redirect.flush(spdlog::level::debug, "STKFMM");
     }
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
