@@ -1,9 +1,11 @@
+#include <skelly_sim.hpp>
+
 #include <body.hpp>
 #include <cnpy.hpp>
 #include <kernels.hpp>
 #include <parse_util.hpp>
 #include <periphery.hpp>
-#include <skelly_sim.hpp>
+#include <utils.hpp>
 
 #include <spdlog/spdlog.h>
 
@@ -172,8 +174,12 @@ Body::Body(const toml::table *body_table, const Params &params) {
     update_cache_variables(params.eta);
 }
 
-bool SphericalBody::check_collision(const Periphery &periphery, double threshold) const { return periphery.check_collision(*this, threshold); }
-bool SphericalBody::check_collision(const Body &body, double threshold) const { return body.check_collision(*this, threshold); }
+bool SphericalBody::check_collision(const Periphery &periphery, double threshold) const {
+    return periphery.check_collision(*this, threshold);
+}
+bool SphericalBody::check_collision(const Body &body, double threshold) const {
+    return body.check_collision(*this, threshold);
+}
 bool SphericalBody::check_collision(const SphericalBody &body, double threshold) const {
     const double dr2 = (this->position_ - body.position_).squaredNorm();
     return (dr2 < pow(this->radius_ + body.radius_ + threshold, 2));
@@ -355,10 +361,15 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
     }
 
     // TODO: Make mult_order and max_pts passable fmm parameters
-    stresslet_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
-        8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm));
-    oseen_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
-        8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
+    {
+        utils::LoggerRedirect redirect(std::cout);
+        stresslet_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
+            8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm));
+        redirect.flush(spdlog::level::debug);
+        oseen_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
+            8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
+        redirect.flush(spdlog::level::debug);
+    }
 
     const int n_bodies_tot = body_tables->size();
     spdlog::info("Reading in {} bodies", n_bodies_tot);

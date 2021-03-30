@@ -749,8 +749,12 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
         return;
     }
 
-    fmm_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
-        8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
+    {
+        utils::LoggerRedirect redirect(std::cout);
+        fmm_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
+            8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
+        redirect.flush(spdlog::level::debug);
+    }
 
     const int n_fibs_tot = fiber_tables->size();
     const int n_fibs_extra = n_fibs_tot % world_size_;

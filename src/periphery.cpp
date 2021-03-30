@@ -2,6 +2,7 @@
 #include <cnpy.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
+#include <utils.hpp>
 
 #include <mpi.h>
 
@@ -80,8 +81,10 @@ Periphery::Periphery(const std::string &precompute_file, const toml::table *body
         using namespace stkfmm;
         const int order = 8;
         const int maxpts = 2000;
+        utils::LoggerRedirect redirect(std::cout);
         fmm_ = std::unique_ptr<FMM<Stk3DFMM>>(
             new FMM<Stk3DFMM>(order, maxpts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm));
+        redirect.flush(spdlog::level::debug);
     }
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
