@@ -14,10 +14,10 @@ class LoggerRedirect {
 
     ~LoggerRedirect() { m_orig.rdbuf(m_old_buffer); }
 
-    void flush(spdlog::level_t level) {
+    void flush(spdlog::level::level_enum level) {
         std::istringstream dumbtmp(ss.str());
         for (std::string line; std::getline(dumbtmp, line);)
-            spdlog::log(spdlog::level::debug, line);
+            spdlog::log(level, line);
         ss.str("");
         ss.clear();
     }
