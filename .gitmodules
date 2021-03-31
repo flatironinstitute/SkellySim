@@ -1,3 +1,6 @@
 [submodule "extern/spdlog"]
 	path = extern/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "extern/trng4"]
+	path = extern/trng4
+	url = https://github.com/blackwer/trng4

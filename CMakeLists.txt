@@ -43,21 +43,24 @@ add_library(skelly STATIC src/fiber.cpp src/kernels.cpp src/utils.cpp src/periph
 target_include_directories(skelly PRIVATE
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/extern/spdlog/include
+  ${PROJECT_SOURCE_DIR}/extern/trng4
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
   )
 target_link_libraries(skelly PRIVATE libSTKFMM_STATIC.a ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
 
 add_subdirectory(extern/spdlog)
+add_subdirectory(extern/trng4)
 
 add_executable(skelly_sim src/skelly_sim.cpp)
 target_include_directories(skelly_sim PRIVATE
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/extern/spdlog/include
+  ${PROJECT_SOURCE_DIR}/extern/trng4
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
   )
-target_link_libraries(skelly_sim PRIVATE skelly Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX spdlog
+target_link_libraries(skelly_sim PRIVATE skelly Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX spdlog trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
 include(CTest)

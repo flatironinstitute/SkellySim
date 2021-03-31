@@ -16,7 +16,7 @@ foreach(file ${files})
   string(REGEX REPLACE "(^.*/|\\.[^.]*$)" "" file_without_ext ${file})
   add_executable(${file_without_ext} ${file})
 
-  target_link_libraries(${file_without_ext} skelly z OpenMP::OpenMP_CXX MPI::MPI_CXX
+  target_link_libraries(${file_without_ext} skelly z OpenMP::OpenMP_CXX MPI::MPI_CXX trng4_static
     ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
   
   target_include_directories(${file_without_ext} PRIVATE
