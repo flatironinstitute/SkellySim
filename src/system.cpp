@@ -4,9 +4,10 @@
 
 #include <skelly_sim.hpp>
 
+#include <rng.hpp>
+
 #include <Eigen/Core>
 #include <fstream>
-#include <random>
 
 #include <parse_util.hpp>
 #include <solver_hydro.hpp>
@@ -15,15 +16,11 @@
 #include <mpi.h>
 
 #include <spdlog/cfg/env.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 // TODO: Refactor all preprocess stuff. It's awful
-
-/// RNG for generating nucleation site positions
-std::mt19937 rng;
-std::uniform_real_distribution<double> uniform_rng(0.0, 1.0);
 
 /// @brief Convert fiber initial positions/orientations to full coordinate representation
 /// @param[out] fiber_array Explicitly instantiated fiber array config
@@ -62,8 +59,8 @@ void resolve_fiber_position(toml::table *fiber_table, Eigen::Vector3d &origin) {
 }
 
 Eigen::Vector3d uniform_on_sphere() {
-    const double u = 2 * (uniform_rng(rng)) - 1;
-    const double theta = 2 * M_PI * uniform_rng(rng);
+    const double u = 2 * (RNG::uniform_unsplit()) - 1;
+    const double theta = 2 * M_PI * RNG::uniform_unsplit();
     const double factor = sqrt(1 - u * u);
     return Eigen::Vector3d{factor * cos(theta), factor * sin(theta), u};
 }
@@ -225,8 +222,7 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
 ///
 /// @param[out] config global toml config after initial parsing
 /// @param[in] seed seed for RNG state (such as for generating nucleation site positions)
-void preprocess(toml::table &config, unsigned long seed) {
-    rng.seed(seed);
+void preprocess(toml::table &config) {
     toml::array *body_array = config["bodies"].as<toml::array>();
     toml::array *fiber_array = config["fibers"].as<toml::array>();
 
@@ -599,7 +595,8 @@ System::System(std::string *input_file) {
 
     param_table_ = toml::parse_file(*input_file);
     params_ = Params(param_table_.get_as<toml::table>("params"));
-    preprocess(param_table_, params_.seed);
+    RNG::init(params_.seed);
+    preprocess(param_table_);
 
     fc_ = FiberContainer(param_table_.get_as<toml::array>("fibers"), params_);
 
