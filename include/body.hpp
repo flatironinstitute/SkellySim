@@ -174,6 +174,13 @@ class BodyContainer {
     size_t get_local_count() const { return (world_rank_ == 0) ? bodies.size() : 0; };
     /// @brief return number of bodies relevant for global calculations
     size_t get_global_count() const { return bodies.size(); };
+
+    size_t get_global_node_count() const {
+        size_t n_nodes = 0;
+        for (const auto &body : bodies)
+            n_nodes += body->n_nodes_;
+        return n_nodes;
+    }
 };
 
 class SphericalBody : public Body {

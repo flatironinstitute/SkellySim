@@ -15,6 +15,16 @@ class Params {
     double tol_tstep;
     double dt_min;
     double dt_max;
+    struct {
+        int n_nodes;
+        double v_growth;
+        double f_catastrophe;
+        double v_grow_collision_scale;
+        double f_catastrophe_collision_scale;
+        double nucleation_rate;
+        double min_length;
+        double bending_rigidity;
+    } dynamic_instability;
     unsigned long seed;
 
     std::string shell_precompute_file;
