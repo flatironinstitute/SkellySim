@@ -1,7 +1,9 @@
 #include <rng.hpp>
 
 #include <trng/normal_dist.hpp>
+#include <trng/poisson_dist.hpp>
 #include <trng/uniform_dist.hpp>
+#include <trng/uniform_int_dist.hpp>
 #include <trng/yarn2.hpp>
 
 #include <mpi.h>
@@ -28,9 +30,12 @@ void init(unsigned long seed) {
 }
 
 double uniform(double low, double high) { return trng::uniform_dist(low, high)(engine_distributed); }
+int uniform_int(int low, int high) { return trng::uniform_int_dist(low, high)(engine_distributed); }
 double normal(double mu, double sigma) { return trng::normal_dist(mu, sigma)(engine_distributed); }
+int poisson_int(double mu) { return trng::poisson_dist(mu)(engine_distributed); }
 
 double uniform_unsplit(double low, double high) { return trng::uniform_dist(low, high)(engine_shared); }
+int uniform_int_unsplit(int low, int high) { return trng::uniform_int_dist(low, high)(engine_shared); }
 double normal_unsplit(double mu, double sigma) { return trng::normal_dist(mu, sigma)(engine_shared); }
-
+int poisson_int_unsplit(double mu) { return trng::poisson_dist(mu)(engine_shared); }
 } // namespace RNG
