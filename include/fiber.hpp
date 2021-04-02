@@ -29,9 +29,10 @@ class Fiber {
     /// \f[{\bf f} = f_s * {\bf x}_s\f]
     double force_scale_ = 4.0;
     // FIXME: Magic numbers in linear operator calculation
-    double beta_tstep_ = 1.0; ///< penalty parameter to ensure inextensibility
-    double epsilon_ = 1E-3;   ///< slenderness parameter
-    double v_length_ = 0.0;   ///< fiber growth velocity
+    double beta_tstep_ = 1.0;         ///< penalty parameter to ensure inextensibility
+    double epsilon_ = 1E-3;           ///< slenderness parameter
+    double v_growth_ = 0.0;           ///< instantaneous fiber growth velocity
+    bool collide_with_cortex = false; ///< flag if interacting with cortex
 
     /// @brief Coefficient for SBT @see Fiber::init
     /// \f[ c_0 = -\frac{log(e \epsilon^\ell)}{8 \pi \eta}\f]

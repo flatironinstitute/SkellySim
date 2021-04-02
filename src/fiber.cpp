@@ -57,7 +57,8 @@ void FiberContainer::update_boundary_conditions(Periphery &shell) {
         fib.bc_minus_ = fib.attached_to_body()
                             ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
                             : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
-        fib.bc_plus_ = shell.check_collision(fib.x_, threshold)
+        fib.collide_with_cortex = shell.check_collision(fib.x_, threshold);
+        fib.bc_plus_ = fib.collide_with_cortex
                            ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
                            : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
         spdlog::debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)&fib, fib.BC_name[fib.bc_minus_.first],
@@ -206,7 +207,7 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     ArrayXd xs_z = xs_.block(2, 0, 1, np).transpose().array();
 
     ArrayXd alpha = mats.alpha;
-    ArrayXd s = (1.0 + alpha) * (0.5 * v_length_);
+    ArrayXd s = (1.0 + alpha) * (0.5 * v_growth_);
     ArrayXd I_arr = ArrayXd::Ones(np);
     RHS_.resize(4 * np);
     RHS_.setZero();
