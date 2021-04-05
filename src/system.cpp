@@ -458,7 +458,8 @@ void dynamic_instability() {
         // sites, or the area, or something rather than a global parameter
         int n_to_nucleate = std::min(RNG::poisson_int(dt * params.dynamic_instability.nucleation_rate),
                                      static_cast<int>(inactive_sites.size()));
-        while (n_to_nucleate) {
+        int n_trials = 100;
+        while (n_to_nucleate && n_trials) {
             int passive_site_index =
                 std::next(inactive_sites.begin(), RNG::uniform_int(0, inactive_sites.size()))->first;
 
@@ -477,10 +478,14 @@ void dynamic_instability() {
             }
 
             if (valid_site) {
+                n_trials = 100;
                 active_sites[passive_site_index] = true;
                 inactive_sites.erase(passive_site_index);
                 to_nucleate.push_back({i_body, i_site});
                 n_to_nucleate--;
+            }
+            else {
+                n_trials--;
             }
         }
     }
@@ -536,8 +541,9 @@ void dynamic_instability() {
                 fib.x_.row(i) = origin(i) + u(i) * s;
 
             fc.fibers.push_back(fib);
-            spdlog::info("Inserted fiber on rank {} at site [{}, {}]", rank, min_fib.binding_site.first,
-                         min_fib.binding_site.second);
+            spdlog::get("global-status")
+                ->info("Inserted fiber on rank {} at site [{}, {}]", rank, min_fib.binding_site.first,
+                       min_fib.binding_site.second);
         }
     }
 }
