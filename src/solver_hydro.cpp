@@ -1,4 +1,5 @@
 #include <solver_hydro.hpp>
+#include <params.hpp>
 #include <system.hpp>
 #include <utils.hpp>
 
@@ -33,7 +34,7 @@ A_fiber_hydro::A_fiber_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm) 
     TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                "A_fiber_hydro constructor: The input Comm object must be nonnull.");
     const global_ordinal_type indexBase = 0;
-    const auto [fiber_sol_size, shell_sol_size, body_sol_size] = System::get_instance().get_local_solution_sizes();
+    const auto [fiber_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
     const int local_size = fiber_sol_size + shell_sol_size + body_sol_size;
 
     // Construct a map for our block row distribution
@@ -56,9 +57,9 @@ void Solver<P_inv_hydro, A_fiber_hydro>::set_RHS() {
     VectorMap RHS_body(RHS_->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size, body_sol_size);
 
     // Initialize GMRES RHS vector
-    RHS_fib = System::get_fiber_container().get_RHS();
-    RHS_shell = System::get_shell().get_RHS();
-    RHS_body = System::get_body_container().get_RHS();
+    RHS_fib = System::get_fiber_RHS();
+    RHS_shell = System::get_shell_RHS();
+    RHS_body = System::get_body_RHS();
 }
 
 template <>
@@ -72,7 +73,7 @@ bool Solver<P_inv_hydro, A_fiber_hydro>::solve() {
     // belosList.set("Block Size", 1);                                         // Blocksize to be used by iterative
     // solver belosList.set("Maximum Iterations", 100);                               // Maximum number of iterations
     // allowed
-    belosList.set("Convergence Tolerance", System::get_params().gmres_tol); // Relative convergence tolerance requested
+    belosList.set("Convergence Tolerance", System::get_params()->gmres_tol); // Relative convergence tolerance requested
     belosList.set("Orthogonalization", "DGKS");                             // Orthogonalization type
     belosList.set("Explicit Residual Scaling", "Norm of Preconditioned Initial Residual");
     belosList.set("Verbosity",

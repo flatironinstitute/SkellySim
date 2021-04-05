@@ -15,6 +15,7 @@
 #endif
 
 #include <body.hpp>
+#include <fiber.hpp>
 
 using Eigen::Map;
 using Eigen::MatrixXd;
@@ -29,11 +30,12 @@ bool allclose(
 }
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
+    int thread_level;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);    
     std::string config_file("test_link_matrix.toml");
     System::init(config_file);
-    FiberContainer &fc = System::get_fiber_container();
-    toml::value &param_table = System::get_param_table();
+    FiberContainer &fc = *System::get_fiber_container();
+    toml::value &param_table = *System::get_param_table();
 
     toml::table special = param_table["special"].as_table();
     VectorXd fibers_xt = parse_util::convert_array(special.at("fibers_xt").as_array());

@@ -6,7 +6,11 @@
 #include <fstream>
 #include <unordered_map>
 
+#include <body.hpp>
+#include <fiber.hpp>
+#include <params.hpp>
 #include <parse_util.hpp>
+#include <periphery.hpp>
 #include <solver_hydro.hpp>
 #include <system.hpp>
 
@@ -16,6 +20,22 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
+
+namespace System {
+Params params_;
+FiberContainer fc_;
+BodyContainer bc_;
+std::unique_ptr<Periphery> shell_;
+
+FiberContainer fc_bak_;
+BodyContainer bc_bak_;
+int rank_;
+toml::value param_table_;
+
+struct {
+    double dt;
+    double time = 0.0;
+} properties;
 
 // TODO: Refactor all preprocess stuff. It's awful
 
@@ -233,14 +253,14 @@ void preprocess(toml::value &config) {
     }
 }
 
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
-                                                                                         MatrixRef &body_velocities) {
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
+                                                                                 MatrixRef &body_velocities) {
     using Eigen::ArrayXXd;
     using Eigen::MatrixXd;
     using Eigen::Vector3d;
 
-    auto &fc = System::get_fiber_container();
-    auto &bc = System::get_body_container();
+    auto &fc = fc_;
+    auto &bc = bc_;
 
     Eigen::MatrixXd force_torque_on_bodies = MatrixXd::Zero(6, bc.get_global_count());
     Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
@@ -320,15 +340,12 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> System::calculate_body_fiber_link_co
 }
 
 std::tuple<int, int, int> get_local_node_counts() {
-    return std::make_tuple(System::get_fiber_container().get_local_node_count(),
-                           System::get_shell().get_local_node_count(),
-                           System::get_body_container().get_local_node_count());
+    return std::make_tuple(fc_.get_local_node_count(), shell_->get_local_node_count(), bc_.get_local_node_count());
 }
 
-std::tuple<int, int, int> System::get_local_solution_sizes() {
-    return std::make_tuple(System::get_fiber_container().get_local_solution_size(),
-                           System::get_shell().get_local_solution_size(),
-                           System::get_body_container().get_local_solution_size());
+std::tuple<int, int, int> get_local_solution_sizes() {
+    return std::make_tuple(fc_.get_local_solution_size(), shell_->get_local_solution_size(),
+                           bc_.get_local_solution_size());
 }
 
 std::tuple<VectorMap, VectorMap, VectorMap> get_solution_maps(double *x) {
@@ -356,7 +373,7 @@ get_node_maps(Eigen::MatrixBase<Derived> &x) {
                            Eigen::Block<Derived>(x.derived(), 0, fib_nodes + shell_nodes, 3, body_nodes));
 }
 
-Eigen::VectorXd System::apply_preconditioner(VectorRef &x) {
+Eigen::VectorXd apply_preconditioner(VectorRef &x) {
     const auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
     const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
     assert(sol_size == x.size());
@@ -365,18 +382,18 @@ Eigen::VectorXd System::apply_preconditioner(VectorRef &x) {
     auto [x_fibers, x_shell, x_bodies] = get_solution_maps(x.data());
     auto [res_fibers, res_shell, res_bodies] = get_solution_maps(res.data());
 
-    res_fibers = System::get_fiber_container().apply_preconditioner(x_fibers);
-    res_shell = System::get_shell().apply_preconditioner(x_shell);
-    res_bodies = System::get_body_container().apply_preconditioner(x_bodies);
+    res_fibers = fc_.apply_preconditioner(x_fibers);
+    res_shell = shell_->apply_preconditioner(x_shell);
+    res_bodies = bc_.apply_preconditioner(x_bodies);
 
     return res;
 }
 
-void System::dynamic_instability() {
-    const double dt = System::get_instance().properties.dt;
-    FiberContainer &fc = System::get_fiber_container();
-    BodyContainer &bc = System::get_body_container();
-    Params &params = System::get_params();
+void dynamic_instability() {
+    const double dt = properties.dt;
+    FiberContainer &fc = fc_;
+    BodyContainer &bc = bc_;
+    Params &params = params_;
 
     size_t n_nodes = 0;
     std::vector<int> body_offsets(bc.bodies.size() + 1);
@@ -426,7 +443,7 @@ void System::dynamic_instability() {
     std::unordered_map<int, bool> active_sites;
     std::unordered_map<int, bool> inactive_sites;
     std::vector<std::pair<int, int>> to_nucleate;
-    if (System::get_rank() == 0) {
+    if (rank_ == 0) {
         for (size_t i = 0; i < occupied_flat.size(); ++i) {
             if (occupied_flat[i])
                 active_sites[i] = true;
@@ -524,13 +541,13 @@ void System::dynamic_instability() {
     }
 }
 
-Eigen::VectorXd System::apply_matvec(VectorRef &x) {
+Eigen::VectorXd apply_matvec(VectorRef &x) {
     using Eigen::Block;
     using Eigen::MatrixXd;
-    const FiberContainer &fc = System::get_fiber_container();
-    const Periphery &shell = System::get_shell();
-    const BodyContainer &bc = System::get_body_container();
-    const double eta = System::get_params().eta;
+    const FiberContainer &fc = fc_;
+    const Periphery &shell = *shell_;
+    const BodyContainer &bc = bc_;
+    const double eta = params_.eta;
 
     const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
     const int total_node_count = fib_node_count + shell_node_count + body_node_count;
@@ -577,15 +594,14 @@ Eigen::VectorXd System::apply_matvec(VectorRef &x) {
     return res;
 }
 
-bool System::step() {
+bool step() {
     using Eigen::MatrixXd;
-    System &system = System::get_instance();
-    Params &params = System::get_params();
-    Periphery &shell = System::get_shell();
-    FiberContainer &fc = System::get_fiber_container();
-    BodyContainer &bc = System::get_body_container();
+    Params &params = params_;
+    Periphery &shell = *shell_;
+    FiberContainer &fc = fc_;
+    BodyContainer &bc = bc_;
     const double eta = params.eta;
-    const double dt = system.properties.dt;
+    const double dt = properties.dt;
     const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
 
     MatrixXd r_trg_external(3, shell_node_count + body_node_count);
@@ -644,24 +660,23 @@ bool System::step() {
     return converged;
 }
 
-void System::backup_impl() {
+void backup() {
     fc_bak_ = fc_;
     bc_bak_ = bc_;
 }
 
-void System::restore_impl() {
+void restore() {
     fc_ = fc_bak_;
     bc_ = bc_bak_;
 }
 
-void System::run() {
-    System &system = System::get_instance();
-    Params &params = System::get_params();
-    while (system.properties.time < params.t_final) {
+void run() {
+    Params &params = params_;
+    while (properties.time < params.t_final) {
         System::backup();
         bool converged = System::step();
         double fiber_error = 0.0;
-        for (const auto &fib : system.fc_.fibers) {
+        for (const auto &fib : fc_.fibers) {
             const auto &mats = fib.matrices_.at(fib.n_nodes_);
             const Eigen::MatrixXd xs = std::pow(2.0 / fib.length_, 1) * fib.x_ * mats.D_1_0;
             for (int i = 0; i < fib.n_nodes_; ++i)
@@ -669,21 +684,21 @@ void System::run() {
         }
         MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-        double dt_new = system.properties.dt;
+        double dt_new = properties.dt;
         bool accept = false;
         if (converged && fiber_error <= params.tol_tstep) {
             accept = true;
             const double tol_window = 0.9 * params.tol_tstep;
             if (fiber_error <= tol_window)
-                dt_new = std::min(params.dt_max, system.properties.dt * params.beta_up);
+                dt_new = std::min(params.dt_max, properties.dt * params.beta_up);
         } else {
-            dt_new = system.properties.dt * params.beta_down;
+            dt_new = properties.dt * params.beta_down;
             accept = false;
         }
 
         if (converged && System::check_collision()) {
             spdlog::info("Collision detected, rejecting solution and taking a smaller timestep");
-            dt_new = system.properties.dt * 0.5;
+            dt_new = properties.dt * 0.5;
             accept = false;
         }
 
@@ -694,20 +709,20 @@ void System::run() {
 
         if (accept) {
             spdlog::info("Accepting timestep and advancing time");
-            system.properties.time += system.properties.dt;
+            properties.time += properties.dt;
         } else {
             spdlog::info("Rejecting timestep");
             System::restore();
         }
-        system.properties.dt = dt_new;
-        spdlog::info("System time, dt, fiber_error: {}, {}, {}", system.properties.time, dt_new, fiber_error);
+        properties.dt = dt_new;
+        spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
     }
 }
 
-bool System::check_collision() {
-    BodyContainer &bc = System::get_body_container();
-    FiberContainer &fc = System::get_fiber_container();
-    Periphery &shell = System::get_shell();
+bool check_collision() {
+    BodyContainer &bc = bc_;
+    FiberContainer &fc = fc_;
+    Periphery &shell = *shell_;
     const double threshold = 0.0;
     using Eigen::VectorXd;
 
@@ -727,7 +742,17 @@ bool System::check_collision() {
     return false;
 }
 
-System::System(std::string *input_file) {
+Eigen::VectorXd get_fiber_RHS() { return fc_.get_RHS(); }
+Eigen::VectorXd get_body_RHS() { return bc_.get_RHS(); }
+Eigen::VectorXd get_shell_RHS() { return shell_->get_RHS(); }
+
+Params *get_params() { return &params_; }
+BodyContainer *get_body_container() { return &bc_; }
+FiberContainer *get_fiber_container() { return &fc_; }
+Periphery *get_shell() { return shell_.get(); }
+toml::value *get_param_table() { return &param_table_; }
+
+void init(const std::string &input_file) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     spdlog::logger sink = rank_ == 0 ? spdlog::logger("", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
                                      : spdlog::logger("", std::make_shared<spdlog::sinks::null_sink_st>());
@@ -737,10 +762,7 @@ System::System(std::string *input_file) {
     spdlog::stdout_color_mt("global-status");
     spdlog::cfg::load_env_levels();
 
-    if (input_file == nullptr)
-        throw std::runtime_error("System uninitialized. Call System::init(\"config_file\").");
-
-    param_table_ = toml::parse(*input_file);
+    param_table_ = toml::parse(input_file);
     params_ = Params(param_table_.at("params"));
     RNG::init(params_.seed);
     preprocess(param_table_);
@@ -764,3 +786,4 @@ System::System(std::string *input_file) {
     bc_ = BodyContainer(param_table_.at("bodies").as_array(), params_);
     properties.dt = params_.dt_initial;
 }
+} // namespace System

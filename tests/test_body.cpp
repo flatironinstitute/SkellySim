@@ -14,6 +14,7 @@
 #endif
 
 #include <body.hpp>
+#include <fiber.hpp>
 
 template <typename DerivedA, typename DerivedB>
 bool allclose(
@@ -32,8 +33,8 @@ int main(int argc, char *argv[]) {
     Body body(body_configs.at(0).as_table(), params);
 
     System::init(config_file);
-    FiberContainer &fc = System::get_fiber_container();
-    BodyContainer &bc = System::get_body_container();
+    FiberContainer &fc = *System::get_fiber_container();
+    BodyContainer &bc = *System::get_body_container();
     for (auto &fiber : fc.fibers) {
         auto [i_body, i_site] = fiber.binding_site_;
         auto &body = *bc.bodies[i_body];
