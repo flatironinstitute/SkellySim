@@ -192,7 +192,7 @@ void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {
     int offset = 0;
     for (auto &body : bodies) {
         body->update_RHS(v_on_bodies.block(0, offset, 3, body->n_nodes_));
-        offset += body->n_nodes_ + 6;
+        offset += body->n_nodes_;
     }
 }
 
