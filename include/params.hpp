@@ -16,7 +16,7 @@ class Params {
     double dt_min;
     double dt_max;
     struct {
-        int n_nodes;
+        int n_nodes = 0;
         double v_growth;
         double f_catastrophe;
         double v_grow_collision_scale;
