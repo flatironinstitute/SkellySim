@@ -1,7 +1,7 @@
 #include "cnpy.hpp"
 #include <Eigen/Core>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <mpi.h>
 #include <system.hpp>
 
@@ -26,10 +26,10 @@ bool allclose(
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
     std::string config_file("test_body.toml");
-    toml::table config = toml::parse_file(config_file);
-    Params params(config.get_as<toml::table>("params"));
-    toml::array *body_configs = config.get_as<toml::array>("bodies");
-    Body body(body_configs->get_as<toml::table>(0), params);
+    toml::value config = toml::parse(config_file);
+    Params params(config.at("params"));
+    toml::array &body_configs = config.at("bodies").as_array();
+    Body body(body_configs.at(0).as_table(), params);
 
     System::init(config_file);
     FiberContainer &fc = System::get_fiber_container();

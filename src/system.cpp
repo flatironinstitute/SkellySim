@@ -1,7 +1,3 @@
-#ifndef __INTEL_COMPILER
-#define TOML_IMPLEMENTATION
-#endif
-
 #include <skelly_sim.hpp>
 
 #include <rng.hpp>
@@ -25,36 +21,35 @@
 
 /// @brief Convert fiber initial positions/orientations to full coordinate representation
 /// @param[out] fiber_array Explicitly instantiated fiber array config
-void resolve_fiber_position(toml::table *fiber_table, Eigen::Vector3d &origin) {
-    int64_t n_nodes = parse_util::parse_val_key<int64_t>(fiber_table, "n_nodes", -1);
-    double length = parse_util::parse_val_key<double>(fiber_table, "length");
+void resolve_fiber_position(toml::value &fiber_table, Eigen::Vector3d &origin) {
+    int64_t n_nodes = toml::find_or<int64_t>(fiber_table, "n_nodes", -1);
+    double length = toml::find<double>(fiber_table, "length");
 
-    toml::array *x_array = fiber_table->get_as<toml::array>("x");
-    toml::array *x_0 = fiber_table->get_as<toml::array>("relative_position");
-    toml::array *u = fiber_table->get_as<toml::array>("orientation");
+    Eigen::VectorXd x_array = parse_util::convert_array<>(toml::find_or<toml::array>(fiber_table, "x", {}));
+    Eigen::VectorXd x_0 = parse_util::convert_array<>(toml::find_or<toml::array>(fiber_table, "relative_position", {}));
+    Eigen::VectorXd u = parse_util::convert_array<>(toml::find_or<toml::array>(fiber_table, "orientation", {}));
 
     if (n_nodes == -1) {
-        n_nodes = x_array->size() / 3;
+        n_nodes = x_array.size() / 3;
         if (n_nodes == 0)
             throw std::runtime_error("Attempt to initialize fiber without point count or positions.");
     }
 
-    if ((!!x_array && !!x_0) || (!!x_array && !!u))
+    if ((x_array.size() && x_0.size()) || (x_array.size() && u.size()))
         throw std::runtime_error("Fiber supplied 'relative_position' or 'orientation' with node positions 'x', "
                                  "ambiguous initialization.");
 
     // FIXME: Make test for this case
-    if (!!x_0 && !!u && x_0->size() == 3 && u->size() == 3) {
-        fiber_table->insert("x", toml::array());
-        x_array = fiber_table->get_as<toml::array>("x");
+    if (x_0.size() == 3 && u.size() == 3) {
         Eigen::MatrixXd x(3, n_nodes);
-        Eigen::Vector3d rel_pos = parse_util::convert_array<>(x_0);
-        Eigen::Vector3d orientation = parse_util::convert_array<>(u);
         Eigen::ArrayXd s = Eigen::ArrayXd::LinSpaced(n_nodes, 0, length).transpose();
         for (int i = 0; i < 3; ++i)
-            x.row(i) = origin(i) + rel_pos(i) + orientation(i) * s;
+            x.row(i) = origin(i) + x_0(i) + u(i) * s;
+
+        fiber_table.as_table()["x"] = toml::array();
+        toml::array &x_tab = fiber_table.at("x").as_array();
         for (int i = 0; i < x.size(); ++i) {
-            x_array->push_back(x.data()[i]);
+            x_tab.push_back(x.data()[i]);
         }
     }
 }
@@ -69,21 +64,21 @@ Eigen::Vector3d uniform_on_sphere() {
 /// @brief Update config to appropriately fill nucleation sites with fibers
 /// @param[out] fiber_array Updated fiber array with pointers to nucleation sites
 /// @param[out] body_array Updated body array with nucleation sites fixed to current fiber position
-void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array) {
+void resolve_nucleation_sites(toml::array &fiber_array, toml::array &body_array) {
     using std::make_pair;
-    const int n_bodies = body_array->size();
+    const int n_bodies = body_array.size();
     std::map<std::pair<int, int>, int> occupied;
     std::vector<int> n_sites(n_bodies);
 
     // Pass through fibers for assigned bodies
-    for (size_t i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
-        toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
-        int i_body = (*fiber_table)["parent_body"].value_or(-1);
-        int i_site = (*fiber_table)["parent_site"].value_or(-1);
+    for (size_t i_fib = 0; i_fib < fiber_array.size(); ++i_fib) {
+        toml::value &fiber_table = fiber_array.at(i_fib);
+        int i_body = toml::find_or<int>(fiber_table, "parent_body", -1);
+        int i_site = toml::find_or<int>(fiber_table, "parent_site", -1);
 
         if (i_body >= n_bodies) {
             std::cerr << "Invalid body reference " << i_body << " on fiber " << i_fib << ": \n"
-                      << *fiber_table << std::endl;
+                      << fiber_table << std::endl;
             throw std::runtime_error("Invalid body reference.\n");
         }
 
@@ -99,7 +94,7 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
                 std::cerr << "Multiple fibers bound to site: ("
                           << i_body << ", " << i_site << ")"
                           << " from fibers (" << i_fib << ", " << j_fib << ") " << ".\n"
-                          << *fiber_table << "\n\n" << *fiber_array->get_as<toml::table>(j_fib) << "\n";
+                          << fiber_table << "\n\n" << fiber_array.at(j_fib) << "\n";
                 throw std::runtime_error("Multiple fibers bound to site.\n");
             // clang-format on
         }
@@ -109,15 +104,16 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
 
     // Pass through fibers for unassigned bodies
     std::vector<int> test_site(n_bodies); //< current site to try for insertion
-    for (size_t i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
-        toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
-        int i_body = (*fiber_table)["parent_body"].value_or(-1);
-        int i_site = (*fiber_table)["parent_site"].value_or(-1);
+    for (size_t i_fib = 0; i_fib < fiber_array.size(); ++i_fib) {
+        toml::value &fiber_table = fiber_array.at(i_fib);
+        int i_body = toml::find_or<int>(fiber_table, "parent_body", -1);
+        int i_site = toml::find_or<int>(fiber_table, "parent_site", -1);
 
         // unattached or site already assigned. move to next fiber
         if (i_body < 0 || i_site >= 0) {
             Eigen::Vector3d origin{0.0, 0.0, 0.0};
-            resolve_fiber_position(fiber_table, origin);
+            if (i_body < 0) // Initialize free fiber
+                resolve_fiber_position(fiber_table, origin);
             continue;
         }
 
@@ -133,29 +129,26 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
     for (const auto &site_map : occupied) {
         auto [i_body, i_site] = site_map.first;
         auto i_fib = site_map.second;
-        toml::table *body_table = body_array->get_as<toml::table>(i_body);
-        toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
-        toml::array *body_position = body_table->get_as<toml::array>("position");
+        toml::value &fiber_table = fiber_array.at(i_fib);
+        toml::array &body_position = body_array.at(i_body).at("position").as_array();
 
-        fiber_table->insert_or_assign("parent_body", i_body);
-        fiber_table->insert_or_assign("parent_site", i_site);
+        fiber_table["parent_body"] = i_body;
+        fiber_table["parent_site"] = i_site;
         Eigen::Vector3d origin = parse_util::convert_array<>(body_position);
 
         resolve_fiber_position(fiber_table, origin);
 
-        toml::array *x_array = fiber_table->get_as<toml::array>("x");
-        nucleation_sites[i_body][i_site] = {x_array->get_as<double>(0)->get() - origin[0],
-                                            x_array->get_as<double>(1)->get() - origin[1],
-                                            x_array->get_as<double>(2)->get() - origin[2]};
+        Eigen::VectorXd x_array = parse_util::convert_array<>(fiber_table.at("x").as_array());
+        nucleation_sites[i_body][i_site] = x_array.segment(0, 3) - origin;
     }
 
     for (int i_body = 0; i_body < n_bodies; ++i_body) {
-        toml::table *body_table = body_array->get_as<toml::table>(i_body);
-        if (!(*body_table)["nucleation_sites"])
-            (*body_table).insert("nucleation_sites", toml::array());
+        toml::value &body_table = body_array.at(i_body);
+        if (!body_table.contains("nucleation_sites"))
+            body_table["nucleation_sites"] = toml::array();
 
-        int n_nucleation_sites = (*body_table)["n_nucleation_sites"].value_or(nucleation_sites[i_body].size());
-        double radius = *(*body_table)["radius"].value<double>();
+        int n_nucleation_sites = toml::find_or<int>(body_table, "n_nucleation_sites", nucleation_sites[i_body].size());
+        double radius = body_table["radius"].as_floating();
         // FIXME: add min_separation parameter
         const double min_separation2 = 0.01 * 0.01;
 
@@ -184,10 +177,10 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
             } while (collision);
         }
 
-        toml::array *x = body_table->get_as<toml::array>("nucleation_sites");
+        toml::array &x = body_table["nucleation_sites"].as_array();
         for (auto &[site, xvec] : nucleation_sites[i_body])
             for (int i = 0; i < 3; ++i)
-                x->push_back(xvec[i]);
+                x.push_back(xvec[i]);
     }
 }
 
@@ -223,16 +216,17 @@ void resolve_nucleation_sites(toml::array *fiber_array, toml::array *body_array)
 ///
 /// @param[out] config global toml config after initial parsing
 /// @param[in] seed seed for RNG state (such as for generating nucleation site positions)
-void preprocess(toml::table &config) {
-    toml::array *body_array = config["bodies"].as<toml::array>();
-    toml::array *fiber_array = config["fibers"].as<toml::array>();
+void preprocess(toml::value &config) {
+    spdlog::info("Preprocessing config file");
+    toml::array &body_array = config["bodies"].as_array();
+    toml::array &fiber_array = config["fibers"].as_array();
 
     // Body-fiber interactions through nucleation sites
-    if (!!body_array && !!fiber_array)
+    if (body_array.size() && fiber_array.size())
         resolve_nucleation_sites(fiber_array, body_array);
-    else if (!!fiber_array) {
-        for (size_t i_fib = 0; i_fib < fiber_array->size(); ++i_fib) {
-            toml::table *fiber_table = fiber_array->get_as<toml::table>(i_fib);
+    else if (fiber_array.size()) {
+        for (size_t i_fib = 0; i_fib < fiber_array.size(); ++i_fib) {
+            toml::value &fiber_table = fiber_array.at(i_fib);
             Eigen::Vector3d origin{0.0, 0.0, 0.0};
             resolve_fiber_position(fiber_table, origin);
         }
@@ -477,7 +471,6 @@ void System::dynamic_instability() {
         double length;
         std::pair<int, int> binding_site;
     };
-
 
     int n_fibers = fc.fibers.size();
     int size, rank;
@@ -736,9 +729,8 @@ bool System::check_collision() {
 
 System::System(std::string *input_file) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
-    spdlog::logger sink = rank_ == 0
-                              ? spdlog::logger("status", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
-                              : spdlog::logger("status", std::make_shared<spdlog::sinks::null_sink_st>());
+    spdlog::logger sink = rank_ == 0 ? spdlog::logger("", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
+                                     : spdlog::logger("", std::make_shared<spdlog::sinks::null_sink_st>());
     spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
     spdlog::stdout_color_mt("STKFMM");
     spdlog::stdout_color_mt("Belos");
@@ -748,19 +740,19 @@ System::System(std::string *input_file) {
     if (input_file == nullptr)
         throw std::runtime_error("System uninitialized. Call System::init(\"config_file\").");
 
-    param_table_ = toml::parse_file(*input_file);
-    params_ = Params(param_table_.get_as<toml::table>("params"));
+    param_table_ = toml::parse(*input_file);
+    params_ = Params(param_table_.at("params"));
     RNG::init(params_.seed);
     preprocess(param_table_);
 
-    fc_ = FiberContainer(param_table_.get_as<toml::array>("fibers"), params_);
+    fc_ = FiberContainer(param_table_.at("fibers").as_array(), params_);
 
-    const toml::table *periphery_table = param_table_.get_as<toml::table>("periphery");
-    if (!!periphery_table) {
+    if (param_table_.contains("periphery")) {
+        const toml::value &periphery_table = param_table_.at("periphery");
         if (!params_.shell_precompute_file.length())
             throw std::runtime_error("Periphery specified, but no precompute file. Set [params] shell_precompute_file "
                                      "in your input config and run the precompute script.");
-        if ((*periphery_table)["shape"].as_string()->value_or("") == std::string("sphere"))
+        if (toml::find_or(periphery_table, "shape", "") == std::string("sphere"))
             shell_ = std::make_unique<SphericalPeriphery>(params_.shell_precompute_file, periphery_table);
         else {
             throw std::runtime_error("Unknown shape for periphery set in input file. Valid values are 'sphere'");
@@ -769,6 +761,6 @@ System::System(std::string *input_file) {
         shell_ = std::make_unique<Periphery>();
     }
 
-    bc_ = BodyContainer(param_table_.get_as<toml::array>("bodies"), params_);
+    bc_ = BodyContainer(param_table_.at("bodies").as_array(), params_);
     properties.dt = params_.dt_initial;
 }

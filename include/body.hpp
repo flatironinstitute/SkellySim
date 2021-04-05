@@ -42,7 +42,7 @@ class Body {
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
 
-    Body(const toml::table *body_table, const Params &params);
+    Body(const toml::value &body_table, const Params &params);
 
     const Eigen::Vector3d &get_position() const { return position_; };
     void update_RHS(MatrixRef &v_on_body);
@@ -87,7 +87,7 @@ class BodyContainer {
     /// Empty container constructor to avoid initialization list complications. No way to
     /// initialize after using this constructor, so overwrite objects with full constructor.
     BodyContainer(){};
-    BodyContainer(toml::array *body_tables, Params &params);
+    BodyContainer(toml::array &body_tables, Params &params);
 
     // FIXME: remove redundant code in =/copy
     BodyContainer(const BodyContainer &orig) {
@@ -185,8 +185,8 @@ class BodyContainer {
 
 class SphericalBody : public Body {
   public:
-    SphericalBody(const toml::table *body_table, const Params &params) : Body(body_table, params) {
-        radius_ = body_table->get_as<double>("radius")->value_or(0.0);
+    SphericalBody(const toml::value &body_table, const Params &params) : Body(body_table, params) {
+        radius_ = toml::find_or<double>(body_table, "radius", 0.0);
     };
     std::unique_ptr<Body> clone() const override { return std::make_unique<SphericalBody>(*this); };
     double radius_;

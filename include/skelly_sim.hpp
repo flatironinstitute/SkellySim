@@ -1,9 +1,6 @@
 #ifndef SKELLYSIM_HPP
 #define SKELLYSIM_HPP
 
-#ifndef __INTEL_COMPILER
-#define TOML_HEADER_ONLY 0
-#endif
 #include <toml.hpp>
 
 #define EIGEN_USE_MKL_ALL

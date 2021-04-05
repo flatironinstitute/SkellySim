@@ -29,8 +29,8 @@ class Params {
 
     std::string shell_precompute_file;
 
-    Params() {};
-    Params(toml::table *param_table);
+    Params(){};
+    Params(toml::value &param_table);
 };
 
 #endif

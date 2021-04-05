@@ -1,3 +1,4 @@
+#include <iostream>
 #include <skelly_sim.hpp>
 
 #include <body.hpp>
@@ -149,22 +150,22 @@ void Body::load_precompute_data(const std::string &precompute_file) {
 ///   surface).
 ///   @return Body object that has been appropriately rotated. Other internal cache variables are _not_ updated.
 /// @see update_cache_variables
-Body::Body(const toml::table *body_table, const Params &params) {
+Body::Body(const toml::value &body_table, const Params &params) {
     using namespace parse_util;
     using std::string;
-    string precompute_file = parse_val_key<string>(body_table, "precompute_file");
+    string precompute_file = toml::find<string>(body_table, "precompute_file");
     load_precompute_data(precompute_file);
 
     // TODO: add body assertions so that input file and precompute data necessarily agree
 
-    if (!!body_table->get("position"))
-        position_ = parse_array_key<>(body_table, "position");
+    if (body_table.contains("position"))
+        position_ = convert_array<>(body_table.at("position").as_array());
 
-    if (!!body_table->get("orientation"))
-        orientation_ = parse_array_key<Eigen::Quaterniond>(body_table, "orientation");
+    if (body_table.contains("orientation"))
+        orientation_ = convert_array<Eigen::Quaterniond>(body_table.at("orientation").as_array());
 
-    if (!!body_table->get("nucleation_sites")) {
-        nucleation_sites_ref_ = parse_array_key<>(body_table, "nucleation_sites");
+    if (body_table.contains("nucleation_sites")) {
+        nucleation_sites_ref_ = convert_array<>(body_table.at("nucleation_sites").as_array());
         nucleation_sites_ref_.resize(3, nucleation_sites_ref_.size() / 3);
         nucleation_sites_ = nucleation_sites_ref_;
     }
@@ -355,13 +356,9 @@ Eigen::VectorXd BodyContainer::apply_preconditioner(VectorRef &X) const {
     return res;
 }
 
-BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
+BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
-
-    if (!body_tables) {
-        return;
-    }
 
     // TODO: Make mult_order and max_pts passable fmm parameters
     {
@@ -374,11 +371,11 @@ BodyContainer::BodyContainer(toml::array *body_tables, Params &params) {
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
 
-    const int n_bodies_tot = body_tables->size();
+    const int n_bodies_tot = body_tables.size();
     spdlog::info("Reading in {} bodies", n_bodies_tot);
 
     for (int i_body = 0; i_body < n_bodies_tot; ++i_body) {
-        toml::table *body_table = body_tables->get_as<toml::table>(i_body);
+        toml::value &body_table = body_tables.at(i_body);
         bodies.emplace_back(new SphericalBody(body_table, params));
 
         auto &body = bodies.back();

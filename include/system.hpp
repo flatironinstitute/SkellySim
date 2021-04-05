@@ -17,15 +17,14 @@ class System {
     FiberContainer fc_bak_;
     BodyContainer bc_bak_;
     int rank_;
-    toml::table param_table_;
+    toml::value param_table_;
 
     struct {
         double dt;
         double time = 0.0;
     } properties;
 
-    static System &
-    get_instance_impl(std::string *const input_file = nullptr) {
+    static System &get_instance_impl(std::string *const input_file = nullptr) {
         static System instance(input_file);
         return instance;
     };
@@ -42,7 +41,7 @@ class System {
     static FiberContainer &get_fiber_container() { return get_instance_impl().fc_; };
     static BodyContainer &get_body_container() { return get_instance_impl().bc_; };
     static Periphery &get_shell() { return *get_instance_impl().shell_; };
-    static toml::table &get_param_table() { return get_instance_impl().param_table_; };
+    static toml::value &get_param_table() { return get_instance_impl().param_table_; };
     static int get_rank() { return get_instance_impl().rank_; };
     static std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
                                                                                             MatrixRef &body_velocities);

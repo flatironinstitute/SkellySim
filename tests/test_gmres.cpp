@@ -25,9 +25,10 @@ int main(int argc, char *argv[]) {
         System::init(config_file);
         System::step();
         success = true;
-    } catch (std::runtime_error &e) {
+    } catch (std::exception &e) {
         spdlog::info(e.what());
     } catch (...) {
+        spdlog::info("Unknown exception detected.");
     }
 
     if (success)

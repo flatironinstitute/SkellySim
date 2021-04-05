@@ -15,7 +15,7 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # using intel, disable offloading
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qno-offload -wd1011")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qno-offload")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
@@ -45,6 +45,7 @@ target_include_directories(skelly PRIVATE
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/extern/spdlog/include
   ${PROJECT_SOURCE_DIR}/extern/trng4
+  ${PROJECT_SOURCE_DIR}/extern/toml11
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
   )
@@ -58,6 +59,7 @@ target_include_directories(skelly_sim PRIVATE
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/extern/spdlog/include
   ${PROJECT_SOURCE_DIR}/extern/trng4
+  ${PROJECT_SOURCE_DIR}/extern/toml11
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
   )

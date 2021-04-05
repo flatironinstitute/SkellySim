@@ -84,7 +84,7 @@ class Fiber {
     /// compute_matrices
     const static std::unordered_map<int, fib_mat_t> matrices_;
 
-    Fiber(toml::table *fiber_table, double eta);
+    Fiber(toml::value &fiber_table, double eta);
 
     /// @brief initialize empty fiber
     /// @param[in] n_nodes fiber 'resolution'
@@ -144,7 +144,7 @@ class FiberContainer {
     /// Empty container constructor to avoid initialization list complications. No way to
     /// initialize after using this constructor, so overwrite objects with full constructor.
     FiberContainer() = default;
-    FiberContainer(toml::array *fiber_tables, Params &params);
+    FiberContainer(toml::array &fiber_tables, Params &params);
 
     void update_derivatives();
     void update_stokeslets(double eta);

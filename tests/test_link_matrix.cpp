@@ -1,10 +1,10 @@
 #include "cnpy.hpp"
 #include <Eigen/Core>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <mpi.h>
-#include <system.hpp>
 #include <parse_util.hpp>
+#include <system.hpp>
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -16,9 +16,9 @@
 
 #include <body.hpp>
 
-using Eigen::VectorXd;
-using Eigen::MatrixXd;
 using Eigen::Map;
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
 
 template <typename DerivedA, typename DerivedB>
 bool allclose(
@@ -33,17 +33,17 @@ int main(int argc, char *argv[]) {
     std::string config_file("test_link_matrix.toml");
     System::init(config_file);
     FiberContainer &fc = System::get_fiber_container();
-    toml::table &param_table = System::get_param_table();
+    toml::value &param_table = System::get_param_table();
 
-    toml::table *special = param_table["special"].as_table();
-    VectorXd fibers_xt = parse_util::convert_array(special->get_as<toml::array>("fibers_xt"));
-    VectorXd body_velocities_flat = parse_util::convert_array(special->get_as<toml::array>("body_velocities"));
-    VectorXd force_torque_ref = parse_util::convert_array(special->get_as<toml::array>("force_torque"));
-    VectorXd velocities_on_fiber_ref = parse_util::convert_array(special->get_as<toml::array>("fiber_velocities"));
+    toml::table special = param_table["special"].as_table();
+    VectorXd fibers_xt = parse_util::convert_array(special.at("fibers_xt").as_array());
+    VectorXd body_velocities_flat = parse_util::convert_array(special.at("body_velocities").as_array());
+    VectorXd force_torque_ref = parse_util::convert_array(special.at("force_torque").as_array());
+    VectorXd velocities_on_fiber_ref = parse_util::convert_array(special.at("fiber_velocities").as_array());
     MatrixXd body_velocities = Map<MatrixXd>(body_velocities_flat.data(), 6, body_velocities_flat.size() / 6);
 
     fc.update_derivatives();
-    
+
     MatrixXd force_torque, velocities_on_fiber;
     std::tie(force_torque, velocities_on_fiber) =
         System::calculate_body_fiber_link_conditions(fibers_xt, body_velocities);

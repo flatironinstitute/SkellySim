@@ -17,7 +17,7 @@ class SphericalBody;
 class Periphery {
   public:
     Periphery() = default;
-    Periphery(const std::string &precompute_file, const toml::table *body_table);
+    Periphery(const std::string &precompute_file, const toml::value &body_table);
 
     Eigen::MatrixXd flow(MatrixRef &trg, MatrixRef &density, double eta) const;
 
@@ -77,9 +77,9 @@ class Periphery {
 class SphericalPeriphery : public Periphery {
   public:
     double radius_;
-    SphericalPeriphery(const std::string &precompute_file, const toml::table *periphery_table)
+    SphericalPeriphery(const std::string &precompute_file, const toml::value &periphery_table)
         : Periphery(precompute_file, periphery_table) {
-        radius_ = periphery_table->get_as<double>("radius")->value_or(0.0);
+        radius_ = toml::find_or<double>(periphery_table, "radius", 0.0);
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;

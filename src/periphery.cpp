@@ -76,7 +76,7 @@ bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double th
     return false;
 }
 
-Periphery::Periphery(const std::string &precompute_file, const toml::table *body_table) {
+Periphery::Periphery(const std::string &precompute_file, const toml::value &body_table) {
     {
         using namespace kernels;
         using namespace stkfmm;

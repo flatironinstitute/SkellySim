@@ -22,6 +22,7 @@ foreach(file ${files})
   target_include_directories(${file_without_ext} PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/extern/spdlog/include
+    ${PROJECT_SOURCE_DIR}/extern/toml11
     ${PVFMM_INCLUDE_DIR}/pvfmm
     ${PVFMM_DEP_INCLUDE_DIR}
     )

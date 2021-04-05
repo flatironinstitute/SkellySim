@@ -2,14 +2,13 @@
 #include <iostream>
 #include <unordered_map>
 
-#include <parse_util.hpp>
-
 #include <fiber.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <utils.hpp>
 
 #include <spdlog/spdlog.h>
+#include <toml.hpp>
 
 /// @file
 /// @brief Implement Fiber and FiberContainer classes and associated functions
@@ -28,21 +27,20 @@ const std::string Fiber::BC_name[] = {"Force", "Torque", "Velocity", "AngularVel
 /// @param[in] fiber_table TOML table with associated fiber values
 /// @param[in] eta Fluid viscosity
 /// @return Fiber object. Cache values are _not_ calculated.
-Fiber::Fiber(toml::table *fiber_table, double eta) {
-    using namespace parse_util;
-    toml::array *x_array = fiber_table->get_as<toml::array>("x");
-    n_nodes_ = x_array->size() / 3;
+Fiber::Fiber(toml::value &fiber_table, double eta) {
+    std::vector<double> x_array = toml::find<std::vector<double>>(fiber_table, "x");
+    n_nodes_ = x_array.size() / 3;
 
     init(eta);
 
-    x_ = convert_array<>(x_array);
+    x_ = Eigen::Map<Eigen::ArrayXd>(x_array.data(), x_array.size());
     x_.resize(3, n_nodes_);
 
-    bending_rigidity_ = parse_val_key<double>(fiber_table, "bending_rigidity");
-    length_ = parse_val_key<double>(fiber_table, "length");
-    force_scale_ = parse_val_key<double>(fiber_table, "force_scale", 0.0);
-    binding_site_.first = (*fiber_table)["parent_body"].value_or(-1);
-    binding_site_.second = (*fiber_table)["parent_site"].value_or(-1);
+    bending_rigidity_ = toml::find<double>(fiber_table, "bending_rigidity");
+    length_ = toml::find<double>(fiber_table, "length");
+    force_scale_ = toml::find_or<double>(fiber_table, "force_scale", 0.0);
+    binding_site_.first = toml::find_or<int>(fiber_table, "parent_body", -1);
+    binding_site_.second = toml::find_or<int>(fiber_table, "parent_site", -1);
 }
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
@@ -744,13 +742,10 @@ void FiberContainer::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, Mat
     }
 }
 
-FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
+FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
+    spdlog::info("Initializing FiberContainer");
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
-
-    if (!fiber_tables) {
-        return;
-    }
 
     {
         utils::LoggerRedirect redirect(std::cout);
@@ -759,7 +754,7 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
 
-    const int n_fibs_tot = fiber_tables->size();
+    const int n_fibs_tot = fiber_tables.size();
     const int n_fibs_extra = n_fibs_tot % world_size_;
     spdlog::info("Reading in {} fibers.", n_fibs_tot);
 
@@ -775,7 +770,7 @@ FiberContainer::FiberContainer(toml::array *fiber_tables, Params &params) {
         const int i_fib_high = displs[world_rank_ + 1];
 
         if (i_fib >= i_fib_low && i_fib < i_fib_high) {
-            toml::table *fiber_table = fiber_tables->get_as<toml::table>(i_fib);
+            toml::value &fiber_table = fiber_tables.at(i_fib);
             fibers.emplace_back(fiber_table, params.eta);
 
             auto &fib = fibers.back();

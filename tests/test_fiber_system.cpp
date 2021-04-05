@@ -11,14 +11,18 @@
 #endif
 
 #include <fiber.hpp>
-
 #include <omp.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
     int rank, size;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    spdlog::stdout_color_mt("STKFMM");
+    spdlog::stdout_color_mt("Belos");
+    spdlog::stdout_color_mt("global-status");
 
     const int n_pts = 32;
     const int n_time = 1;
@@ -29,9 +33,9 @@ int main(int argc, char *argv[]) {
     const double f_stall = 1.0;
     const std::string input_file = "2K_MTs_onCortex_R5_L1.toml";
 
-    toml::table config = toml::parse_file(input_file);
-    Params params(config.get_as<toml::table>("params"));
-    FiberContainer fibs(config.get_as<toml::array>("fibers"), params);
+    toml::value config = toml::parse(input_file);
+    Params params(config.at("params"));
+    FiberContainer fibs(config.at("fibers").as_array(), params);
 
     Eigen::MatrixXd f_fib = Eigen::MatrixXd::Zero(3, fibs.get_local_node_count());
 
