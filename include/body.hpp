@@ -181,6 +181,12 @@ class BodyContainer {
             n_nodes += body->n_nodes_;
         return n_nodes;
     }
+    size_t get_global_site_count() const {
+        size_t n_sites = 0;
+        for (const auto &body : bodies)
+            n_sites += body->nucleation_sites_.cols();
+        return n_sites;
+    }
 };
 
 class SphericalBody : public Body {

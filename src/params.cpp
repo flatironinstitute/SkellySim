@@ -27,6 +27,7 @@ Params::Params(toml::value &pt) {
             dynamic_instability.nucleation_rate = toml::find(di, "nucleation_rate").as_floating();
             dynamic_instability.min_length = toml::find(di, "min_length").as_floating();
             dynamic_instability.bending_rigidity = toml::find(di, "bending_rigidity").as_floating();
+            dynamic_instability.min_separation = toml::find(di, "min_separation").as_floating();
         } catch (std::runtime_error &e) {
             MPI_Finalize();
             exit(1);

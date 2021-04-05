@@ -24,6 +24,7 @@ class Params {
         double nucleation_rate;
         double min_length;
         double bending_rigidity;
+        double min_separation;
     } dynamic_instability;
     unsigned long seed;
 

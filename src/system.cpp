@@ -170,7 +170,7 @@ void resolve_nucleation_sites(toml::array &fiber_array, toml::array &body_array)
         int n_nucleation_sites = toml::find_or<int>(body_table, "n_nucleation_sites", nucleation_sites[i_body].size());
         double radius = body_table["radius"].as_floating();
         // FIXME: add min_separation parameter
-        const double min_separation2 = 0.01 * 0.01;
+        const double min_separation2 = pow(params_.dynamic_instability.min_separation, 2);
 
         for (int i = 0; i < n_nucleation_sites; ++i) {
             if (nucleation_sites[i_body].count(i))
@@ -394,6 +394,8 @@ void dynamic_instability() {
     FiberContainer &fc = fc_;
     BodyContainer &bc = bc_;
     Params &params = params_;
+    if (params_.dynamic_instability.n_nodes == 0)
+        return;
 
     size_t n_nodes = 0;
     std::vector<int> body_offsets(bc.bodies.size() + 1);
@@ -418,7 +420,7 @@ void dynamic_instability() {
         return {-1, -1};
     };
 
-    std::vector<uint8_t> occupied_flat(bc.get_global_node_count(), 0);
+    std::vector<uint8_t> occupied_flat(bc.get_global_site_count(), 0);
     auto fib = fc.fibers.begin();
     while (fib != fc.fibers.end()) {
         fib->v_growth_ = params.dynamic_instability.v_growth;
@@ -438,7 +440,8 @@ void dynamic_instability() {
         }
     }
 
-    MPI_Reduce(MPI_IN_PLACE, occupied_flat.data(), occupied_flat.size(), MPI_BYTE, MPI_LOR, 0, MPI_COMM_WORLD);
+    MPI_Reduce(rank_ == 0 ? MPI_IN_PLACE : occupied_flat.data(), occupied_flat.data(), occupied_flat.size(), MPI_BYTE,
+               MPI_LOR, 0, MPI_COMM_WORLD);
 
     std::unordered_map<int, bool> active_sites;
     std::unordered_map<int, bool> inactive_sites;
@@ -456,17 +459,17 @@ void dynamic_instability() {
         int n_to_nucleate = std::min(RNG::poisson_int(dt * params.dynamic_instability.nucleation_rate),
                                      static_cast<int>(inactive_sites.size()));
         while (n_to_nucleate) {
-            const int passive_site_index = inactive_sites[RNG::uniform_int(0, inactive_sites.size())];
+            int passive_site_index =
+                std::next(inactive_sites.begin(), RNG::uniform_int(0, inactive_sites.size()))->first;
 
             auto [i_body, i_site] = binding_site_from_index(passive_site_index);
             Eigen::Vector3d site_pos_i = bc.at(i_body).nucleation_sites_.col(i_site);
             bool valid_site = true;
+            const double min_ds2 = pow(params.dynamic_instability.min_separation, 2);
             for (auto &[active_site_index, dum] : active_sites) {
                 auto [j_body, j_site] = binding_site_from_index(active_site_index);
                 Eigen::Vector3d site_pos_j = bc.at(j_body).nucleation_sites_.col(j_site);
 
-                // FIXME: STUB. THIS SHOULD BE A PARAM
-                const double min_ds2 = 0.2;
                 if ((site_pos_j - site_pos_i).squaredNorm() < min_ds2) {
                     valid_site = false;
                     break;
@@ -510,22 +513,12 @@ void dynamic_instability() {
         fiber_counts[fiber_rank]++;
     }
 
-    if (rank == 0) {
-        MPI_Bcast(new_fibers.data(), sizeof(fiber_struct) * new_fibers.size(), MPI_CHAR, 0, MPI_COMM_WORLD);
+    int n_new = new_fibers.size();
+    MPI_Bcast(&n_new, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    new_fibers.resize(n_new);
+    MPI_Bcast(new_fibers.data(), sizeof(fiber_struct) * new_fibers.size(), MPI_CHAR, 0, MPI_COMM_WORLD);
+    if (n_new)
         spdlog::info("Sent {} fibers to nucleate", new_fibers.size());
-    } else {
-        MPI_Status status;
-        MPI_Probe(0, 0, MPI_COMM_WORLD, &status);
-
-        int count;
-        MPI_Get_count(&status, MPI_CHAR, &count);
-        const int n_new = count / sizeof(fiber_struct);
-        spdlog::get("global-status")->debug("Rank {} recieving {} potential new fibers", rank, n_new);
-
-        new_fibers.resize(n_new);
-        MPI_Recv(new_fibers.data(), count, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        spdlog::get("global-status")->debug("Rank {} recieved {} potential new fibers", rank, n_new);
-    }
 
     for (const auto &min_fib : new_fibers) {
         if (min_fib.rank == rank) {
@@ -533,6 +526,14 @@ void dynamic_instability() {
             fib.length_ = params.dynamic_instability.min_length;
             fib.v_growth_ = params.dynamic_instability.v_growth;
             fib.binding_site_ = min_fib.binding_site;
+
+            Eigen::MatrixXd x(3, fib.n_nodes_);
+            Eigen::ArrayXd s = Eigen::ArrayXd::LinSpaced(fib.n_nodes_, 0, fib.length_).transpose();
+            Eigen::Vector3d origin = bc_.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second);
+            Eigen::Vector3d u = (origin - bc_.bodies[fib.binding_site_.first]->position_).normalized();
+
+            for (int i = 0; i < 3; ++i)
+                fib.x_.row(i) = origin(i) + u(i) * s;
 
             fc.fibers.push_back(fib);
             spdlog::info("Inserted fiber on rank {} at site [{}, {}]", rank, min_fib.binding_site.first,
@@ -602,6 +603,10 @@ bool step() {
     BodyContainer &bc = bc_;
     const double eta = params.eta;
     const double dt = properties.dt;
+
+    // Since DI can change size of fiber containers, must call first.
+    System::dynamic_instability();
+
     const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
 
     MatrixXd r_trg_external(3, shell_node_count + body_node_count);
