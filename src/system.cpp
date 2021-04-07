@@ -727,11 +727,11 @@ bool check_collision() {
     using Eigen::VectorXd;
 
     for (const auto &body : bc.bodies)
-        if (body->check_collision(shell, threshold))
+        if (shell.n_nodes_global_ && body->check_collision(shell, threshold))
             return true;
 
     for (const auto &fiber : fc.fibers)
-        if (shell.check_collision(fiber.x_, threshold))
+        if (shell.n_nodes_global_ && shell.check_collision(fiber.x_, threshold))
             return true;
 
     for (auto &body1 : bc.bodies)

@@ -38,7 +38,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
     // Output:
     //    vel [3xn_trg_local]: velocity at target coordinates
     if (!n_nodes_global_)
-        return Eigen::MatrixXd(3, r_trg.cols());
+        return Eigen::MatrixXd::Zero(3, r_trg.cols());
     utils::LoggerRedirect redirect(std::cout);
     const int n_dl = density.size() / 3;
     const int n_trg = r_trg.size() / 3;
