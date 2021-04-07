@@ -9,6 +9,8 @@
 #include <spdlog/spdlog.h>
 
 Eigen::VectorXd Periphery::apply_preconditioner(VectorRef &x_local) const {
+    if (!n_nodes_global_)
+        return Eigen::VectorXd();
     assert(x_local.size() == get_local_solution_size());
     Eigen::VectorXd x_shell(3 * n_nodes_global_);
     MPI_Allgatherv(x_local.data(), node_counts_[world_rank_], MPI_DOUBLE, x_shell.data(), node_counts_.data(),
@@ -17,6 +19,8 @@ Eigen::VectorXd Periphery::apply_preconditioner(VectorRef &x_local) const {
 }
 
 Eigen::VectorXd Periphery::matvec(VectorRef &x_local, MatrixRef &v_local) const {
+    if (!n_nodes_global_)
+        return Eigen::VectorXd();
     assert(x_local.size() == get_local_solution_size());
     assert(v_local.size() == get_local_solution_size());
     Eigen::VectorXd x_shell(3 * n_nodes_global_);
@@ -33,6 +37,8 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
     //    eta: Fluid viscosity
     // Output:
     //    vel [3xn_trg_local]: velocity at target coordinates
+    if (!n_nodes_global_)
+        return Eigen::MatrixXd(3, r_trg.cols());
     utils::LoggerRedirect redirect(std::cout);
     const int n_dl = density.size() / 3;
     const int n_trg = r_trg.size() / 3;

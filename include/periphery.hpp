@@ -40,7 +40,7 @@ class Periphery {
     std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> fmm_;
     Eigen::MatrixXd M_inv_;                        ///< Process local elements of inverse matrix
     Eigen::MatrixXd stresslet_plus_complementary_; ///< Process local elements of stresslet tensor
-    Eigen::MatrixXd node_pos_;                     ///< [3xn_nodes_local] matrix representing node positions
+    Eigen::MatrixXd node_pos_ = Eigen::MatrixXd(3, 0); ///< [3xn_nodes_local] matrix representing node positions
     Eigen::MatrixXd node_normal_;        ///< [3xn_nodes_local] matrix representing node normal vectors (inward facing)
     Eigen::VectorXd quadrature_weights_; ///< [n_nodes] array of 'far-field' quadrature weights
     Eigen::VectorXd RHS_;                ///< Current 'right-hand-side' for matrix formulation of solver
