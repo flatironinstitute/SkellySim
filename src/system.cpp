@@ -239,13 +239,12 @@ void resolve_nucleation_sites(toml::array &fiber_array, toml::array &body_array)
 /// @param[in] seed seed for RNG state (such as for generating nucleation site positions)
 void preprocess(toml::value &config) {
     spdlog::info("Preprocessing config file");
-    toml::array &body_array = config["bodies"].as_array();
-    toml::array &fiber_array = config["fibers"].as_array();
 
     // Body-fiber interactions through nucleation sites
-    if (body_array.size() && fiber_array.size())
-        resolve_nucleation_sites(fiber_array, body_array);
-    else if (fiber_array.size()) {
+    if (config.contains("fibers") && config.contains("bodies"))
+        resolve_nucleation_sites(config["fibers"].as_array(), config["bodies"].as_array());
+    else if (config.contains("fibers")) {
+        toml::array &fiber_array = config["fibers"].as_array();
         for (size_t i_fib = 0; i_fib < fiber_array.size(); ++i_fib) {
             toml::value &fiber_table = fiber_array.at(i_fib);
             Eigen::Vector3d origin{0.0, 0.0, 0.0};
@@ -588,6 +587,7 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     res_fibers = fc.matvec(x_fibers, v_fibers, v_fib_boundary);
     res_shell = shell.matvec(x_shell, v_shell);
     res_bodies = bc.matvec(v_bodies, body_densities, body_velocities);
+    spdlog::debug("res max {}\t{}", res_shell.maxCoeff(), res_bodies.maxCoeff());
 
     return res;
 }
@@ -768,7 +768,8 @@ void init(const std::string &input_file) {
     RNG::init(params_.seed);
     preprocess(param_table_);
 
-    fc_ = FiberContainer(param_table_.at("fibers").as_array(), params_);
+    if (param_table_.contains("fibers"))
+        fc_ = FiberContainer(param_table_.at("fibers").as_array(), params_);
 
     if (param_table_.contains("periphery")) {
         const toml::value &periphery_table = param_table_.at("periphery");

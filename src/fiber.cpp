@@ -644,6 +644,8 @@ MatrixXd FiberContainer::get_local_node_positions() const {
 MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, double eta) const {
     const size_t n_src = fib_forces.cols();
     const size_t n_trg_external = r_trg_external.cols();
+    if (!n_src)
+        return Eigen::MatrixXd::Zero(3, n_trg_external);
 
     MatrixXd weighted_forces(3, n_src);
     MatrixXd r_src(3, n_src);
