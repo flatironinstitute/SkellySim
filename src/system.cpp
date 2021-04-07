@@ -30,6 +30,7 @@ std::unique_ptr<Periphery> shell_;
 FiberContainer fc_bak_;
 BodyContainer bc_bak_;
 int rank_;
+int size_;
 toml::value param_table_;
 
 struct {
@@ -490,18 +491,8 @@ void dynamic_instability() {
         }
     }
 
-    using new_fiber = struct {
-        int rank;
-        int n_nodes;
-        double length;
-        std::pair<int, int> binding_site;
-    };
-
     int n_fibers = fc.fibers.size();
-    int size, rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    std::vector<int> fiber_counts(rank == 0 ? size : 0);
+    std::vector<int> fiber_counts(rank_ == 0 ? size_ : 0);
     MPI_Gather(&n_fibers, 1, MPI_INT, fiber_counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     using fiber_struct = struct {
@@ -526,7 +517,7 @@ void dynamic_instability() {
         spdlog::info("Sent {} fibers to nucleate", new_fibers.size());
 
     for (const auto &min_fib : new_fibers) {
-        if (min_fib.rank == rank) {
+        if (min_fib.rank == rank_) {
             Fiber fib(params.dynamic_instability.n_nodes, params.dynamic_instability.bending_rigidity, params.eta);
             fib.length_ = params.dynamic_instability.min_length;
             fib.v_growth_ = params.dynamic_instability.v_growth;
@@ -542,7 +533,7 @@ void dynamic_instability() {
 
             fc.fibers.push_back(fib);
             spdlog::get("global-status")
-                ->info("Inserted fiber on rank {} at site [{}, {}]", rank, min_fib.binding_site.first,
+                ->info("Inserted fiber on rank {} at site [{}, {}]", rank_, min_fib.binding_site.first,
                        min_fib.binding_site.second);
         }
     }
@@ -639,8 +630,6 @@ bool step() {
     CVectorMap sol = solver_.get_solution();
 
     double residual = solver_.get_residual();
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     spdlog::info("Residual: {}", residual);
 
     auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(sol.data());
@@ -765,6 +754,7 @@ toml::value *get_param_table() { return &param_table_; }
 
 void init(const std::string &input_file) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
+    MPI_Comm_size(MPI_COMM_WORLD, &size_);
     spdlog::logger sink = rank_ == 0 ? spdlog::logger("", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
                                      : spdlog::logger("", std::make_shared<spdlog::sinks::null_sink_st>());
     spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));

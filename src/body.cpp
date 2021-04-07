@@ -75,7 +75,7 @@ void Body::update_preconditioner(double eta) {
 void Body::update_RHS(MatrixRef &v_on_body) {
     RHS_.resize(n_nodes_ * 3 + 6);
     RHS_.segment(0, n_nodes_ * 3) = -CVectorMap(v_on_body.data(), v_on_body.size());
-    RHS_.segment(n_nodes_ * 3, 6) = Eigen::VectorXd::Zero(6);
+    RHS_.segment(n_nodes_ * 3, 6).setZero();
 }
 
 /// @brief Move body to new position with new orientation
@@ -226,7 +226,7 @@ Eigen::MatrixXd BodyContainer::get_local_node_positions() const {
     return r_body_nodes;
 }
 
-Eigen::MatrixXd BodyContainer::get_node_normals() const {
+Eigen::MatrixXd BodyContainer::get_local_node_normals() const {
     Eigen::MatrixXd node_normals;
 
     const int n_nodes = get_local_node_count();
@@ -271,7 +271,7 @@ Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, Matr
     const int n_nodes = get_local_node_count(); //< Distributed node counts for fmm calls
     const int n_trg = r_trg.cols();
     const Eigen::MatrixXd node_positions = get_local_node_positions(); //< Distributed node positions for fmm calls
-    const Eigen::MatrixXd node_normals = get_node_normals();           //< Distributed node normals for fmm calls
+    const Eigen::MatrixXd node_normals = get_local_node_normals();           //< Distributed node normals for fmm calls
     const Eigen::MatrixXd null_matrix;                                 //< Empty matrix for dummy arguments to kernels
     const int n_bodies_global = get_global_count();
 

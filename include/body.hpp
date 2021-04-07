@@ -137,7 +137,7 @@ class BodyContainer {
     Eigen::VectorXd get_RHS() const;
     Eigen::MatrixXd get_global_node_positions() const;
     Eigen::MatrixXd get_local_node_positions() const;
-    Eigen::MatrixXd get_node_normals() const;
+    Eigen::MatrixXd get_local_node_normals() const;
     Eigen::MatrixXd get_center_positions(bool override_distributed) const {
         if (world_rank_ != 0 && !override_distributed)
             return Eigen::MatrixXd(3, 0);
