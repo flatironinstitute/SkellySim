@@ -8,6 +8,7 @@
 #include <params.hpp>
 
 class Periphery;
+class SphericalBody;
 
 /// Class for "small" bodies such as MTOCs
 class Body {
@@ -62,6 +63,10 @@ class Body {
     };
 
     virtual bool check_collision(const Body &body, double threshold) const {
+        throw std::runtime_error("Collision undefined on base Body class\n");
+    };
+
+    virtual bool check_collision(const SphericalBody &body, double threshold) const {
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
 
@@ -199,7 +204,7 @@ class SphericalBody : public Body {
 
     bool check_collision(const Periphery &periphery, double threshold) const override;
     bool check_collision(const Body &body, double threshold) const override;
-    bool check_collision(const SphericalBody &body, double threshold) const;
+    bool check_collision(const SphericalBody &body, double threshold) const override;
 };
 
 #endif
