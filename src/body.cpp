@@ -337,7 +337,7 @@ Eigen::VectorXd BodyContainer::matvec(MatrixRef &v_bodies, MatrixRef &body_densi
             VectorXd KU = body->K_ * U;
             VectorXd KTLambda = body->K_.transpose() * CVectorMap(d.data(), 3 * body->n_nodes_);
 
-            res_nodes = -(cx + cy + cz) - KU + CVectorMap(v_bodies.data() + node_offset * 3, body->n_nodes_ * 3);
+            res_nodes = -(cx + cy + cz) - KU + CVectorMap(v_bodies.data() + node_offset, body->n_nodes_ * 3);
             res_com = -KTLambda + U;
 
             node_offset += 3 * body->n_nodes_;
