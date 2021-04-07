@@ -727,11 +727,11 @@ bool check_collision() {
     using Eigen::VectorXd;
 
     for (const auto &body : bc.bodies)
-        if (shell.n_nodes_global_ && body->check_collision(shell, threshold))
+        if (body->check_collision(shell, threshold))
             return true;
 
     for (const auto &fiber : fc.fibers)
-        if (shell.n_nodes_global_ && shell.check_collision(fiber.x_, threshold))
+        if (shell.check_collision(fiber.x_, threshold))
             return true;
 
     for (auto &body1 : bc.bodies)
@@ -785,7 +785,8 @@ void init(const std::string &input_file) {
         shell_ = std::make_unique<Periphery>();
     }
 
-    bc_ = BodyContainer(param_table_.at("bodies").as_array(), params_);
+    if (param_table_.contains("bodies"))
+        bc_ = BodyContainer(param_table_.at("bodies").as_array(), params_);
     properties.dt = params_.dt_initial;
 }
 } // namespace System

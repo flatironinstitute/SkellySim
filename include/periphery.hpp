@@ -59,12 +59,16 @@ class Periphery {
     Eigen::VectorXi row_displs_;
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const {
+        if (!n_nodes_global_)
+            return false;
         // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
         // you make this a pure virtual function, so instead we just throw an error.
         throw std::runtime_error("Collision undefined on base Periphery class\n");
     };
 
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const {
+        if (!n_nodes_global_)
+            return false;
         throw std::runtime_error("Collision undefined on base Periphery class\n");
     };
 
