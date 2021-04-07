@@ -349,8 +349,9 @@ Eigen::VectorXd BodyContainer::apply_preconditioner(VectorRef &X) const {
     if (world_rank_ == 0) {
         int offset = 0;
         for (const auto &b : bodies) {
-            res.segment(offset, b->n_nodes_ * 3 + 6) = b->A_LU_.solve(X.segment(offset, b->n_nodes_ * 3 + 6));
-            offset += b->n_nodes_ * 3 + 6;
+            const int blocksize = b->n_nodes_ * 3 + 6;
+            res.segment(offset, blocksize) = b->A_LU_.solve(X.segment(offset, blocksize));
+            offset += blocksize;
         }
     }
     return res;
