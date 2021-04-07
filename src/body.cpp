@@ -249,9 +249,11 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> BodyContainer::unpack_solution_vecto
     MatrixXd body_densities(3, get_local_node_count());
     if (world_rank_ == 0) {
         int offset = 0;
+        int density_col = 0;
         for (int i = 0; i < n_bodies_global; ++i) {
             for (int j = 0; j < bodies[i]->n_nodes_; ++j) {
-                body_densities.col(j) = x.segment(offset, 3);
+                body_densities.col(density_col) = x.segment(offset, 3);
+                density_col++;
                 offset += 3;
             }
 
