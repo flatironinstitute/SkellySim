@@ -300,7 +300,7 @@ Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, Matr
     center_positions = get_global_center_positions();
     Eigen::MatrixXd torques = forces_torques.block(3, 0, 3, n_bodies_global);
 
-    v_bdy2all += kernels::rotlet(center_positions, r_trg, torques);
+    v_bdy2all += kernels::rotlet(center_positions, r_trg, torques, eta);
 
     return v_bdy2all;
 }
