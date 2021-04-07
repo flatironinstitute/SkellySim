@@ -227,19 +227,19 @@ Eigen::MatrixXd BodyContainer::get_local_node_positions() const {
 }
 
 Eigen::MatrixXd BodyContainer::get_node_normals() const {
-    Eigen::MatrixXd r_body_nodes;
+    Eigen::MatrixXd node_normals;
 
-    const int n_nodes = get_local_solution_size();
+    const int n_nodes = get_local_node_count();
+    node_normals.resize(3, n_nodes);
     if (world_rank_ == 0) {
-        r_body_nodes.resize(3, n_nodes);
         int offset = 0;
         for (const auto &body : bodies) {
-            r_body_nodes.block(0, offset, 3, body->n_nodes_) = body->node_normals_;
+            node_normals.block(0, offset, 3, body->n_nodes_) = body->node_normals_;
             offset += body->n_nodes_;
         }
     }
 
-    return r_body_nodes;
+    return node_normals;
 }
 
 std::pair<Eigen::MatrixXd, Eigen::MatrixXd> BodyContainer::unpack_solution_vector(VectorRef &x) const {
