@@ -46,6 +46,7 @@ target_include_directories(skelly PRIVATE
   ${PROJECT_SOURCE_DIR}/extern/spdlog/include
   ${PROJECT_SOURCE_DIR}/extern/trng4
   ${PROJECT_SOURCE_DIR}/extern/toml11
+  ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
   )
@@ -60,6 +61,7 @@ target_include_directories(skelly_sim PRIVATE
   ${PROJECT_SOURCE_DIR}/extern/spdlog/include
   ${PROJECT_SOURCE_DIR}/extern/trng4
   ${PROJECT_SOURCE_DIR}/extern/toml11
+  ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
   )

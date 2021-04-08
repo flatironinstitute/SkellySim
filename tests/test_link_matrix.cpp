@@ -1,3 +1,5 @@
+#include <skelly_sim.hpp>
+
 #include "cnpy.hpp"
 #include <Eigen/Core>
 #include <fstream>

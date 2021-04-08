@@ -44,6 +44,7 @@ class Body {
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
 
     Body(const toml::value &body_table, const Params &params);
+    Body() = default;
 
     const Eigen::Vector3d &get_position() const { return position_; };
     void update_RHS(MatrixRef &v_on_body);
@@ -69,6 +70,8 @@ class Body {
     virtual bool check_collision(const SphericalBody &body, double threshold) const {
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
+
+    MSGPACK_DEFINE_MAP(position_, orientation_);
 
     // For structures with fixed size Eigen::Vector types, this ensures alignment if the
     // structure is allocated via `new`
@@ -192,6 +195,8 @@ class BodyContainer {
             n_sites += body->nucleation_sites_.cols();
         return n_sites;
     }
+
+    MSGPACK_DEFINE(bodies);
 };
 
 class SphericalBody : public Body {

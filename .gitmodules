@@ -7,3 +7,6 @@
 [submodule "extern/toml11"]
 	path = extern/toml11
 	url = https://github.com/ToruNiina/toml11
+[submodule "extern/msgpack-c"]
+	path = extern/msgpack-c
+	url = https://github.com/msgpack/msgpack-c

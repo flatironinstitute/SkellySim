@@ -9,9 +9,6 @@ class FiberContainer;
 class Periphery;
 
 namespace System {
-void backup_impl();
-void restore_impl();
-
 void init(const std::string &input_file);
 Params *get_params();
 BodyContainer *get_body_container();

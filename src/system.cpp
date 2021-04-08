@@ -26,6 +26,7 @@ Params params_;
 FiberContainer fc_;
 BodyContainer bc_;
 std::unique_ptr<Periphery> shell_;
+std::ofstream ofs_;
 
 FiberContainer fc_bak_;
 BodyContainer bc_bak_;
@@ -37,6 +38,18 @@ struct {
     double dt;
     double time = 0.0;
 } properties;
+
+struct output_map {
+    double &time = properties.time;
+    FiberContainer &fibers = fc_;
+    BodyContainer &bodies = bc_;
+    MSGPACK_DEFINE_MAP(time, fibers, bodies);
+} output_map;
+
+void write() {
+    msgpack::pack(ofs_, output_map);
+    ofs_.flush();
+}
 
 // TODO: Refactor all preprocess stuff. It's awful
 
@@ -483,8 +496,7 @@ void dynamic_instability() {
                 inactive_sites.erase(passive_site_index);
                 to_nucleate.push_back({i_body, i_site});
                 n_to_nucleate--;
-            }
-            else {
+            } else {
                 n_trials--;
             }
         }
@@ -587,7 +599,6 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     res_fibers = fc.matvec(x_fibers, v_fibers, v_fib_boundary);
     res_shell = shell.matvec(x_shell, v_shell);
     res_bodies = bc.matvec(v_bodies, body_densities, body_velocities);
-    spdlog::debug("res max {}\t{}", res_shell.maxCoeff(), res_bodies.maxCoeff());
 
     return res;
 }
@@ -653,6 +664,9 @@ bool step() {
             double s = std::cos(0.5 * phi_norm);
             Eigen::Vector3d p = std::sin(0.5 * phi_norm) * phi / phi_norm;
             Eigen::Quaterniond orientation_new = Eigen::Quaterniond(s, p[0], p[1], p[2]) * body->orientation_;
+            std::stringstream ss;
+            ss << x_new.transpose();
+            spdlog::debug("Moving body {}: [{}]", i, ss.str());
             body->move(x_new, orientation_new);
         }
     }
@@ -680,6 +694,8 @@ void restore() {
 
 void run() {
     Params &params = params_;
+
+    System::write();
     while (properties.time < params.t_final) {
         System::backup();
         bool converged = System::step();
@@ -718,6 +734,9 @@ void run() {
         if (accept) {
             spdlog::info("Accepting timestep and advancing time");
             properties.time += properties.dt;
+            double &dt_write = params_.dt_write;
+            if ((int)(properties.time / dt_write) > (int)((properties.time - properties.dt) / dt_write))
+                System::write();
         } else {
             spdlog::info("Rejecting timestep");
             System::restore();
@@ -725,6 +744,8 @@ void run() {
         properties.dt = dt_new;
         spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
     }
+
+    System::write();
 }
 
 bool check_collision() {
@@ -796,5 +817,8 @@ void init(const std::string &input_file) {
     if (param_table_.contains("bodies"))
         bc_ = BodyContainer(param_table_.at("bodies").as_array(), params_);
     properties.dt = params_.dt_initial;
+
+    std::string filename = "skelly_sim.out." + std::to_string(rank_);
+    ofs_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary);
 }
 } // namespace System

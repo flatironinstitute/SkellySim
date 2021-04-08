@@ -1,3 +1,5 @@
+#include <skelly_sim.hpp>
+
 #include <algorithm>
 #include <iostream>
 #include <unordered_map>

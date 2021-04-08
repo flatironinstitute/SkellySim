@@ -13,6 +13,7 @@ Params::Params(toml::value &pt) {
     beta_down = toml::find_or(pt, "beta_down", 0.5);
     seed = toml::find_or(pt, "seed", 1);
     dt_min = toml::find_or(pt, "dt_min", 1E-4);
+    dt_write = toml::find_or(pt, "dt_write", 0.25);
     seed = toml::find_or(pt, "seed", 1);
 
     if (pt.contains("dynamic_instability")) {

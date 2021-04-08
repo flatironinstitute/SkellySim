@@ -21,16 +21,21 @@ class Fiber {
     enum BC { Force, Torque, Velocity, AngularVelocity, Position, Angle };
     static const std::string BC_name[];
 
+    // Input parameters
     int n_nodes_;                  ///< number of nodes representing the fiber
     double length_;                ///< length of fiber
     double bending_rigidity_;      ///< bending rigidity 'E' of fiber
     double penalty_param_ = 500.0; ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
     /// @brief scale of external force on node @see generate_external_force
     /// \f[{\bf f} = f_s * {\bf x}_s\f]
-    double force_scale_ = 4.0;
+    double force_scale_ = 0.0;
     // FIXME: Magic numbers in linear operator calculation
-    double beta_tstep_ = 1.0;         ///< penalty parameter to ensure inextensibility
-    double epsilon_ = 1E-3;           ///< slenderness parameter
+    double beta_tstep_ = 1.0; ///< penalty parameter to ensure inextensibility
+    double epsilon_ = 1E-3;   ///< slenderness parameter
+
+    /// (body, site) pair for minus end binding. -1 implies unbound
+    std::pair<int, int> binding_site_{-1, -1};
+
     double v_growth_ = 0.0;           ///< instantaneous fiber growth velocity
     bool collide_with_cortex = false; ///< flag if interacting with cortex
 
@@ -41,9 +46,6 @@ class Fiber {
     /// @brief Coefficient for SBT @see Fiber::init
     /// \f[ c_1 = \frac{1}{4\pi\eta} \f]
     double c_1_;
-
-    /// (body, site) pair for minus end binding. -1 implies unbound
-    std::pair<int, int> binding_site_{-1, -1};
 
     /// Boundary condition pair for minus end of fiber
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
@@ -85,6 +87,7 @@ class Fiber {
     const static std::unordered_map<int, fib_mat_t> matrices_;
 
     Fiber(toml::value &fiber_table, double eta);
+    Fiber() = default;
 
     /// @brief initialize empty fiber
     /// @param[in] n_nodes fiber 'resolution'
@@ -123,6 +126,8 @@ class Fiber {
     void update_derivatives();
     void update_stokeslet(double);
     bool attached_to_body() { return binding_site_.first >= 0; };
+    MSGPACK_DEFINE_MAP(n_nodes_, length_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_, epsilon_,
+                       binding_site_, x_);
 };
 
 /// Class to hold the fiber objects.
@@ -188,6 +193,9 @@ class FiberContainer {
   private:
     int world_size_ = -1;
     int world_rank_;
+
+  public:
+    MSGPACK_DEFINE(fibers);
 };
 
 #endif

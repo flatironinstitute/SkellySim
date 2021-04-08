@@ -163,6 +163,8 @@ Body::Body(const toml::value &body_table, const Params &params) {
 
     if (body_table.contains("orientation"))
         orientation_ = convert_array<Eigen::Quaterniond>(body_table.at("orientation").as_array());
+    else
+        orientation_ = orientation_ref_;
 
     if (body_table.contains("nucleation_sites")) {
         nucleation_sites_ref_ = convert_array<>(body_table.at("nucleation_sites").as_array());

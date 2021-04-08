@@ -15,6 +15,7 @@ class Params {
     double tol_tstep;
     double dt_min;
     double dt_max;
+    double dt_write;
     struct {
         int n_nodes = 0;
         double v_growth;
