@@ -12,10 +12,11 @@ class Params {
     double beta_down;
     double gmres_tol;
     double t_final;
-    double tol_tstep;
+    double fiber_error_tol;
     double dt_min;
     double dt_max;
     double dt_write;
+    bool periphery_binding_flag;
     struct {
         int n_nodes = 0;
         double v_growth;

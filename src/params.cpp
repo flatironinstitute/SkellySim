@@ -7,7 +7,7 @@ Params::Params(toml::value &pt) {
     dt_initial = toml::find_or(pt, "dt_initial", 1E-2);
     gmres_tol = toml::find_or(pt, "gmres_tol", 1E-2);
     t_final = toml::find_or(pt, "t_final", 1.0);
-    tol_tstep = toml::find_or(pt, "tol_tstep", 1E-2);
+    fiber_error_tol = toml::find_or(pt, "fiber_error_tol", 1E-1);
     dt_max = toml::find_or(pt, "dt_max", 2.0);
     beta_up = toml::find_or(pt, "beta_up", 1.2);
     beta_down = toml::find_or(pt, "beta_down", 0.5);
@@ -15,6 +15,7 @@ Params::Params(toml::value &pt) {
     dt_min = toml::find_or(pt, "dt_min", 1E-4);
     dt_write = toml::find_or(pt, "dt_write", 0.25);
     seed = toml::find_or(pt, "seed", 1);
+    periphery_binding_flag = toml::find_or(pt, "periphery_binding_flag", false);
 
     if (pt.contains("dynamic_instability")) {
         const auto &di = pt.at("dynamic_instability");

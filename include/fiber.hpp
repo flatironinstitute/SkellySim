@@ -24,6 +24,7 @@ class Fiber {
     // Input parameters
     int n_nodes_;                  ///< number of nodes representing the fiber
     double length_;                ///< length of fiber
+    double length_prev_;           ///< length pre-dynamic instability call
     double bending_rigidity_;      ///< bending rigidity 'E' of fiber
     double penalty_param_ = 500.0; ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
     /// @brief scale of external force on node @see generate_external_force
@@ -36,8 +37,8 @@ class Fiber {
     /// (body, site) pair for minus end binding. -1 implies unbound
     std::pair<int, int> binding_site_{-1, -1};
 
-    double v_growth_ = 0.0;           ///< instantaneous fiber growth velocity
-    bool collide_with_cortex = false; ///< flag if interacting with cortex
+    double v_growth_ = 0.0;      ///< instantaneous fiber growth velocity
+    bool near_periphery = false; ///< flag if interacting with periphery
 
     /// @brief Coefficient for SBT @see Fiber::init
     /// \f[ c_0 = -\frac{log(e \epsilon^\ell)}{8 \pi \eta}\f]
@@ -112,6 +113,7 @@ class Fiber {
         xss_.resize(3, n_nodes_);
         xsss_.resize(3, n_nodes_);
         xssss_.resize(3, n_nodes_);
+        length_prev_ = length_;
 
         c_0_ = -log(M_E * std::pow(epsilon_, 2)) / (8 * M_PI * eta);
         c_1_ = 2.0 / (8.0 * M_PI * eta);
@@ -188,7 +190,7 @@ class FiberContainer {
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
 
-    void update_boundary_conditions(Periphery &shell);
+    void update_boundary_conditions(Periphery &shell, bool periphery_binding_flag);
 
   private:
     int world_size_ = -1;

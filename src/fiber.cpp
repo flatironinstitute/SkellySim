@@ -49,16 +49,15 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 ///
 /// Updates: flag Fiber::at_surface_
 /// @param[in] Periphery object
-/// FIXME: should respect some sort of cortical sliding parameter to decide plus end BC
-void FiberContainer::update_boundary_conditions(Periphery &shell) {
+void FiberContainer::update_boundary_conditions(Periphery &shell, bool periphery_binding_flag) {
     /// FIXME: magic number in cortex interaction
     const double threshold = 0.75;
     for (auto &fib : fibers) {
         fib.bc_minus_ = fib.attached_to_body()
                             ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
                             : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
-        fib.collide_with_cortex = shell.check_collision(fib.x_, threshold);
-        fib.bc_plus_ = fib.collide_with_cortex
+        fib.near_periphery = shell.check_collision(fib.x_, threshold);
+        fib.bc_plus_ = (fib.near_periphery && periphery_binding_flag)
                            ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
                            : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
         spdlog::debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)&fib, fib.BC_name[fib.bc_minus_.first],
@@ -79,10 +78,10 @@ void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_di
 /// Updates: Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_
 void Fiber::update_derivatives() {
     auto &fib_mats = matrices_.at(n_nodes_);
-    xs_ = std::pow(2.0 / length_, 1) * x_ * fib_mats.D_1_0;
-    xss_ = std::pow(2.0 / length_, 2) * x_ * fib_mats.D_2_0;
-    xsss_ = std::pow(2.0 / length_, 3) * x_ * fib_mats.D_3_0;
-    xssss_ = std::pow(2.0 / length_, 4) * x_ * fib_mats.D_4_0;
+    xs_ = std::pow(2.0 / length_prev_, 1) * x_ * fib_mats.D_1_0;
+    xss_ = std::pow(2.0 / length_prev_, 2) * x_ * fib_mats.D_2_0;
+    xsss_ = std::pow(2.0 / length_prev_, 3) * x_ * fib_mats.D_3_0;
+    xssss_ = std::pow(2.0 / length_prev_, 4) * x_ * fib_mats.D_4_0;
 }
 
 /// @brief Updates the linear operator A_ that defines the linear system
@@ -207,15 +206,15 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     ArrayXd xs_z = xs_.block(2, 0, 1, np).transpose().array();
 
     ArrayXd alpha = mats.alpha;
-    ArrayXd s = (1.0 + alpha) * (0.5 * v_growth_);
+    ArrayXd s_dot = (1.0 + alpha) * (0.5 * v_growth_);
     ArrayXd I_arr = ArrayXd::Ones(np);
     RHS_.resize(4 * np);
     RHS_.setZero();
 
     // TODO (GK) : xs should be calculated at x_rhs when polymerization term is added to the rhs
-    RHS_.segment(0 * np, np) = x_x / dt + s * xs_x;
-    RHS_.segment(1 * np, np) = x_y / dt + s * xs_y;
-    RHS_.segment(2 * np, np) = x_z / dt + s * xs_z;
+    RHS_.segment(0 * np, np) = x_x / dt + s_dot * xs_x;
+    RHS_.segment(1 * np, np) = x_y / dt + s_dot * xs_y;
+    RHS_.segment(2 * np, np) = x_z / dt + s_dot * xs_z;
     RHS_.segment(3 * np, np) = -penalty_param_ * VectorXd::Ones(np);
 
     if (flow.size()) {

@@ -438,7 +438,7 @@ void dynamic_instability() {
     while (fib != fc.fibers.end()) {
         fib->v_growth_ = params.dynamic_instability.v_growth;
         double f_cat = params.dynamic_instability.f_catastrophe;
-        if (fib->collide_with_cortex) {
+        if (fib->near_periphery) {
             fib->v_growth_ *= params.dynamic_instability.v_grow_collision_scale;
             f_cat *= params.dynamic_instability.f_catastrophe_collision_scale;
         }
@@ -448,6 +448,7 @@ void dynamic_instability() {
         } else {
             if (fib->attached_to_body())
                 occupied_flat[site_index(fib->binding_site_)] = 1;
+            fib->length_prev_ = fib->length_;
             fib->length_ += dt * fib->v_growth_;
             fib++;
         }
@@ -627,7 +628,7 @@ bool step() {
     MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
 
     fc.update_RHS(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
-    fc.update_boundary_conditions(shell);
+    fc.update_boundary_conditions(shell, params.periphery_binding_flag);
     fc.apply_bc_rectangular(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
 
     shell.update_RHS(v_fib2all.block(0, fib_node_count, 3, shell_node_count));
@@ -710,9 +711,9 @@ void run() {
 
         double dt_new = properties.dt;
         bool accept = false;
-        if (converged && fiber_error <= params.tol_tstep) {
+        if (converged && fiber_error <= params.fiber_error_tol) {
             accept = true;
-            const double tol_window = 0.9 * params.tol_tstep;
+            const double tol_window = 0.9 * params.fiber_error_tol;
             if (fiber_error <= tol_window)
                 dt_new = std::min(params.dt_max, properties.dt * params.beta_up);
         } else {
@@ -727,6 +728,7 @@ void run() {
         }
 
         if (dt_new < params.dt_min) {
+            spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
             spdlog::critical("Timestep smaller than minimum allowed");
             throw std::runtime_error("Timestep smaller than dt_min");
         }
@@ -755,18 +757,21 @@ bool check_collision() {
     const double threshold = 0.0;
     using Eigen::VectorXd;
 
+    char collided = false;
     for (const auto &body : bc.bodies)
-        if (body->check_collision(shell, threshold))
-            return true;
+        if (!collided && body->check_collision(shell, threshold))
+            collided = true;
 
     for (const auto &fiber : fc.fibers)
-        if (shell.check_collision(fiber.x_, threshold))
-            return true;
+        if (!collided && shell.check_collision(fiber.x_, threshold))
+            collided = true;
 
     for (auto &body1 : bc.bodies)
         for (auto &body2 : bc.bodies)
-            if (body1 != body2 && body1->check_collision(*body2, threshold))
-                return true;
+            if (!collided && body1 != body2 && body1->check_collision(*body2, threshold))
+                collided = true;
+
+    MPI_Allreduce(MPI_IN_PLACE, &collided, 1, MPI_CHAR, MPI_LOR, MPI_COMM_WORLD);
 
     return false;
 }
