@@ -539,6 +539,14 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices(int n_nodes_finite_di
 // FIXME: Make this an input parameter
 const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matrices(4);
 
+int FiberContainer::get_global_count() const {
+    const int local_fib_count = get_local_count();
+    int global_fib_count;
+
+    MPI_Allreduce(&local_fib_count, &global_fib_count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    return global_fib_count;
+}
+
 int FiberContainer::get_global_total_fib_nodes() const {
     const int local_fib_nodes = get_local_node_count();
     int global_fib_nodes;
@@ -646,7 +654,7 @@ MatrixXd FiberContainer::get_local_node_positions() const {
 MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, double eta) const {
     const size_t n_src = fib_forces.cols();
     const size_t n_trg_external = r_trg_external.cols();
-    if (!n_src)
+    if (!get_global_count())
         return Eigen::MatrixXd::Zero(3, n_trg_external);
 
     MatrixXd weighted_forces(3, n_src);
