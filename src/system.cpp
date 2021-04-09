@@ -410,12 +410,12 @@ void dynamic_instability() {
     if (params_.dynamic_instability.n_nodes == 0)
         return;
 
-    size_t n_nodes = 0;
+    size_t n_sites = 0;
     std::vector<int> body_offsets(bc.bodies.size() + 1);
     int i_body = 0;
     for (const auto &body : bc.bodies) {
-        n_nodes += body->n_nodes_;
-        body_offsets[i_body + 1] = body_offsets[i_body] + body->n_nodes_;
+        n_sites += body->nucleation_sites_.cols();
+        body_offsets[i_body + 1] = body_offsets[i_body] + body->nucleation_sites_.cols();
         i_body++;
     }
 
