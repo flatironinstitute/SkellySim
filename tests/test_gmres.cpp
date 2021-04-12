@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
         System::step();
         success = true;
     } catch (std::exception &e) {
-        spdlog::info(e.what());
+        spdlog::critical(e.what());
     } catch (...) {
         spdlog::info("Unknown exception detected.");
     }
