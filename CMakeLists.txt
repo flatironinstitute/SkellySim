@@ -65,7 +65,7 @@ target_include_directories(skelly_sim PRIVATE
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
   )
-target_link_libraries(skelly_sim PRIVATE skelly Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX spdlog trng4_static
+target_link_libraries(skelly_sim PRIVATE skelly z Eigen3::Eigen OpenMP::OpenMP_CXX MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
 include(CTest)

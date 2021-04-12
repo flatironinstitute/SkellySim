@@ -1,18 +1,23 @@
-#include <Teuchos_CommandLineProcessor.hpp>
-#include <Tpetra_Core.hpp>
+#include <skelly_sim.hpp>
 
-using namespace Teuchos;
+#include <system.hpp>
+
+#include <mpi.h>
+#include <spdlog/spdlog.h>
 
 int main(int argc, char *argv[]) {
+    int thread_level;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
 
-    Tpetra::ScopeGuard tpetraScope(&argc, &argv);
-    {
-        RCP<const Comm<int>> comm = Tpetra::getDefaultComm();
-        const int rank = comm->getRank();
-        const int size = comm->getSize();
-
-        CommandLineProcessor cmdp(false, true);
+    if (argc != 2) {
+        spdlog::critical("No config file provided. Add config_file as argument to skelly_sim.");
+        MPI_Finalize();
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    System::init(std::string(argv[1]));
+    System::run();
+
+    MPI_Finalize();
+    return EXIT_SUCCESS;
 }

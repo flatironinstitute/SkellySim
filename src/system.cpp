@@ -789,8 +789,8 @@ toml::value *get_param_table() { return &param_table_; }
 void init(const std::string &input_file) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
-    spdlog::logger sink = rank_ == 0 ? spdlog::logger("", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
-                                     : spdlog::logger("", std::make_shared<spdlog::sinks::null_sink_st>());
+    spdlog::logger sink = rank_ == 0 ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
+                                     : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
     spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
     spdlog::stdout_color_mt("STKFMM");
     spdlog::stdout_color_mt("Belos");
