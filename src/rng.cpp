@@ -8,6 +8,8 @@
 
 #include <mpi.h>
 
+#include <iostream>
+
 namespace RNG {
 using engine_type = trng::yarn2;
 engine_type engine_distributed;
@@ -27,6 +29,26 @@ void init(unsigned long seed) {
 
     engine_distributed.split(2, 1);
     engine_distributed.split(size, rank);
+}
+
+void init(std::pair<std::string, std::string> state) {
+    std::stringstream shared_stream;
+    std::stringstream distributed_stream;
+
+    shared_stream.str(state.first);
+    distributed_stream.str(state.second);
+
+    shared_stream >> engine_shared;
+    distributed_stream >> engine_distributed;
+}
+
+std::pair<std::string, std::string> dump_state() {
+    std::stringstream shared_stream;
+    std::stringstream distributed_stream;
+
+    shared_stream << engine_shared;
+    distributed_stream << engine_distributed;
+    return std::make_pair(shared_stream.str(), distributed_stream.str());
 }
 
 double uniform(double low, double high) { return trng::uniform_dist(low, high)(engine_distributed); }

@@ -43,10 +43,12 @@ struct output_map {
     double &time = properties.time;
     FiberContainer &fibers = fc_;
     BodyContainer &bodies = bc_;
-    MSGPACK_DEFINE_MAP(time, fibers, bodies);
+    std::pair<std::string, std::string> rng_state;
+    MSGPACK_DEFINE_MAP(time, rng_state, fibers, bodies);
 } output_map;
 
 void write() {
+    output_map.rng_state = RNG::dump_state();
     msgpack::pack(ofs_, output_map);
     ofs_.flush();
 }
