@@ -9,7 +9,7 @@ class FiberContainer;
 class Periphery;
 
 namespace System {
-void init(const std::string &input_file);
+void init(const std::string &input_file, bool resume_flag = false);
 Params *get_params();
 BodyContainer *get_body_container();
 FiberContainer *get_fiber_container();

@@ -15,6 +15,7 @@
 #include <system.hpp>
 
 #include <mpi.h>
+#include <sys/mman.h>
 
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/null_sink.h>
@@ -39,18 +40,71 @@ struct {
     double time = 0.0;
 } properties;
 
-struct output_map {
+typedef struct output_map_t {
     double &time = properties.time;
+    double &dt = properties.dt;
     FiberContainer &fibers = fc_;
     BodyContainer &bodies = bc_;
     std::pair<std::string, std::string> rng_state;
-    MSGPACK_DEFINE_MAP(time, rng_state, fibers, bodies);
-} output_map;
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);
+} output_map_t;
+output_map_t output_map;
+
+typedef struct input_map_t {
+    double time;
+    double dt;
+    FiberContainer fibers;
+    BodyContainer bodies;
+    std::pair<std::string, std::string> rng_state;
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);
+} input_map_t;
 
 void write() {
     output_map.rng_state = RNG::dump_state();
     msgpack::pack(ofs_, output_map);
     ofs_.flush();
+}
+
+void resume_from_trajectory(std::string if_file) {
+    int fd = open(if_file.c_str(), O_RDONLY);
+    if (fd == -1)
+        throw std::runtime_error("Unable to open trajectory file " + if_file + " for resume.");
+
+    struct stat sb;
+    if (fstat(fd, &sb) == -1)
+        throw std::runtime_error("Error statting " + if_file + " for resume.");
+
+    std::size_t buflen = sb.st_size;
+
+    const char *addr = static_cast<const char *>(mmap(NULL, buflen, PROT_READ, MAP_PRIVATE, fd, 0u));
+    if (addr == MAP_FAILED)
+        throw std::runtime_error("Error mapping " + if_file + " for resume.");
+
+    std::size_t offset = 0;
+    msgpack::object_handle oh;
+    // FIXME: There is probably a way to not have to read the entire trajectory
+    while (offset != buflen)
+        msgpack::unpack(oh, addr, buflen, offset);
+
+    // FIXME: This is a bug-prone way to unpack. Should make proper clone functions that merge
+    // the minimum representation with existing data automatically (node data, etc)
+    msgpack::object obj = oh.get();
+    input_map_t const &min_state = obj.as<input_map_t>();
+    output_map.time = min_state.time;
+    output_map.dt = min_state.dt;
+    fc_.fibers.clear();
+    for (const auto &min_fib : min_state.fibers.fibers) {
+        Fiber new_fib = min_fib;
+        new_fib.init(params_.eta);
+        new_fib.x_ = min_fib.x_;
+        fc_.fibers.push_back(new_fib);
+    }
+    for (int i = 0; i < bc_.bodies.size(); ++i) {
+        bc_.bodies[i]->position_ = min_state.bodies.bodies[i]->position_;
+        bc_.bodies[i]->orientation_ = min_state.bodies.bodies[i]->orientation_;
+    }
+    output_map.rng_state = min_state.rng_state;
+    RNG::init(output_map.rng_state);
 }
 
 // TODO: Refactor all preprocess stuff. It's awful
@@ -788,11 +842,12 @@ FiberContainer *get_fiber_container() { return &fc_; }
 Periphery *get_shell() { return shell_.get(); }
 toml::value *get_param_table() { return &param_table_; }
 
-void init(const std::string &input_file) {
+void init(const std::string &input_file, bool resume_flag) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
-    spdlog::logger sink = rank_ == 0 ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
-                                     : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
+    spdlog::logger sink = rank_ == 0
+                              ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
+                              : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
     spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
     spdlog::stdout_color_mt("STKFMM");
     spdlog::stdout_color_mt("Belos");
@@ -826,6 +881,11 @@ void init(const std::string &input_file) {
     properties.dt = params_.dt_initial;
 
     std::string filename = "skelly_sim.out." + std::to_string(rank_);
-    ofs_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary);
+    if (resume_flag) {
+        resume_from_trajectory(filename);
+        ofs_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary | std::ofstream::app);
+    } else {
+        ofs_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary);
+    }
 }
 } // namespace System
