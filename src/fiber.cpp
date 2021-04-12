@@ -389,7 +389,6 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     }
 
     switch (bc_plus_.first) {
-    // FIXME: implement more BC
     case BC::Velocity: {
         int endc = xss_.cols() - 1;
         int endr = D_3.rows() - 1;
@@ -673,7 +672,6 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
     }
 
     // All-to-all
-    // FIXME: MPI not compatible with direct calculation
     MatrixXd r_trg(3, n_src + n_trg_external);
     r_trg.block(0, 0, 3, n_src) = r_src;
     if (n_trg_external)
@@ -684,7 +682,6 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Subtract self term
-    // FIXME: Subtracting self flow only works when system has only fibers
     offset = 0;
     for (const auto &fib : fibers) {
         VectorMap wf_flat(weighted_forces.data() + offset * 3, fib.n_nodes_ * 3);
