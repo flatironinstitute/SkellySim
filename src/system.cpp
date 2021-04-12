@@ -588,7 +588,8 @@ void dynamic_instability() {
         if (min_fib.rank == rank_) {
             Fiber fib(params.dynamic_instability.n_nodes, params.dynamic_instability.bending_rigidity, params.eta);
             fib.length_ = params.dynamic_instability.min_length;
-            fib.v_growth_ = params.dynamic_instability.v_growth;
+            fib.length_prev_ = params.dynamic_instability.min_length;
+            fib.v_growth_ = 0.0;
             fib.binding_site_ = min_fib.binding_site;
 
             Eigen::MatrixXd x(3, fib.n_nodes_);
@@ -600,7 +601,7 @@ void dynamic_instability() {
                 fib.x_.row(i) = origin(i) + u(i) * s;
 
             fc.fibers.push_back(fib);
-            spdlog::get("global-status")
+            spdlog::get("SkellySim global")
                 ->info("Inserted fiber on rank {} at site [{}, {}]", rank_, min_fib.binding_site.first,
                        min_fib.binding_site.second);
         }
@@ -851,7 +852,7 @@ void init(const std::string &input_file, bool resume_flag) {
     spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
     spdlog::stdout_color_mt("STKFMM");
     spdlog::stdout_color_mt("Belos");
-    spdlog::stdout_color_mt("global-status");
+    spdlog::stdout_color_mt("SkellySim global");
     spdlog::cfg::load_env_levels();
 
     param_table_ = toml::parse(input_file);
