@@ -60,9 +60,10 @@ void FiberContainer::update_boundary_conditions(Periphery &shell, bool periphery
         fib.bc_plus_ = (fib.near_periphery && periphery_binding_flag)
                            ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
                            : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
-        spdlog::debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)&fib, fib.BC_name[fib.bc_minus_.first],
-                      fib.BC_name[fib.bc_minus_.second], fib.BC_name[fib.bc_plus_.first],
-                      fib.BC_name[fib.bc_plus_.second]);
+        spdlog::get("SkellySim global")
+            ->debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)&fib, fib.BC_name[fib.bc_minus_.first],
+                    fib.BC_name[fib.bc_minus_.second], fib.BC_name[fib.bc_plus_.first],
+                    fib.BC_name[fib.bc_plus_.second]);
     }
 }
 
