@@ -40,6 +40,8 @@ class Body {
     /// [ 3 x n_nucleation_sites ] nucleation site positions in lab frame
     Eigen::MatrixXd nucleation_sites_;
 
+    Eigen::Vector3d external_force_{0.0, 0.0, 0.0};
+
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
 

@@ -682,16 +682,36 @@ bool step() {
     fc.update_cache_variables(dt, eta);
 
     MatrixXd f_on_fibers = fc.generate_constant_force();
-    MatrixXd v_fib2all = fc.flow(f_on_fibers, r_trg_external, eta);
+    MatrixXd v_all = fc.flow(f_on_fibers, r_trg_external, eta);
 
-    fc.update_RHS(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
+    fc.update_RHS(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
     fc.update_boundary_conditions(shell, params.periphery_binding_flag);
-    fc.apply_bc_rectangular(dt, v_fib2all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
+    fc.apply_bc_rectangular(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
 
-    shell.update_RHS(v_fib2all.block(0, fib_node_count, 3, shell_node_count));
+    shell.update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
 
     bc.update_cache_variables(eta);
-    bc.update_RHS(v_fib2all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
+
+    // Check for an add external body forces
+    for (const auto &body : bc.bodies) {
+        if (!body->external_force_.any())
+            continue;
+        // apply external force
+        Eigen::MatrixXd force_torque_bodies = Eigen::MatrixXd::Zero(6, bc.bodies.size());
+        for (int i = 0; i < bc.bodies.size(); ++i)
+            force_torque_bodies.col(i).segment(0, 3) += body->external_force_;
+
+        const int total_node_count = fib_node_count + shell_node_count + body_node_count;
+        MatrixXd r_all(3, total_node_count);
+        auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
+        r_fibers = fc.get_local_node_positions();
+        r_shell = shell.get_local_node_positions();
+        r_bodies = bc.get_local_node_positions();
+
+        v_all += bc.flow(r_all, Eigen::MatrixXd::Zero(r_bodies.rows(), r_bodies.cols()), force_torque_bodies, eta);
+        break;
+    }
+    bc.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
 
     Solver<P_inv_hydro, A_fiber_hydro> solver_;
     solver_.set_RHS();
@@ -712,21 +732,28 @@ bool step() {
 
     Eigen::MatrixXd body_velocities, body_densities;
     std::tie(body_velocities, body_densities) = bc.unpack_solution_vector(body_sol);
+    for (int i = 0; i < body_velocities.cols(); ++i) {
+        std::stringstream ss;
+        ss << body_velocities.col(i).transpose();
+        spdlog::debug("body velocities {}: [{}]", i, ss.str());
+    }
 
     for (int i = 0; i < bc.bodies.size(); ++i) {
         auto &body = bc.bodies[i];
         Eigen::Vector3d x_new = body->position_ + body_velocities.col(i).segment(0, 3) * dt;
         Eigen::Vector3d phi = body_velocities.col(i).segment(3, 3) * dt;
         double phi_norm = phi.norm();
+        Eigen::Quaterniond orientation_new = body->orientation_;
         if (phi_norm) {
             double s = std::cos(0.5 * phi_norm);
             Eigen::Vector3d p = std::sin(0.5 * phi_norm) * phi / phi_norm;
-            Eigen::Quaterniond orientation_new = Eigen::Quaterniond(s, p[0], p[1], p[2]) * body->orientation_;
-            std::stringstream ss;
-            ss << x_new.transpose();
-            spdlog::debug("Moving body {}: [{}]", i, ss.str());
-            body->move(x_new, orientation_new);
+            orientation_new = Eigen::Quaterniond(s, p[0], p[1], p[2]) * body->orientation_;
         }
+        std::stringstream ss;
+        ss << x_new.transpose();
+        spdlog::debug("Moving body {}: [{}]", i, ss.str());
+
+        body->move(x_new, orientation_new);
     }
 
     // Re-pin fibers to bodies

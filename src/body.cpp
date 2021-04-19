@@ -172,6 +172,9 @@ Body::Body(const toml::value &body_table, const Params &params) {
         nucleation_sites_ = nucleation_sites_ref_;
     }
 
+    if (body_table.contains("external_force"))
+        external_force_ = convert_array<>(body_table.at("external_force").as_array());
+
     move(position_, orientation_);
 
     update_cache_variables(params.eta);
