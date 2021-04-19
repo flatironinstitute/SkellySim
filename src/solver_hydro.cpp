@@ -86,7 +86,7 @@ bool Solver<P_inv_hydro, A_fiber_hydro>::solve() {
 
     double st = omp_get_wtime();
     Belos::ReturnType ret = solver.solve();
-    redirect.flush(spdlog::level::debug, "Belos");
+    redirect.flush(spdlog::level::trace, "Belos");
 
     if (ret == Belos::Converged) {
         spdlog::info("Solver converged with parameters: iters {}, time {}, achieved tolerance {}", solver.getNumIters(),
