@@ -137,9 +137,9 @@ Eigen::MatrixXd kernels::rotlet(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &d
     // FIXME: Might want to vectorize rotlet calculation
     for (int i_trg = 0; i_trg < N_trg; ++i_trg) {
         for (int i_src = 0; i_src < N_src; ++i_src) {
-            double dx = r_src(0, i_src) - r_trg(0, i_trg);
-            double dy = r_src(1, i_src) - r_trg(1, i_trg);
-            double dz = r_src(2, i_src) - r_trg(2, i_trg);
+            double dx = r_trg(0, i_trg) - r_src(0, i_src);
+            double dy = r_trg(1, i_trg) - r_src(1, i_src);
+            double dz = r_trg(2, i_trg) - r_src(2, i_src);
             double dr2 = dx * dx + dy * dy + dz * dz;
 
             double dr = dr2 < eps2 ? sqrt(reg2 + dr2) : sqrt(dr2);
