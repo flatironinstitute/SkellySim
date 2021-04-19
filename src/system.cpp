@@ -379,7 +379,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions
         force_torque_on_bodies.col(i_body).segment(3, 3) += L_body;
 
         // SECOND FROM BODY ON-TO FIBER
-        // Translational and angular velocities at the attacment point are calculated
+        // Translational and angular velocities at the attachment point are calculated
         Vector3d v_body = body_velocities.block(0, i_body, 3, 1);
         Vector3d w_body = body_velocities.block(3, i_body, 3, 1);
 
