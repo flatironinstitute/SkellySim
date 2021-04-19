@@ -40,6 +40,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 
     bending_rigidity_ = toml::find<double>(fiber_table, "bending_rigidity");
     length_ = toml::find<double>(fiber_table, "length");
+    length_prev_ = toml::find<double>(fiber_table, "length");
     force_scale_ = toml::find_or<double>(fiber_table, "force_scale", 0.0);
     binding_site_.first = toml::find_or<int>(fiber_table, "parent_body", -1);
     binding_site_.second = toml::find_or<int>(fiber_table, "parent_site", -1);
