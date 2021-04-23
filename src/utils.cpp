@@ -2,6 +2,8 @@
 #include <skelly_sim.hpp>
 #include <utils.hpp>
 
+#include <cnpy.hpp>
+
 //  Following the paper Calculation of weights in finite different formulas,
 //  Bengt Fornberg, SIAM Rev. 40 (3), 685 (1998).
 //
@@ -102,4 +104,12 @@ Eigen::VectorXd utils::collect_into_global(VectorRef &local_vec) {
                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     return global_vec;
+}
+
+Eigen::MatrixXd utils::load_mat(cnpy::npz_t &npz, const char *var) {
+    return Eigen::Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0]).matrix().transpose();
+}
+
+Eigen::VectorXd utils::load_vec(cnpy::npz_t &npz, const char *var) {
+    return Eigen::Map<Eigen::VectorXd>(npz[var].data<double>(), npz[var].shape[0]);
 }
