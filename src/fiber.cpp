@@ -350,6 +350,9 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         B(3, 3 * np) = -1;
 
         Vector3d BC_start_vec_0{0.0, 0.0, 0.0};
+        if (f_on_fiber.size())
+            BC_start_vec_0 = f_on_fiber.col(0);
+
         B_RHS.segment(0, 3) = BC_start_vec_0;
         B_RHS(3) = BC_start_vec_0.dot(xs_.col(0));
 
@@ -392,7 +395,7 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
 
     switch (bc_plus_.first) {
     case BC::Velocity: {
-        int endc = xss_.cols() - 1;
+        int endc = n_nodes_ - 1;
         int endr = D_3.rows() - 1;
         B(7, 1 * np - 1) = beta_tstep_ / dt;
         B(8, 2 * np - 1) = beta_tstep_ / dt;
@@ -589,12 +592,13 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
     for (const auto &fib : fibers) {
         auto &mats = fib.matrices_.at(fib.n_nodes_);
         const int np = fib.n_nodes_;
-        MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / fib.length_, 1);
+        const int bc_start_i = 4 * np - 14;
+        MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / fib.length_prev_, 1);
         MatrixXd xsDs = (D_1.array().colwise() * fib.xs_.row(0).transpose().array()).transpose();
         MatrixXd ysDs = (D_1.array().colwise() * fib.xs_.row(1).transpose().array()).transpose();
         MatrixXd zsDs = (D_1.array().colwise() * fib.xs_.row(2).transpose().array()).transpose();
 
-        VectorXd vT = VectorXd::Zero(np * 4);
+        VectorXd vT = VectorXd(np * 4);
         auto v_fib_x = v_fib.row(0).segment(offset, np).transpose();
         auto v_fib_y = v_fib.row(1).segment(offset, np).transpose();
         auto v_fib_z = v_fib.row(2).segment(offset, np).transpose();
@@ -604,15 +608,20 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
         vT.segment(3 * np, np) = xsDs * v_fib_x + ysDs * v_fib_y + zsDs * v_fib_z;
 
         VectorXd vT_in = VectorXd::Zero(4 * np);
-        vT_in.segment(0, 4 * np - 14) = mats.P_downsample_bc * vT;
+        vT_in.segment(0, bc_start_i) = mats.P_downsample_bc * vT;
 
         VectorXd xs_vT = VectorXd::Zero(4 * np); // from body attachments
-        xs_vT(4 * np - 11) = v_fib_x(0) * fib.xs_(0, 0) + v_fib_y(0) * fib.xs_(1, 0) + v_fib_z(0) * fib.xs_(2, 0);
+        const int minus_node = offset;
+        const int plus_node = offset + np - 1;
+        xs_vT(bc_start_i + 3) = v_fib.col(minus_node).dot(fib.xs_.col(0));
 
         // Body link BC (match velocities of body to fiber minus end)
         VectorXd y_BC = VectorXd::Zero(4 * np);
         if (v_fib_boundary.size() > 0)
-            y_BC.segment(4 * np - 14, 7) = v_fib_boundary.col(i_fib);
+            y_BC.segment(bc_start_i + 0, 7) = v_fib_boundary.col(i_fib);
+
+        if (fib.bc_plus_.first == Fiber::Velocity)
+            xs_vT(bc_start_i + 10) = v_fib.col(plus_node).dot(fib.xs_.col(np - 1));
 
         res.segment(4 * offset, 4 * np) = fib.A_ * x_all.segment(4 * offset, 4 * np) - vT_in + xs_vT + y_BC;
 
