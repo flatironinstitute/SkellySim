@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
 
     Fiber fib(x.cols(), bending_rigidity, eta);
     fib.length_ = length;
+    fib.length_prev_ = length;
     fib.x_ = x;
     fib.update_derivatives();
     fib.update_stokeslet(eta);
