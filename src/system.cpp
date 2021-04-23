@@ -684,12 +684,6 @@ bool step() {
     MatrixXd f_on_fibers = fc.generate_constant_force();
     MatrixXd v_all = fc.flow(f_on_fibers, r_trg_external, eta);
 
-    fc.update_RHS(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
-    fc.update_boundary_conditions(shell, params.periphery_binding_flag);
-    fc.apply_bc_rectangular(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers.block(0, 0, 3, fib_node_count));
-
-    shell.update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
-
     bc.update_cache_variables(eta);
 
     // Check for an add external body forces
@@ -697,6 +691,7 @@ bool step() {
         if (!body->external_force_.any())
             continue;
         // apply external force
+        spdlog::info("Applying external force to body and calculating flow");
         Eigen::MatrixXd force_torque_bodies = Eigen::MatrixXd::Zero(6, bc.bodies.size());
         for (int i = 0; i < bc.bodies.size(); ++i)
             force_torque_bodies.col(i).segment(0, 3) += body->external_force_;
@@ -712,6 +707,12 @@ bool step() {
         break;
     }
     bc.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
+
+    fc.update_RHS(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
+    fc.update_boundary_conditions(shell, params.periphery_binding_flag);
+    fc.apply_bc_rectangular(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
+
+    shell.update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
 
     Solver<P_inv_hydro, A_fiber_hydro> solver_;
     solver_.set_RHS();
