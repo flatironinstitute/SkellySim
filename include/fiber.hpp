@@ -63,7 +63,7 @@ class Fiber {
     Eigen::MatrixXd stokeslet_;
 
     Eigen::MatrixXd A_;                         ///< Fiber's linear operator for matrix solver
-    Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< Fiber preconditioner, LU decomposition of Fiber::A_
+    Eigen::FullPivLU<Eigen::MatrixXd> A_LU_; ///< Fiber preconditioner, LU decomposition of Fiber::A_
     /// Fiber force operator, @see Fiber::update_force_operator, FiberContainer::apply_fiber_force
     Eigen::MatrixXd force_operator_;
     Eigen::VectorXd RHS_; ///< Current 'right-hand-side' for matrix formulation of solver
