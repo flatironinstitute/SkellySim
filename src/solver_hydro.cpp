@@ -1,12 +1,12 @@
-#include <solver_hydro.hpp>
 #include <params.hpp>
+#include <solver_hydro.hpp>
 #include <system.hpp>
 #include <utils.hpp>
 
 #include <Teuchos_ParameterList.hpp>
 
-#include <BelosBlockGmresSolMgr.hpp>
 #include <BelosLinearProblem.hpp>
+#include <BelosPseudoBlockGmresSolMgr.hpp>
 #include <BelosTpetraAdapter.hpp>
 
 #include <spdlog/spdlog.h>
@@ -70,18 +70,15 @@ bool Solver<P_inv_hydro, A_fiber_hydro>::solve() {
     bool set = problem.setProblem();
 
     Teuchos::ParameterList belosList;
-    // belosList.set("Block Size", 1);                                         // Blocksize to be used by iterative
-    // solver belosList.set("Maximum Iterations", 100);                               // Maximum number of iterations
     // allowed
     belosList.set("Convergence Tolerance", System::get_params()->gmres_tol); // Relative convergence tolerance requested
-    belosList.set("Orthogonalization", "DGKS");                             // Orthogonalization type
-    belosList.set("Explicit Residual Scaling", "Norm of Preconditioned Initial Residual");
+    belosList.set("Orthogonalization", "ICGS");                              // Orthogonalization type
     belosList.set("Verbosity",
                   Belos::MsgType::IterationDetails + Belos::MsgType::FinalSummary + Belos::MsgType::StatusTestDetails);
     belosList.set("Output Frequency", 1);
     belosList.set("Output Style", Belos::OutputType::General);
 
-    Belos::BlockGmresSolMgr<ST, MV, OP> solver(rcpFromRef(problem), rcpFromRef(belosList));
+    Belos::PseudoBlockGmresSolMgr<ST, MV, OP> solver(rcpFromRef(problem), rcpFromRef(belosList));
     utils::LoggerRedirect redirect(std::cout);
 
     double st = omp_get_wtime();
