@@ -759,8 +759,9 @@ bool step() {
     // Re-pin fibers to bodies
     for (auto &fib : fc.fibers) {
         if (fib.binding_site_.first >= 0) {
-            Eigen::Vector3d origin = bc.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second);
-            fib.x_.colwise() += origin - fib.x_.col(0);
+            Eigen::Vector3d delta =
+                bc.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);
+            fib.x_.colwise() += delta;
         }
     }
 
