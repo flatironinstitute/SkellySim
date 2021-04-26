@@ -228,8 +228,10 @@ void resolve_nucleation_sites(toml::array &fiber_array, toml::array &body_array)
 
         resolve_fiber_position(fiber_table, origin);
 
-        Eigen::VectorXd x_array = parse_util::convert_array<>(fiber_table.at("x").as_array());
-        nucleation_sites[i_body][i_site] = x_array.segment(0, 3) - origin;
+        if (fiber_table.contains("x")) {
+            Eigen::VectorXd x_array = parse_util::convert_array<>(fiber_table.at("x").as_array());
+            nucleation_sites[i_body][i_site] = x_array.segment(0, 3) - origin;
+        }
     }
 
     for (int i_body = 0; i_body < n_bodies; ++i_body) {
@@ -271,6 +273,29 @@ void resolve_nucleation_sites(toml::array &fiber_array, toml::array &body_array)
         for (auto &[site, xvec] : nucleation_sites[i_body])
             for (int i = 0; i < 3; ++i)
                 x.push_back(xvec[i]);
+    }
+
+    for (const auto &site_map : occupied) {
+        auto [i_body, i_site] = site_map.first;
+        auto i_fib = site_map.second;
+        toml::value &fiber_table = fiber_array.at(i_fib);
+        toml::array &body_position = body_array.at(i_body).at("position").as_array();
+        toml::array &nucleation_sites = body_array.at(i_body).at("nucleation_sites").as_array();
+
+        fiber_table["parent_body"] = i_body;
+        fiber_table["parent_site"] = i_site;
+        Eigen::Vector3d origin = parse_util::convert_array<>(body_position);
+        Eigen::VectorXd sites = parse_util::convert_array<>(nucleation_sites);
+
+        if (!fiber_table.contains("x")) {
+            Eigen::Vector3d site_pos = Eigen::Map<Eigen::Vector3d>(sites.data() + i_site * 3, 3);
+            Eigen::Vector3d fiber_origin = site_pos;
+            Eigen::Vector3d fiber_orientation = fiber_origin.normalized();
+            fiber_table["relative_position"] = {fiber_origin[0], fiber_origin[1], fiber_origin[2]};
+            fiber_table["orientation"] = {fiber_orientation[0], fiber_orientation[1], fiber_orientation[2]};
+
+            resolve_fiber_position(fiber_table, origin);
+        }
     }
 }
 
@@ -702,8 +727,8 @@ bool step() {
         r_bodies = bc.get_local_node_positions();
 
         v_all += bc.flow(r_all, Eigen::MatrixXd::Zero(r_bodies.rows(), r_bodies.cols()), force_torque_bodies, eta);
-        break;
     }
+
     bc.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
 
     fc.update_RHS(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
