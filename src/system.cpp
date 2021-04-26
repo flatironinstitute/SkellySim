@@ -23,22 +23,22 @@
 #include <spdlog/spdlog.h>
 
 namespace System {
-Params params_;                    //< Simulation input parameters
-FiberContainer fc_;                //< Fibers
-BodyContainer bc_;                 //< Bodies
-std::unique_ptr<Periphery> shell_; //< Periphery
-std::ofstream ofs_;                //< Trajectory output file stream. Opened at initialization
+Params params_;                    ///< Simulation input parameters
+FiberContainer fc_;                ///< Fibers
+BodyContainer bc_;                 ///< Bodies
+std::unique_ptr<Periphery> shell_; ///< Periphery
+std::ofstream ofs_;                ///< Trajectory output file stream. Opened at initialization
 
-FiberContainer fc_bak_;   //< Copy of fibers for timestep reversion
-BodyContainer bc_bak_;    //< Copy of bodies for timestep reversion
-int rank_;                //< MPI rank
-int size_;                //< MPI size
-toml::value param_table_; //< Parsed input table
+FiberContainer fc_bak_;   ///< Copy of fibers for timestep reversion
+BodyContainer bc_bak_;    ///< Copy of bodies for timestep reversion
+int rank_;                ///< MPI rank
+int size_;                ///< MPI size
+toml::value param_table_; ///< Parsed input table
 
 /// @brief Time varying system properties that are extrinsic to the physical objects
 struct {
-    double dt;         //< Current timestep size
-    double time = 0.0; //< Current system time
+    double dt;         ///< Current timestep size
+    double time = 0.0; ///< Current system time
 } properties;
 
 /// @brief Structure for trajectory output via msgpack
@@ -46,26 +46,26 @@ struct {
 /// This can be extended easily, so long as you update the corresponding input_map_t and potentially the System::write()
 /// function if you can't use a reference in the output_map for some reason.
 typedef struct output_map_t {
-    double &time = properties.time;
-    double &dt = properties.dt;
-    FiberContainer &fibers = fc_;
-    BodyContainer &bodies = bc_;
-    std::pair<std::string, std::string> rng_state;
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);
+    double &time = properties.time;                          ///< System::properties
+    double &dt = properties.dt;                              ///< System::properties
+    FiberContainer &fibers = fc_;                            ///< System::fc_
+    BodyContainer &bodies = bc_;                             ///< System::bc_
+    std::pair<std::string, std::string> rng_state;           ///< string representation of split/unsplit state in RNG
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies); ///< Helper routine to specify serialization
 } output_map_t;
-output_map_t output_map;
+output_map_t output_map; ///< Output data for msgpack dump
 
 /// @brief Structure for importing frame of trajectory into the simulation
 ///
-/// We can't use output_map_t here, but rather use copies of the member variables which are then
-/// used to update the System variables.
+/// We can't use output_map_t here, but rather a similar struct which uses copies of the member
+/// variables (rather than references) which are then used to update the System variables.
 typedef struct input_map_t {
-    double time;
-    double dt;
-    FiberContainer fibers;
-    BodyContainer bodies;
-    std::pair<std::string, std::string> rng_state;
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);
+    double time;                                             ///< System::properties
+    double dt;                                               ///< System::properties
+    FiberContainer fibers;                                   ///< System::fc_
+    BodyContainer bodies;                                    ///< System::bc_
+    std::pair<std::string, std::string> rng_state;           ///< string representation of split/unsplit state in RNG
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies); ///< Helper routine to specify serialization
 } input_map_t;
 
 /// Flush current simulation state to trajectory file.
@@ -77,7 +77,7 @@ void write() {
 
 /// @brief Set system state to last state found in trajectory files
 ///
-/// @param if_file[in] input file name of trajectory file for this rank
+/// @param[in] if_file input file name of trajectory file for this rank
 void resume_from_trajectory(std::string if_file) {
     int fd = open(if_file.c_str(), O_RDONLY);
     if (fd == -1)
@@ -125,7 +125,8 @@ void resume_from_trajectory(std::string if_file) {
 // TODO: Refactor all preprocess stuff. It's awful
 
 /// @brief Convert fiber initial positions/orientations to full coordinate representation
-/// @param[out] fiber_array Explicitly instantiated fiber array config
+/// @param[out] fiber_table Explicitly instantiated element of fiber config
+/// @param[in] origin origin of coordinate system for fiber
 void resolve_fiber_position(toml::value &fiber_table, Eigen::Vector3d &origin) {
     int64_t n_nodes = toml::find_or<int64_t>(fiber_table, "n_nodes", -1);
     double length = toml::find<double>(fiber_table, "length");
@@ -956,8 +957,8 @@ Periphery *get_shell() { return shell_.get(); }
 toml::value *get_param_table() { return &param_table_; }
 
 /// @brief Initialize entire system. Needs to be called once at the beginning of the program execution
-/// @param input_file[in] String of toml config file specifying system parameters and initial conditions
-/// @param resume_flag[in] true if simulation is resuming from prior execution state, false otherwise.
+/// @param[in] input_file String of toml config file specifying system parameters and initial conditions
+/// @param[in] resume_flag true if simulation is resuming from prior execution state, false otherwise.
 void init(const std::string &input_file, bool resume_flag) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
