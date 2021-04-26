@@ -37,6 +37,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
     //    eta: Fluid viscosity
     // Output:
     //    vel [3xn_trg_local]: velocity at target coordinates
+    spdlog::debug("Started shell flow");
     if (!n_nodes_global_)
         return Eigen::MatrixXd::Zero(3, r_trg.cols());
     utils::LoggerRedirect redirect(std::cout);
@@ -57,6 +58,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
     Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg) / eta;
     redirect.flush(spdlog::level::debug, "STKFMM");
 
+    spdlog::debug("Finished shell flow");
     return vel;
 }
 

@@ -661,6 +661,7 @@ MatrixXd FiberContainer::get_local_node_positions() const {
 }
 
 MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, double eta) const {
+    spdlog::debug("Starting fiber flow");
     const size_t n_src = fib_forces.cols();
     const size_t n_trg_external = r_trg_external.cols();
     if (!get_global_count())
@@ -701,6 +702,7 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
         offset += fib.n_nodes_;
     }
 
+    spdlog::debug("Finished fiber flow");
     return vel;
 }
 

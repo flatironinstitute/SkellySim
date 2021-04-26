@@ -272,13 +272,14 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> BodyContainer::unpack_solution_vecto
 
 Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, MatrixRef &forces_torques,
                                     double eta) const {
+    spdlog::debug("Started body flow");
     utils::LoggerRedirect redirect(std::cout);
     if (!bodies.size())
         return Eigen::MatrixXd::Zero(3, r_trg.cols());
     const int n_nodes = get_local_node_count(); //< Distributed node counts for fmm calls
     const int n_trg = r_trg.cols();
     const Eigen::MatrixXd node_positions = get_local_node_positions(); //< Distributed node positions for fmm calls
-    const Eigen::MatrixXd node_normals = get_local_node_normals();           //< Distributed node normals for fmm calls
+    const Eigen::MatrixXd node_normals = get_local_node_normals();     //< Distributed node normals for fmm calls
     const Eigen::MatrixXd null_matrix;                                 //< Empty matrix for dummy arguments to kernels
     const int n_bodies_global = get_global_count();
 
@@ -292,11 +293,13 @@ Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, Matr
             for (int j = 0; j < 3; ++j)
                 f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node);
 
+    spdlog::debug("body_stresslet");
     Eigen::MatrixXd v_bdy2all =
         (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, n_trg) / eta;
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Section: Oseen kernel
+    spdlog::debug("body_oseen");
     Eigen::MatrixXd center_positions = get_local_center_positions(); //< Distributed center positions for FMM calls
     Eigen::MatrixXd forces = forces_torques.block(0, 0, 3, center_positions.cols());
     v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
@@ -304,11 +307,13 @@ Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, Matr
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
     // rank gets the body centers and calculates the center->target rotlet
+    spdlog::debug("body_rotlet");
     center_positions = get_global_center_positions();
     Eigen::MatrixXd torques = forces_torques.block(3, 0, 3, n_bodies_global);
 
     v_bdy2all += kernels::rotlet(center_positions, r_trg, torques, eta);
 
+    spdlog::debug("Finished body flow");
     return v_bdy2all;
 }
 
