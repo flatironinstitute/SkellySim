@@ -687,15 +687,13 @@ bool step() {
     bc.update_cache_variables(eta);
 
     // Check for an add external body forces
-    for (const auto &body : bc.bodies) {
-        if (!body->external_force_.any())
-            continue;
-        // apply external force
-        spdlog::info("Applying external force to body and calculating flow");
-        Eigen::MatrixXd force_torque_bodies = Eigen::MatrixXd::Zero(6, bc.bodies.size());
-        for (int i = 0; i < bc.bodies.size(); ++i)
-            force_torque_bodies.col(i).segment(0, 3) += body->external_force_;
+    Eigen::MatrixXd force_torque_bodies = Eigen::MatrixXd::Zero(6, bc.bodies.size());
+    for (size_t i = 0; i < bc.bodies.size(); ++i) {
+        const auto &body = bc.bodies[i];
+        force_torque_bodies.col(i).segment(0, 3) += body->external_force_;
+    }
 
+    if (force_torque_bodies.any()) {
         const int total_node_count = fib_node_count + shell_node_count + body_node_count;
         MatrixXd r_all(3, total_node_count);
         auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
