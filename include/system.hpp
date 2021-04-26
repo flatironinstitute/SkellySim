@@ -8,6 +8,7 @@ class BodyContainer;
 class FiberContainer;
 class Periphery;
 
+/// Namespace for System, which drives the simulation and handles communication (timestepping, data wrangling, etc)
 namespace System {
 void init(const std::string &input_file, bool resume_flag = false);
 Params *get_params();

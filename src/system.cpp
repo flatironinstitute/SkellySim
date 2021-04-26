@@ -23,23 +23,28 @@
 #include <spdlog/spdlog.h>
 
 namespace System {
-Params params_;
-FiberContainer fc_;
-BodyContainer bc_;
-std::unique_ptr<Periphery> shell_;
-std::ofstream ofs_;
+Params params_;                    //< Simulation input parameters
+FiberContainer fc_;                //< Fibers
+BodyContainer bc_;                 //< Bodies
+std::unique_ptr<Periphery> shell_; //< Periphery
+std::ofstream ofs_;                //< Trajectory output file stream. Opened at initialization
 
-FiberContainer fc_bak_;
-BodyContainer bc_bak_;
-int rank_;
-int size_;
-toml::value param_table_;
+FiberContainer fc_bak_;   //< Copy of fibers for timestep reversion
+BodyContainer bc_bak_;    //< Copy of bodies for timestep reversion
+int rank_;                //< MPI rank
+int size_;                //< MPI size
+toml::value param_table_; //< Parsed input table
 
+/// @brief Time varying system properties that are extrinsic to the physical objects
 struct {
-    double dt;
-    double time = 0.0;
+    double dt;         //< Current timestep size
+    double time = 0.0; //< Current system time
 } properties;
 
+/// @brief Structure for trajectory output via msgpack
+///
+/// This can be extended easily, so long as you update the corresponding input_map_t and potentially the System::write()
+/// function if you can't use a reference in the output_map for some reason.
 typedef struct output_map_t {
     double &time = properties.time;
     double &dt = properties.dt;
@@ -50,6 +55,10 @@ typedef struct output_map_t {
 } output_map_t;
 output_map_t output_map;
 
+/// @brief Structure for importing frame of trajectory into the simulation
+///
+/// We can't use output_map_t here, but rather use copies of the member variables which are then
+/// used to update the System variables.
 typedef struct input_map_t {
     double time;
     double dt;
@@ -59,12 +68,16 @@ typedef struct input_map_t {
     MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);
 } input_map_t;
 
+/// Flush current simulation state to trajectory file.
 void write() {
     output_map.rng_state = RNG::dump_state();
     msgpack::pack(ofs_, output_map);
     ofs_.flush();
 }
 
+/// @brief Set system state to last state found in trajectory files
+///
+/// @param if_file[in] input file name of trajectory file for this rank
 void resume_from_trajectory(std::string if_file) {
     int fd = open(if_file.c_str(), O_RDONLY);
     if (fd == -1)
@@ -85,6 +98,8 @@ void resume_from_trajectory(std::string if_file) {
     // FIXME: There is probably a way to not have to read the entire trajectory
     while (offset != buflen)
         msgpack::unpack(oh, addr, buflen, offset);
+
+    // FIXME: add assertion that system time is the same across all ranks to resume functionality
 
     // FIXME: This is a bug-prone way to unpack. Should make proper clone functions that merge
     // the minimum representation with existing data automatically (node data, etc)
@@ -144,6 +159,7 @@ void resolve_fiber_position(toml::value &fiber_table, Eigen::Vector3d &origin) {
     }
 }
 
+/// @brief Generate uniformly distributed point on unit sphere
 Eigen::Vector3d uniform_on_sphere() {
     const double u = 2 * (RNG::uniform_unsplit()) - 1;
     const double theta = 2 * M_PI * RNG::uniform_unsplit();
@@ -330,7 +346,6 @@ void resolve_nucleation_sites(toml::array &fiber_array, toml::array &body_array)
 /// the relevant data to fully initialize at object creation time.
 ///
 /// @param[out] config global toml config after initial parsing
-/// @param[in] seed seed for RNG state (such as for generating nucleation site positions)
 void preprocess(toml::value &config) {
     spdlog::info("Preprocessing config file");
 
@@ -347,6 +362,10 @@ void preprocess(toml::value &config) {
     }
 }
 
+/// @brief Calculate forces/torques on the bodies and velocities on the fibers due to attachment constraints
+/// @param[in] fibers_xt [4 x num_fiber_nodes_local] Vector of fiber node positions and tensions on current rank.
+/// Ordering is [fib1.nodes.x, fib1.nodes.y, fib1.nodes.z, fib1.T, fib2.nodes.x, ...]
+/// @param[in] body_velocities [6 x n_bodies] Matrix of body center of mass velocities and angular velocities
 std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
                                                                                  MatrixRef &body_velocities) {
     using Eigen::ArrayXXd;
@@ -433,15 +452,18 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions
     return std::make_pair(force_torque_on_bodies, velocities_on_fiber);
 }
 
+/// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
 std::tuple<int, int, int> get_local_node_counts() {
     return std::make_tuple(fc_.get_local_node_count(), shell_->get_local_node_count(), bc_.get_local_node_count());
 }
 
+/// @brief Get GMRES solution size local to MPI rank for each object type [fibers, shell, bodies]
 std::tuple<int, int, int> get_local_solution_sizes() {
     return std::make_tuple(fc_.get_local_solution_size(), shell_->get_local_solution_size(),
                            bc_.get_local_solution_size());
 }
 
+/// @brief Map 1D array data to a three-tuple of Vector Maps [fibers, shell, bodies]
 std::tuple<VectorMap, VectorMap, VectorMap> get_solution_maps(double *x) {
     using Eigen::Map;
     using Eigen::VectorXd;
@@ -450,6 +472,7 @@ std::tuple<VectorMap, VectorMap, VectorMap> get_solution_maps(double *x) {
                            VectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
 }
 
+/// @brief Map 1D array data to a three-tuple of const Vector Maps [fibers, shell, bodies]
 std::tuple<CVectorMap, CVectorMap, CVectorMap> get_solution_maps(const double *x) {
     using Eigen::Map;
     using Eigen::VectorXd;
@@ -458,6 +481,10 @@ std::tuple<CVectorMap, CVectorMap, CVectorMap> get_solution_maps(const double *x
                            CVectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
 }
 
+/// @brief Map Eigen Matrix node data to a three-tuple of Matrix Block references (use like view)
+///
+/// @param[in] x [3 x n_nodes_local] Matrix where you want the views
+/// @return Three-tuple of node data [3 x n_fiber_nodes, 3 x n_bodiy_nodes, 3 x n_periphery_nodes]
 template <typename Derived>
 std::tuple<Eigen::Block<Derived>, Eigen::Block<Derived>, Eigen::Block<Derived>>
 get_node_maps(Eigen::MatrixBase<Derived> &x) {
@@ -467,6 +494,11 @@ get_node_maps(Eigen::MatrixBase<Derived> &x) {
                            Eigen::Block<Derived>(x.derived(), 0, fib_nodes + shell_nodes, 3, body_nodes));
 }
 
+/// @brief Apply and return preconditioner results from fibers/body/shell
+///
+/// \f[ P^{-1} * x = y \f]
+/// @param [in] x [local_solution_size] Vector to apply preconditioner on
+/// @return [local_solution_size] Preconditioned input vector
 Eigen::VectorXd apply_preconditioner(VectorRef &x) {
     const auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
     const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
@@ -483,6 +515,13 @@ Eigen::VectorXd apply_preconditioner(VectorRef &x) {
     return res;
 }
 
+/// @brief Nucleate/grow/destroy Fibers based on dynamic instability rules. See white paper for details
+///
+/// Modifies:
+/// - FiberContainer::fibers [for nucleation/catastrophe]
+/// - Fiber::v_growth_
+/// - Fiber::length_
+/// - Fiber::length_prev_
 void dynamic_instability() {
     const double dt = properties.dt;
     FiberContainer &fc = fc_;
@@ -633,6 +672,11 @@ void dynamic_instability() {
     }
 }
 
+/// @brief Apply and return entire operator on system state vector for fibers/body/shell
+///
+/// \f[ A * x = y \f]
+/// @param [in] x [local_solution_size] Vector to apply matvec on
+/// @return [local_solution_size] Vector y, the result of the operator applied to x.
 Eigen::VectorXd apply_matvec(VectorRef &x) {
     using Eigen::Block;
     using Eigen::MatrixXd;
@@ -686,6 +730,10 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     return res;
 }
 
+/// @brief Generate next trial system state for the current System::properties::dt
+///
+/// @note Modifies anything that evolves in time.
+/// @return If the Matrix solver converged to the requested tolerance with no issue.
 bool step() {
     using Eigen::MatrixXd;
     Params &params = params_;
@@ -792,16 +840,19 @@ bool step() {
     return converged;
 }
 
+/// @brief store copies of Fiber and Body containers in case time step is rejected
 void backup() {
     fc_bak_ = fc_;
     bc_bak_ = bc_;
 }
 
+/// @brief restore copies of Fiber and Body containers to the state when last backed up
 void restore() {
     fc_ = fc_bak_;
     bc_ = bc_bak_;
 }
 
+/// @brief Run the simulation!
 void run() {
     Params &params = params_;
 
@@ -859,6 +910,7 @@ void run() {
     System::write();
 }
 
+/// @brief Check for any collisions between objects
 bool check_collision() {
     BodyContainer &bc = bc_;
     FiberContainer &fc = fc_;
@@ -885,16 +937,27 @@ bool check_collision() {
     return collided;
 }
 
+/// @brief Return copy of fiber container's RHS
 Eigen::VectorXd get_fiber_RHS() { return fc_.get_RHS(); }
+/// @brief Return copy of body container's RHS
 Eigen::VectorXd get_body_RHS() { return bc_.get_RHS(); }
+/// @brief Return copy of shell's RHS
 Eigen::VectorXd get_shell_RHS() { return shell_->get_RHS(); }
 
+/// @brief get pointer to params struct
 Params *get_params() { return &params_; }
+/// @brief get pointer to body container
 BodyContainer *get_body_container() { return &bc_; }
+/// @brief get pointer to fiber container
 FiberContainer *get_fiber_container() { return &fc_; }
+/// @brief get pointer to shell
 Periphery *get_shell() { return shell_.get(); }
+/// @brief get pointer to param table struct
 toml::value *get_param_table() { return &param_table_; }
 
+/// @brief Initialize entire system. Needs to be called once at the beginning of the program execution
+/// @param input_file[in] String of toml config file specifying system parameters and initial conditions
+/// @param resume_flag[in] true if simulation is resuming from prior execution state, false otherwise.
 void init(const std::string &input_file, bool resume_flag) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);

@@ -23,8 +23,8 @@ class Fiber {
 
     // Input parameters
     int n_nodes_;                  ///< number of nodes representing the fiber
-    double length_;                ///< length of fiber
-    double length_prev_;           ///< length pre-dynamic instability call
+    double length_;                ///< Desired 'constraint' length of fiber
+    double length_prev_;           ///< Last accepted length_
     double bending_rigidity_;      ///< bending rigidity 'E' of fiber
     double penalty_param_ = 500.0; ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
     /// @brief scale of external force on node @see generate_external_force
