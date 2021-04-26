@@ -882,7 +882,7 @@ bool check_collision() {
 
     MPI_Allreduce(MPI_IN_PLACE, &collided, 1, MPI_CHAR, MPI_LOR, MPI_COMM_WORLD);
 
-    return false;
+    return collided;
 }
 
 Eigen::VectorXd get_fiber_RHS() { return fc_.get_RHS(); }
