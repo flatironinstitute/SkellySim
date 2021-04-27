@@ -180,17 +180,41 @@ Body::Body(const toml::value &body_table, const Params &params) {
     update_cache_variables(params.eta);
 }
 
+/// @brief Check for collision with body and periphery.
+/// This is a double dispatch routine to handle polymorphism of the callee
+///
+/// @param[in] periphery Reference to Periphery object to check against
+/// @param[in] threshold Minimum between surfaces to consider it a collision
+/// @return true if collision detected, false otherwise
 bool SphericalBody::check_collision(const Periphery &periphery, double threshold) const {
     return periphery.check_collision(*this, threshold);
 }
+
+/// @brief Check for collision with body and another body.
+/// This is a double dispatch routine to handle polymorphism of the callee
+///
+/// @param[in] body Reference to Body object to check against
+/// @param[in] threshold Minimum between surfaces to consider it a collision
+/// @return true if collision detected, false otherwise
 bool SphericalBody::check_collision(const Body &body, double threshold) const {
     return body.check_collision(*this, threshold);
 }
+
+/// @brief Check for collision with SphericalBody and another SphericalBody.
+/// This routine is the end result of the double dispatch call on a generic Body callee that is actually a
+/// SphericalBody.
+///
+/// @param[in] body Reference to SphericalBody object to check against
+/// @param[in] threshold Minimum between surfaces to consider it a collision
+/// @return true if collision detected, false otherwise
 bool SphericalBody::check_collision(const SphericalBody &body, double threshold) const {
     const double dr2 = (this->position_ - body.position_).squaredNorm();
     return (dr2 < pow(this->radius_ + body.radius_ + threshold, 2));
 }
 
+/// @brief Update the RHS for all bodies for given velocities
+///
+/// @param[in] v_on_bodies [3 x n_local_body_nodes] matrix of velocities at the body nodes
 void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {
     if (world_rank_)
         return;
@@ -201,6 +225,9 @@ void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {
     }
 }
 
+/// @brief Return a copy of the current RHS for all bodies (all bodies on rank 0, empty otherwise)
+///
+/// @return [local_solution_size] vector of the RHS for all bodies
 Eigen::VectorXd BodyContainer::get_RHS() const {
     Eigen::VectorXd RHS(get_local_solution_size());
 
@@ -214,6 +241,9 @@ Eigen::VectorXd BodyContainer::get_RHS() const {
     return RHS;
 }
 
+/// @brief Return copy of local node positions (all bodies on rank 0, empty otherwise)
+///
+/// @return [3 x n_body_nodes_local] matrix of body node positions
 Eigen::MatrixXd BodyContainer::get_local_node_positions() const {
     Eigen::MatrixXd r_body_nodes;
 
@@ -231,6 +261,9 @@ Eigen::MatrixXd BodyContainer::get_local_node_positions() const {
     return r_body_nodes;
 }
 
+/// @brief Return copy of local node normals (all bodies on rank 0, empty otherwise)
+///
+/// @return [3 x n_body_nodes_local] matrix of body node normals
 Eigen::MatrixXd BodyContainer::get_local_node_normals() const {
     Eigen::MatrixXd node_normals;
 
@@ -247,6 +280,12 @@ Eigen::MatrixXd BodyContainer::get_local_node_normals() const {
     return node_normals;
 }
 
+/// @brief unpack linearized body solution/guess/whatever vector into two things more useful
+///
+/// All nodes get a copy of body_velocities, while only rank 0 gets the body_densities
+/// @param[in] x Linearized body state vector
+/// @return <[6 x n_bodies_global] vector of body velocities + angular velocities,
+/// [3 x n_body_nodes_local] vector of body "densities">
 std::pair<Eigen::MatrixXd, Eigen::MatrixXd> BodyContainer::unpack_solution_vector(VectorRef &x) const {
     using Eigen::MatrixXd;
     const int n_bodies_global = get_global_count();
@@ -270,6 +309,12 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> BodyContainer::unpack_solution_vecto
     return std::make_pair(body_velocities, body_densities);
 }
 
+/// @brief Calculate velocity at target coordinates due to the bodies
+/// @param[in] r_trg [3 x n_trg_local] Matrix of target coordinates to evaluate the velocity due to bodies at
+/// @param[in] densities [3 x n_nodes_local] Matrix of body node source strengths
+/// @param[in] forces_torques [6 x n_bodies] Matrix of body center-of-mass forces and torques
+/// @param[in] eta Fluid viscosity
+/// @return [3 x n_trg_local] Matrix of velocities due to bodies at target coordinates
 Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, MatrixRef &forces_torques,
                                     double eta) const {
     spdlog::debug("Started body flow");
@@ -317,6 +362,14 @@ Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, Matr
     return v_bdy2all;
 }
 
+/// @brief Apply body portion of matrix-free operator given densities/velocities
+///
+/// \f[ A_{\textrm{bodies}} * x_\textrm{bodies} = y_{\textrm{bodies}} \f]
+/// where 'x' is derived from the input densities and velocities
+/// @param[in] v_bodies [3 x n_body_nodes_local] matrix of velocities at body nodes
+/// @param[in] body_densities [3 x n_body_nodes_local] matrix of body source strength "densities"
+/// @param[in] body_velocities [6 x n_bodies_global] vector of body velocities + angular velocities,
+/// @return [body_local_solution_size] vector 'y' in the formulation above
 Eigen::VectorXd BodyContainer::matvec(MatrixRef &v_bodies, MatrixRef &body_densities,
                                       MatrixRef &body_velocities) const {
     using Eigen::Block;
@@ -356,19 +409,27 @@ Eigen::VectorXd BodyContainer::matvec(MatrixRef &v_bodies, MatrixRef &body_densi
     return res;
 }
 
-Eigen::VectorXd BodyContainer::apply_preconditioner(VectorRef &X) const {
+/// @brief Apply body portion of preconditioner given linearized body state vector x
+///
+/// \f[ P^{-1}_{\textrm{bodies}} * x_\textrm{bodies} = y_{\textrm{bodies}} \f]
+/// @return [body_local_solution_size] preconditioned vector 'y' in the formulation above
+Eigen::VectorXd BodyContainer::apply_preconditioner(VectorRef &x) const {
     Eigen::VectorXd res(get_local_solution_size());
     if (world_rank_ == 0) {
         int offset = 0;
         for (const auto &b : bodies) {
             const int blocksize = b->n_nodes_ * 3 + 6;
-            res.segment(offset, blocksize) = b->A_LU_.solve(X.segment(offset, blocksize));
+            res.segment(offset, blocksize) = b->A_LU_.solve(x.segment(offset, blocksize));
             offset += blocksize;
         }
     }
     return res;
 }
 
+/// @brief Construct and fill BodyContainer from parsed toml and system parameters
+///
+/// @param[in] body_tables Parsed TOML array of initial body objects
+/// @param[in] params initialized Params struct of system parameters
 BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);

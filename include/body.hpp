@@ -40,14 +40,16 @@ class Body {
     /// [ 3 x n_nucleation_sites ] nucleation site positions in lab frame
     Eigen::MatrixXd nucleation_sites_;
 
+    /// [3] vector of constant external force on body in lab frame
     Eigen::Vector3d external_force_{0.0, 0.0, 0.0};
 
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
 
     Body(const toml::value &body_table, const Params &params);
-    Body() = default;
+    Body() = default; ///< default constructor...
 
+    /// Return reference to body COM position
     const Eigen::Vector3d &get_position() const { return position_; };
     void update_RHS(MatrixRef &v_on_body);
     void update_cache_variables(double eta);
@@ -57,33 +59,39 @@ class Body {
     void load_precompute_data(const std::string &input_file);
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
 
+    /// @brief Make a copy of this instance
     virtual std::unique_ptr<Body> clone() const { return std::make_unique<Body>(*this); }
 
+    /// @brief dummy method to be overriden by derived classes
     virtual bool check_collision(const Periphery &periphery, double threshold) const {
         // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
         // you make this a pure virtual function, so instead we just throw an error.
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
 
+    /// @brief dummy method to be overriden by derived classes
     virtual bool check_collision(const Body &body, double threshold) const {
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
 
+    /// @brief dummy method to be overriden by derived classes
     virtual bool check_collision(const SphericalBody &body, double threshold) const {
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
 
+    /// @brief Serialize body automatically with msgpack macros
     MSGPACK_DEFINE_MAP(position_, orientation_);
 
-    // For structures with fixed size Eigen::Vector types, this ensures alignment if the
-    // structure is allocated via `new`
+    /// For structures with fixed size Eigen::Vector types, this ensures alignment if the
+    /// structure is allocated via `new`
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+/// @brief Container for multiple generic Body objects
 class BodyContainer {
   private:
-    int world_rank_ = 0;
-    int world_size_;
+    int world_rank_ = 0; ///< MPI world rank
+    int world_size_;     ///< MPI world size
 
   public:
     /// Vector of body pointers
@@ -94,12 +102,12 @@ class BodyContainer {
     /// Pointer to FMM oseen kernel (PVel)
     std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> oseen_kernel_;
 
-    /// Empty container constructor to avoid initialization list complications. No way to
-    /// initialize after using this constructor, so overwrite objects with full constructor.
-    BodyContainer(){};
+    /// @brief Empty container constructor to avoid initialization list complications.
+    BodyContainer() = default;
     BodyContainer(toml::array &body_tables, Params &params);
 
     // FIXME: remove redundant code in =/copy
+    /// @brief Copy constructor...
     BodyContainer(const BodyContainer &orig) {
         for (auto &body : orig.bodies) {
             bodies.push_back(body->clone());
@@ -110,6 +118,7 @@ class BodyContainer {
         oseen_kernel_ = orig.oseen_kernel_;
     };
 
+    /// @brief Assignment operator...
     BodyContainer &operator=(const BodyContainer orig) {
         bodies.clear();
         for (auto &body : orig.bodies) {
@@ -148,6 +157,10 @@ class BodyContainer {
     Eigen::MatrixXd get_global_node_positions() const;
     Eigen::MatrixXd get_local_node_positions() const;
     Eigen::MatrixXd get_local_node_normals() const;
+
+    /// @brief Get body center position
+    /// @param[in] override_distributed if 'true', get center position regardless of MPI rank, otherwise only rank 0
+    /// @return [3 x n_bodies] vector of center positions
     Eigen::MatrixXd get_center_positions(bool override_distributed) const {
         if (world_rank_ != 0 && !override_distributed)
             return Eigen::MatrixXd(3, 0);
@@ -169,15 +182,24 @@ class BodyContainer {
 
     Eigen::MatrixXd flow(MatrixRef &r_trg, MatrixRef &densities, MatrixRef &force_torque_bodies, double eta) const;
 
+    /// @brief Update cache variables for each Body. @see Body::update_cache_variables
     void update_cache_variables(double eta) {
         for (auto &body : bodies)
             body->update_cache_variables(eta);
     }
 
+    /// @brief Get copy of a given nucleation site
+    ///
+    /// @param[in] i_body index of relevant body
+    /// @param[in] j_site index of nucleation site
     Eigen::Vector3d get_nucleation_site(int i_body, int j_site) const {
         return bodies[i_body]->nucleation_sites_.col(j_site);
     };
 
+    /// @brief get reference to ith Body without inspecting internal BodyContainer::bodies
+    ///
+    /// @param[in] i index of body in container
+    /// @return Reference to ith Body in bodies
     const Body &at(size_t i) const { return *bodies.at(i); };
 
     /// @brief return number of bodies relevant for local calculations
@@ -185,12 +207,15 @@ class BodyContainer {
     /// @brief return number of bodies relevant for global calculations
     size_t get_global_count() const { return bodies.size(); };
 
+    /// @brief Return total number of body nodes across all MPI ranks
     size_t get_global_node_count() const {
         size_t n_nodes = 0;
         for (const auto &body : bodies)
             n_nodes += body->n_nodes_;
         return n_nodes;
     }
+
+    /// @brief Return total number of body nucleation sites across all MPI ranks
     size_t get_global_site_count() const {
         size_t n_sites = 0;
         for (const auto &body : bodies)
@@ -198,16 +223,23 @@ class BodyContainer {
         return n_sites;
     }
 
+    /// @brief msgpack serialization routine
     MSGPACK_DEFINE(bodies);
 };
 
+/// @brief Spherical Body...
 class SphericalBody : public Body {
   public:
+    /// @brief Construct spherical body. @see Body
+    /// @param[in] body_table Parsed TOML body table. Must have 'radius' key defined.
+    /// @param[in] params Initialized Params object
     SphericalBody(const toml::value &body_table, const Params &params) : Body(body_table, params) {
         radius_ = toml::find_or<double>(body_table, "radius", 0.0);
     };
+
+    /// Duplicate SphericalBody object
     std::unique_ptr<Body> clone() const override { return std::make_unique<SphericalBody>(*this); };
-    double radius_;
+    double radius_; ///< Radius of body
 
     bool check_collision(const Periphery &periphery, double threshold) const override;
     bool check_collision(const Body &body, double threshold) const override;
