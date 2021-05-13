@@ -30,9 +30,20 @@ class Params {
     } dynamic_instability;
     unsigned long seed;
 
+    struct {
+        int body_stresslet_multipole_order = 8;
+        int body_stresslet_max_points = 2000;
+        int body_oseen_multipole_order = 8;
+        int body_oseen_max_points = 2000;
+        int fiber_stokeslet_multipole_order = 8;
+        int fiber_stokeslet_max_points = 2000;
+        int periphery_stresslet_multipole_order = 8;
+        int periphery_stresslet_max_points = 2000;
+    } stkfmm;
+
     std::string shell_precompute_file;
 
-    Params(){};
+    Params() = default;
     Params(toml::value &param_table);
 };
 

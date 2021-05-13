@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <kernels.hpp>
+#include <params.hpp>
 
 class SphericalBody;
 
@@ -17,7 +18,7 @@ class SphericalBody;
 class Periphery {
   public:
     Periphery() = default;
-    Periphery(const std::string &precompute_file, const toml::value &body_table);
+    Periphery(const std::string &precompute_file, const toml::value &body_table, const Params &params);
 
     Eigen::MatrixXd flow(MatrixRef &trg, MatrixRef &density, double eta) const;
 
@@ -37,7 +38,7 @@ class Periphery {
     Eigen::VectorXd matvec(VectorRef &x_local, MatrixRef &v_local) const;
 
     /// pointer to FMM object (pointer to avoid constructing object with empty Periphery)
-    std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> fmm_;
+    std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> stresslet_kernel_;
     Eigen::MatrixXd M_inv_;                        ///< Process local elements of inverse matrix
     Eigen::MatrixXd stresslet_plus_complementary_; ///< Process local elements of stresslet tensor
     Eigen::MatrixXd node_pos_ = Eigen::MatrixXd(3, 0); ///< [3xn_nodes_local] matrix representing node positions
@@ -81,8 +82,8 @@ class Periphery {
 class SphericalPeriphery : public Periphery {
   public:
     double radius_;
-    SphericalPeriphery(const std::string &precompute_file, const toml::value &periphery_table)
-        : Periphery(precompute_file, periphery_table) {
+    SphericalPeriphery(const std::string &precompute_file, const toml::value &periphery_table, const Params &params)
+        : Periphery(precompute_file, periphery_table, params) {
         radius_ = toml::find_or<double>(periphery_table, "radius", 0.0);
     };
 

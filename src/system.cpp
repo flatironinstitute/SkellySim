@@ -985,7 +985,7 @@ void init(const std::string &input_file, bool resume_flag) {
             throw std::runtime_error("Periphery specified, but no precompute file. Set [params] shell_precompute_file "
                                      "in your input config and run the precompute script.");
         if (toml::find_or(periphery_table, "shape", "") == std::string("sphere"))
-            shell_ = std::make_unique<SphericalPeriphery>(params_.shell_precompute_file, periphery_table);
+            shell_ = std::make_unique<SphericalPeriphery>(params_.shell_precompute_file, periphery_table, params_);
         else {
             throw std::runtime_error("Unknown shape for periphery set in input file. Valid values are 'sphere'");
         }

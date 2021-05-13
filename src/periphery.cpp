@@ -54,7 +54,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
                 f_dl(i * 3 + j, node) = 2.0 * node_normal_(i, node) * density_reshaped(j, node);
 
     Eigen::MatrixXd r_sl, f_sl; // dummy SL positions/values
-    Eigen::MatrixXd pvel = (*fmm_)(r_sl, node_pos_, r_trg, f_sl, f_dl);
+    Eigen::MatrixXd pvel = (*stresslet_kernel_)(r_sl, node_pos_, r_trg, f_sl, f_dl);
     Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg) / eta;
     redirect.flush(spdlog::level::debug, "STKFMM");
 
@@ -84,15 +84,15 @@ bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double th
     return false;
 }
 
-Periphery::Periphery(const std::string &precompute_file, const toml::value &body_table) {
+Periphery::Periphery(const std::string &precompute_file, const toml::value &body_table, const Params &params) {
     {
         using namespace kernels;
         using namespace stkfmm;
-        const int order = 8;
-        const int maxpts = 2000;
+        const int mult_order = params.stkfmm.periphery_stresslet_multipole_order;
+        const int max_pts = params.stkfmm.periphery_stresslet_max_points;
         utils::LoggerRedirect redirect(std::cout);
-        fmm_ = std::unique_ptr<FMM<Stk3DFMM>>(
-            new FMM<Stk3DFMM>(order, maxpts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm));
+        stresslet_kernel_ = std::unique_ptr<FMM<Stk3DFMM>>(
+            new FMM<Stk3DFMM>(mult_order, max_pts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm));
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
 

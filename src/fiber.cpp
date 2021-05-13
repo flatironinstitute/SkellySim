@@ -690,7 +690,7 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
         r_trg.block(0, n_src, 3, n_trg_external) = r_trg_external;
     MatrixXd r_dl_dummy, f_dl_dummy;
     utils::LoggerRedirect redirect(std::cout);
-    MatrixXd vel = (*fmm_)(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
+    MatrixXd vel = (*stokeslet_kernel_)(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Subtract self term
@@ -770,8 +770,10 @@ FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
 
     {
         utils::LoggerRedirect redirect(std::cout);
-        fmm_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
-            8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
+        const int mult_order = params.stkfmm.fiber_stokeslet_multipole_order;
+        const int max_pts = params.stkfmm.fiber_stokeslet_max_points;
+        stokeslet_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
+            mult_order, max_pts, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
 
