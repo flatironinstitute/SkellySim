@@ -726,7 +726,7 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
 
     res_fibers = fc.matvec(x_fibers, v_fibers, v_fib_boundary);
     res_shell = shell.matvec(x_shell, v_shell);
-    res_bodies = bc.matvec(v_bodies, body_densities, body_velocities);
+    res_bodies = bc.matvec(v_bodies, x_bodies);
 
     return res;
 }
@@ -801,32 +801,6 @@ bool step() {
         for (int i = 0; i < 3; ++i)
             fib.x_.row(i) = sol.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
         offset += 4 * fib.n_nodes_;
-    }
-
-    Eigen::MatrixXd body_velocities, body_densities;
-    std::tie(body_velocities, body_densities) = bc.unpack_solution_vector(body_sol);
-    for (int i = 0; i < body_velocities.cols(); ++i) {
-        std::stringstream ss;
-        ss << body_velocities.col(i).transpose();
-        spdlog::debug("body velocities {}: [{}]", i, ss.str());
-    }
-
-    for (int i = 0; i < bc.bodies.size(); ++i) {
-        auto &body = bc.bodies[i];
-        Eigen::Vector3d x_new = body->position_ + body_velocities.col(i).segment(0, 3) * dt;
-        Eigen::Vector3d phi = body_velocities.col(i).segment(3, 3) * dt;
-        double phi_norm = phi.norm();
-        Eigen::Quaterniond orientation_new = body->orientation_;
-        if (phi_norm) {
-            double s = std::cos(0.5 * phi_norm);
-            Eigen::Vector3d p = std::sin(0.5 * phi_norm) * phi / phi_norm;
-            orientation_new = Eigen::Quaterniond(s, p[0], p[1], p[2]) * body->orientation_;
-        }
-        std::stringstream ss;
-        ss << x_new.transpose();
-        spdlog::debug("Moving body {}: [{}]", i, ss.str());
-
-        body->move(x_new, orientation_new);
     }
 
     // Re-pin fibers to bodies
