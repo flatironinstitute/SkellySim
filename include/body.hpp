@@ -150,7 +150,11 @@ class BodyContainer {
 
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &X) const;
-    Eigen::MatrixXd flow(MatrixRef &r_trg, MatrixRef &densities, MatrixRef &force_torque_bodies, double eta) const;
+    Eigen::MatrixXd flow(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const;
+    Eigen::MatrixXd flow_body_spherical(const std::vector<const Body *> &bodies, MatrixRef &r_trg,
+                                        VectorRef &body_solution, double eta) const;
+    Eigen::MatrixXd flow_body_deformable(const std::vector<const Body *> &bodies, MatrixRef &r_trg,
+                                         VectorRef &body_solution, double eta) const;
     void step(VectorRef &body_sol, double dt) const;
 
     /// @brief Update cache variables for each Body. @see Body::update_cache_variables
