@@ -8,6 +8,8 @@
 #include <periphery.hpp>
 #include <utils.hpp>
 
+#include <typeindex>
+
 #include <spdlog/spdlog.h>
 
 /// @brief Construct body from relevant toml config and system params
@@ -108,14 +110,8 @@ void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
     }
 }
 
-/// @brief Calculate velocity at target coordinates due to the bodies
-/// @param[in] r_trg [3 x n_trg_local] Matrix of target coordinates to evaluate the velocity due to bodies at
-/// @param[in] densities [3 x n_nodes_local] Matrix of body node source strengths
-/// @param[in] forces_torques [6 x n_bodies] Matrix of body center-of-mass forces and torques
-/// @param[in] eta Fluid viscosity
-/// @return [3 x n_trg_local] Matrix of velocities due to bodies at target coordinates
-Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, MatrixRef &forces_torques,
-                                    double eta) const {
+Eigen::MatrixXd BodyContainer::flow_body_spherical(const std::vector<const Body *> &bodies, MatrixRef &r_trg,
+                                                   VectorRef &body_solution, double eta) const {
     spdlog::debug("Started body flow");
     utils::LoggerRedirect redirect(std::cout);
     if (!bodies.size())
@@ -159,6 +155,50 @@ Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, MatrixRef &densities, Matr
 
     spdlog::debug("Finished body flow");
     return v_bdy2all;
+}
+
+Eigen::MatrixXd BodyContainer::flow_body_deformable(const std::vector<const Body *> &bodies, MatrixRef &r_trg,
+                                                    VectorRef &body_solution, double eta) const {
+    return Eigen::MatrixXd::Zero();
+}
+
+/// @brief Calculate velocity at target coordinates due to the bodies
+/// @param[in] r_trg [3 x n_trg_local] Matrix of target coordinates to evaluate the velocity due to bodies at
+/// @param[in] densities [3 x n_nodes_local] Matrix of body node source strengths
+/// @param[in] forces_torques [6 x n_bodies] Matrix of body center-of-mass forces and torques
+/// @param[in] eta Fluid viscosity
+/// @return [3 x n_trg_local] Matrix of velocities due to bodies at target coordinates
+Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const {
+    std::unordered_map<std::type_index, std::vector<const Body *>> sorted_body_map;
+    std::unordered_map<std::type_index, Eigen::VectorXd> solution_map;
+    int solution_offset = 0;
+    for (const auto &body : bodies) {
+        const auto index = std::type_index(typeid(*body));
+        if (sorted_body_map.find(index) == sorted_body_map.end()) {
+            sorted_body_map[index] = std::vector<const Body *>();
+            solution_map[index] = Eigen::VectorXd();
+        }
+        sorted_body_map[index].push_back(body.get());
+        const int solution_size = body->get_solution_size();
+        const int old_solution_size = solution_map[index].size();
+        solution_map[index].resize(old_solution_size + solution_size);
+        solution_map[index].segment(old_solution_size, solution_size) =
+            body_solutions.segment(solution_offset, solution_size);
+        solution_offset += solution_size;
+    }
+
+    for (const auto &body_index_list : sorted_body_map) {
+        const auto &index = body_index_list.first;
+        const auto &body_vec = body_index_list.second;
+        if (index == std::type_index(typeid(SphericalBody))) {
+            flow_body_spherical(body_vec, r_trg, solution_map[index], eta);
+            flow_body_spherical(body_vec, r_trg, solution_map[index], eta);
+        } else if (index == std::type_index(typeid(DeformableBody))) {
+            flow_body_deformable(body_vec, r_trg, solution_map[index], eta);
+        } else {
+            throw std::runtime_error("Unknown Body type found in BodyContainer::flow routine");
+        }
+    }
 }
 
 /// @brief Apply body portion of matrix-free operator given densities/velocities
