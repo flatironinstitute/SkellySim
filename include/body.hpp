@@ -38,7 +38,7 @@ class Body {
     virtual void step(double dt, VectorRef &body_solution);
 
     virtual int get_solution_size() const;
-    const Eigen::Vector3d &get_position() const;
+    virtual const Eigen::Vector3d &get_position() const;
     virtual Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const;
     virtual Eigen::VectorXd apply_preconditioner(VectorRef &x) const;
 
@@ -263,8 +263,7 @@ class SphericalBody : public Body {
     int get_solution_size() const override { return n_nodes_ * 3 + 6; };
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
 
-    const Eigen::Vector3d &get_position() const { return position_; }
-    override;
+    const Eigen::Vector3d &get_position() const override { return position_; }
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
     void update_K_matrix();
     void update_singularity_subtraction_vecs(double eta);
