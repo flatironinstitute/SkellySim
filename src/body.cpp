@@ -59,45 +59,6 @@ VectorXd BodyContainer::get_RHS() const {
     return RHS;
 }
 
-// /// @brief Return copy of local node positions (all bodies on rank 0, empty otherwise)
-// ///
-// /// @return [3 x n_body_nodes_local] matrix of body node positions
-// MatrixXd BodyContainer::get_local_node_positions() const {
-//     MatrixXd r_body_nodes;
-
-//     const int n_nodes = get_local_node_count();
-//     r_body_nodes.resize(3, n_nodes);
-//     if (world_rank_ == 0) {
-//         r_body_nodes.resize(3, n_nodes);
-//         int offset = 0;
-//         for (const auto &body : bodies) {
-//             r_body_nodes.block(0, offset, 3, body->n_nodes_) = body->node_positions_;
-//             offset += body->n_nodes_;
-//         }
-//     }
-
-//     return r_body_nodes;
-// }
-
-/// @brief Return copy of local node normals (all bodies on rank 0, empty otherwise)
-///
-/// @return [3 x n_body_nodes_local] matrix of body node normals
-// MatrixXd BodyContainer::get_local_node_normals() const {
-//     MatrixXd node_normals;
-
-//     const int n_nodes = get_local_node_count();
-//     node_normals.resize(3, n_nodes);
-//     if (world_rank_ == 0) {
-//         int offset = 0;
-//         for (const auto &body : bodies) {
-//             node_normals.block(0, offset, 3, body->n_nodes_) = body->node_normals_;
-//             offset += body->n_nodes_;
-//         }
-//     }
-
-//     return node_normals;
-// }
-
 void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
     const int global_solution_size = get_global_solution_size();
     VectorXd bodies_solution_global(global_solution_size);
@@ -113,6 +74,9 @@ void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
     }
 }
 
+/// @brief Return copy of local node positions (all bodies on rank 0, empty otherwise)
+/// @param[in] std::vector of shared_ptr<DerivedBody>
+/// @return [3 x n_body_nodes_local] matrix of body node positions
 template <typename T>
 MatrixXd BodyContainer::get_local_node_positions(const T &body_vec) const {
     MatrixXd r_body_nodes;
@@ -133,6 +97,9 @@ MatrixXd BodyContainer::get_local_node_positions(const T &body_vec) const {
     return r_body_nodes;
 }
 
+/// @brief Return copy of local node positions (all bodies on rank 0, empty otherwise)
+/// @param[in] std::vector of shared_ptr<DerivedBody>
+/// @return [3 x n_body_nodes_local] matrix of body node positions
 template <typename T>
 MatrixXd BodyContainer::get_local_node_normals(const T &body_vec) const {
     MatrixXd normals;
@@ -170,6 +137,9 @@ VectorXd BodyContainer::get_local_solution(const T &body_vec, VectorRef &body_so
     return sub_solution;
 }
 
+/// @brief Get forces and torques from each rank
+/// @param[in] std::vector of shared_ptr<DerivedBody>
+/// @return pair<[3 x n_bodies_local], [3 x n_bodies_local]> matrices of body forces/torques
 template <typename T>
 std::pair<MatrixXd, MatrixXd> BodyContainer::get_global_forces_torques(const T &body_vec) const {
     const int n_bodies = body_vec.size();
@@ -182,6 +152,35 @@ std::pair<MatrixXd, MatrixXd> BodyContainer::get_global_forces_torques(const T &
     MPI_Allreduce(MPI_IN_PLACE, forces_torques.data(), forces_torques.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     return std::make_pair(forces_torques.block(0, 0, 3, n_bodies), forces_torques.block(3, 0, 3, n_bodies));
+}
+
+/// @brief Get center positions regardless of rank
+/// @param[in] std::vector of shared_ptr<DerivedBody>
+/// @return [3 x n_bodies_local] matrix of body centers
+template <typename T>
+MatrixXd BodyContainer::get_global_center_positions(const T &body_vec) const {
+    const int n_bodies = body_vec.size();
+    Eigen::MatrixXd centers(3, n_bodies);
+    for (size_t i = 0; i < body_vec.size(); ++i)
+        centers.col(i) = body_vec[i]->get_position();
+
+    return centers;
+}
+
+/// @brief Get center positions on rank 0, otherwise empty
+/// @param[in] std::vector of shared_ptr<DerivedBody>
+/// @return [3 x n_bodies_local] matrix of body centers
+template <typename T>
+MatrixXd BodyContainer::get_local_center_positions(const T &body_vec) const {
+    if (world_rank_ != 0)
+        return Eigen::MatrixXd();
+
+    const int n_bodies = body_vec.size();
+    Eigen::MatrixXd centers(3, n_bodies);
+    for (size_t i = 0; i < body_vec.size(); ++i)
+        centers.col(i) = body_vec[i]->get_position();
+
+    return centers;
 }
 
 MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const {
@@ -241,10 +240,14 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
 MatrixXd BodyContainer::flow_deformable(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const {
     if (!deformable_bodies.size())
         return MatrixXd::Zero(3, r_trg.cols());
+    utils::LoggerRedirect redirect(std::cout);
 
     const VectorXd spherical_solution = get_local_solution(deformable_bodies, body_solutions);
 
+    // Code here
     MatrixXd v_bdy2all = MatrixXd::Zero(3, r_trg.cols());
+
+    redirect.flush(spdlog::level::debug, "STKFMM");
     return v_bdy2all;
 }
 
