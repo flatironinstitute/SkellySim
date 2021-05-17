@@ -366,8 +366,8 @@ void preprocess(toml::value &config) {
 /// @brief Calculate forces/torques on the bodies and velocities on the fibers due to attachment constraints
 /// @param[in] fibers_xt [4 x num_fiber_nodes_local] Vector of fiber node positions and tensions on current rank.
 /// Ordering is [fib1.nodes.x, fib1.nodes.y, fib1.nodes.z, fib1.T, fib2.nodes.x, ...]
-/// @param[in] body_velocities [6 x n_bodies] Matrix of body center of mass velocities and angular velocities
-Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, MatrixRef &body_velocities) {
+/// @param[in] x_bodies entire body component of the solution vector (deformable+rigid)
+Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, VectorRef &x_bodies) {
     using Eigen::ArrayXXd;
     using Eigen::MatrixXd;
     using Eigen::Vector3d;
@@ -375,8 +375,14 @@ Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, Matri
     auto &fc = fc_;
     auto &bc = bc_;
 
-    Eigen::MatrixXd force_torque_on_bodies = MatrixXd::Zero(6, bc.get_global_count());
     Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
+
+    MatrixXd body_velocities(6, bc.spherical_bodies.size());
+    int index = 0;
+    for (const auto &body : bc.spherical_bodies) {
+        body_velocities.col(index) =
+            x_bodies.segment(bc.solution_offsets_.at(std::static_pointer_cast<Body>(body)) + body->n_nodes_ * 3, 6);
+    }
 
     int xt_offset = 0;
     int i_fib = 0;
@@ -659,7 +665,7 @@ void dynamic_instability() {
             Eigen::MatrixXd x(3, fib.n_nodes_);
             Eigen::ArrayXd s = Eigen::ArrayXd::LinSpaced(fib.n_nodes_, 0, fib.length_).transpose();
             Eigen::Vector3d origin = bc_.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second);
-            Eigen::Vector3d u = (origin - bc_.bodies[fib.binding_site_.first]->position_).normalized();
+            Eigen::Vector3d u = (origin - bc_.bodies[fib.binding_site_.first]->get_position()).normalized();
 
             for (int i = 0; i < 3; ++i)
                 fib.x_.row(i) = origin(i) + u(i) * s;
@@ -713,14 +719,12 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     r_fibbody.block(0, r_fibers.cols(), 3, r_bodies.cols()) = r_bodies;
     MatrixXd v_shell2fibbody = shell.flow(r_fibbody, x_shell, eta);
 
-    MatrixXd body_velocities, body_densities;
-    std::tie(body_velocities, body_densities) = bc.unpack_solution_vector(x_bodies);
-    MatrixXd fib_boundary = System::calculate_body_fiber_link_conditions(x_fibers, body_velocities);
+    MatrixXd v_fib_boundary = System::calculate_body_fiber_link_conditions(x_fibers, x_bodies);
 
     v_all = v_fib2all;
     v_fibers += v_shell2fibbody.block(0, 0, 3, r_fibers.cols());
     v_bodies += v_shell2fibbody.block(0, r_fibers.cols(), 3, r_bodies.cols());
-    v_all += bc.flow(r_all, body_densities, force_torque_bodies, eta);
+    v_all += bc.flow(r_all, x_bodies, eta);
 
     res_fibers = fc.matvec(x_fibers, v_fibers, v_fib_boundary);
     res_shell = shell.matvec(x_shell, v_shell);
@@ -749,7 +753,7 @@ bool step() {
 
     MatrixXd r_trg_external(3, shell_node_count + body_node_count);
     r_trg_external.block(0, 0, 3, shell_node_count) = shell.get_local_node_positions();
-    r_trg_external.block(0, shell_node_count, 3, body_node_count) = bc.get_local_node_positions();
+    r_trg_external.block(0, shell_node_count, 3, body_node_count) = bc.get_local_node_positions(bc.bodies);
 
     fc.update_cache_variables(dt, eta);
 
@@ -759,21 +763,22 @@ bool step() {
     bc.update_cache_variables(eta);
 
     // Check for an add external body forces
-    Eigen::MatrixXd force_torque_bodies = Eigen::MatrixXd::Zero(6, bc.bodies.size());
-    for (size_t i = 0; i < bc.bodies.size(); ++i) {
-        const auto &body = bc.bodies[i];
-        force_torque_bodies.col(i).segment(0, 3) += body->external_force_;
+    bool external_force_body = false;
+    for (auto &body : bc.spherical_bodies) {
+        body->force_torque_.setZero();
+        body->force_torque_.segment(0, 3) = body->external_force_;
+        external_force_body = external_force_body | body->external_force_.any();
     }
 
-    if (force_torque_bodies.any()) {
+    if (external_force_body) {
         const int total_node_count = fib_node_count + shell_node_count + body_node_count;
         MatrixXd r_all(3, total_node_count);
         auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
         r_fibers = fc.get_local_node_positions();
         r_shell = shell.get_local_node_positions();
-        r_bodies = bc.get_local_node_positions();
+        r_bodies = bc.get_local_node_positions(bc.bodies);
 
-        v_all += bc.flow(r_all, Eigen::MatrixXd::Zero(r_bodies.rows(), r_bodies.cols()), force_torque_bodies, eta);
+        v_all += bc.flow(r_all, Eigen::MatrixXd::Zero(r_bodies.rows(), r_bodies.cols()), eta);
     }
 
     bc.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
