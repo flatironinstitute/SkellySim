@@ -12,6 +12,9 @@
 
 #include <spdlog/spdlog.h>
 
+using Eigen::MatrixXd;
+using Eigen::VectorXd;
+
 /// @brief Construct body from relevant toml config and system params
 ///
 ///   @param[in] body_table toml table from pre-parsed config
@@ -43,8 +46,8 @@ void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {
 /// @brief Return a copy of the current RHS for all bodies (all bodies on rank 0, empty otherwise)
 ///
 /// @return [local_solution_size] vector of the RHS for all bodies
-Eigen::VectorXd BodyContainer::get_RHS() const {
-    Eigen::VectorXd RHS(get_local_solution_size());
+VectorXd BodyContainer::get_RHS() const {
+    VectorXd RHS(get_local_solution_size());
 
     if (world_rank_ == 0) {
         int offset = 0;
@@ -56,48 +59,48 @@ Eigen::VectorXd BodyContainer::get_RHS() const {
     return RHS;
 }
 
-/// @brief Return copy of local node positions (all bodies on rank 0, empty otherwise)
-///
-/// @return [3 x n_body_nodes_local] matrix of body node positions
-Eigen::MatrixXd BodyContainer::get_local_node_positions() const {
-    Eigen::MatrixXd r_body_nodes;
+// /// @brief Return copy of local node positions (all bodies on rank 0, empty otherwise)
+// ///
+// /// @return [3 x n_body_nodes_local] matrix of body node positions
+// MatrixXd BodyContainer::get_local_node_positions() const {
+//     MatrixXd r_body_nodes;
 
-    const int n_nodes = get_local_node_count();
-    r_body_nodes.resize(3, n_nodes);
-    if (world_rank_ == 0) {
-        r_body_nodes.resize(3, n_nodes);
-        int offset = 0;
-        for (const auto &body : bodies) {
-            r_body_nodes.block(0, offset, 3, body->n_nodes_) = body->node_positions_;
-            offset += body->n_nodes_;
-        }
-    }
+//     const int n_nodes = get_local_node_count();
+//     r_body_nodes.resize(3, n_nodes);
+//     if (world_rank_ == 0) {
+//         r_body_nodes.resize(3, n_nodes);
+//         int offset = 0;
+//         for (const auto &body : bodies) {
+//             r_body_nodes.block(0, offset, 3, body->n_nodes_) = body->node_positions_;
+//             offset += body->n_nodes_;
+//         }
+//     }
 
-    return r_body_nodes;
-}
+//     return r_body_nodes;
+// }
 
 /// @brief Return copy of local node normals (all bodies on rank 0, empty otherwise)
 ///
 /// @return [3 x n_body_nodes_local] matrix of body node normals
-Eigen::MatrixXd BodyContainer::get_local_node_normals() const {
-    Eigen::MatrixXd node_normals;
+// MatrixXd BodyContainer::get_local_node_normals() const {
+//     MatrixXd node_normals;
 
-    const int n_nodes = get_local_node_count();
-    node_normals.resize(3, n_nodes);
-    if (world_rank_ == 0) {
-        int offset = 0;
-        for (const auto &body : bodies) {
-            node_normals.block(0, offset, 3, body->n_nodes_) = body->node_normals_;
-            offset += body->n_nodes_;
-        }
-    }
+//     const int n_nodes = get_local_node_count();
+//     node_normals.resize(3, n_nodes);
+//     if (world_rank_ == 0) {
+//         int offset = 0;
+//         for (const auto &body : bodies) {
+//             node_normals.block(0, offset, 3, body->n_nodes_) = body->node_normals_;
+//             offset += body->n_nodes_;
+//         }
+//     }
 
-    return node_normals;
-}
+//     return node_normals;
+// }
 
 void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
     const int global_solution_size = get_global_solution_size();
-    Eigen::VectorXd bodies_solution_global(global_solution_size);
+    VectorXd bodies_solution_global(global_solution_size);
     if (world_rank_ == 0)
         bodies_solution_global = bodies_solution;
     MPI_Bcast(bodies_solution_global.data(), global_solution_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -110,22 +113,100 @@ void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
     }
 }
 
-Eigen::MatrixXd BodyContainer::flow_body_spherical(const std::vector<const Body *> &bodies, MatrixRef &r_trg,
-                                                   VectorRef &body_solution, double eta) const {
+template <typename T>
+MatrixXd BodyContainer::get_local_node_positions(const T &body_vec) const {
+    MatrixXd r_body_nodes;
+    int n_nodes = 0;
+    for (auto &body : body_vec)
+        n_nodes += body->n_nodes_;
+
+    r_body_nodes.resize(3, n_nodes);
+    if (world_rank_ == 0) {
+        r_body_nodes.resize(3, n_nodes);
+        int offset = 0;
+        for (const auto &body : body_vec) {
+            r_body_nodes.block(0, offset, 3, body->n_nodes_) = body->node_positions_;
+            offset += body->n_nodes_;
+        }
+    }
+
+    return r_body_nodes;
+}
+
+template <typename T>
+MatrixXd BodyContainer::get_local_node_normals(const T &body_vec) const {
+    MatrixXd normals;
+    int n_nodes = 0;
+    for (auto &body : body_vec)
+        n_nodes += body->n_nodes_;
+
+    normals.resize(3, n_nodes);
+    if (world_rank_ == 0) {
+        int offset = 0;
+        for (const auto &body : body_vec) {
+            normals.block(0, offset, 3, body->n_nodes_) = body->node_normals_;
+            offset += body->n_nodes_;
+        }
+    }
+
+    return normals;
+}
+
+template <typename T>
+VectorXd BodyContainer::get_local_solution(const T &body_vec, VectorRef &body_solutions) const {
+    int solution_size = 0;
+    int n_nodes = 0;
+    for (const auto &body : body_vec)
+        solution_size += body->get_solution_size();
+
+    VectorXd sub_solution(solution_size);
+    int solution_offset = 0;
+    for (auto &body : body_vec) {
+        const int body_solution_size = body->get_solution_size();
+        sub_solution.segment(solution_offset, body_solution_size) =
+            body_solutions.segment(solution_offsets_.at(body), body_solution_size);
+        solution_offset += body->get_solution_size();
+    }
+    return sub_solution;
+}
+
+template <typename T>
+std::pair<MatrixXd, MatrixXd> BodyContainer::get_global_forces_torques(const T &body_vec) const {
+    const int n_bodies = body_vec.size();
+    Eigen::MatrixXd forces(3, n_bodies);
+    Eigen::MatrixXd torques(3, n_bodies);
+    Eigen::MatrixXd forces_torques(6, n_bodies);
+    for (size_t i = 0; i < body_vec.size(); ++i)
+        forces_torques.col(i) = body_vec[i]->force_torque_;
+
+    MPI_Allreduce(MPI_IN_PLACE, forces_torques.data(), forces_torques.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    return std::make_pair(forces_torques.block(0, 0, 3, n_bodies), forces_torques.block(3, 0, 3, n_bodies));
+}
+
+MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const {
     spdlog::debug("Started body flow");
     utils::LoggerRedirect redirect(std::cout);
-    if (!bodies.size())
-        return Eigen::MatrixXd::Zero(3, r_trg.cols());
-    const int n_nodes = get_local_node_count(); //< Distributed node counts for fmm calls
+    if (!spherical_bodies.size())
+        return MatrixXd::Zero(3, r_trg.cols());
+
+    const VectorXd spherical_solution = get_local_solution(spherical_bodies, body_solutions);
+    const MatrixXd node_positions = get_local_node_positions(spherical_bodies);
+    const MatrixXd node_normals = get_local_node_normals(spherical_bodies);
+    const int n_nodes = node_positions.cols();
+    MatrixXd densities(3, n_nodes);
+    int node_offset = 0;
+    for (auto &body : spherical_bodies) {
+        densities.block(0, node_offset, 3, body->n_nodes_) =
+            CMatrixMap(body_solutions.data() + solution_offsets_.at(body), 3, body->n_nodes_);
+        node_offset += body->n_nodes_;
+    }
     const int n_trg = r_trg.cols();
-    const Eigen::MatrixXd node_positions = get_local_node_positions(); //< Distributed node positions for fmm calls
-    const Eigen::MatrixXd node_normals = get_local_node_normals();     //< Distributed node normals for fmm calls
-    const Eigen::MatrixXd null_matrix;                                 //< Empty matrix for dummy arguments to kernels
-    const int n_bodies_global = get_global_count();
+    const MatrixXd null_matrix; //< Empty matrix for dummy arguments to kernels
 
     // Section: Stresslet kernel
-    const Eigen::MatrixXd &r_dl = node_positions; //< "double layer" positions for stresslet kernel
-    Eigen::MatrixXd f_dl(9, n_nodes);             //< "double layer" "force" for stresslet kernel
+    const MatrixXd &r_dl = node_positions; //< "double layer" positions for stresslet kernel
+    MatrixXd f_dl(9, n_nodes);             //< "double layer" "force" for stresslet kernel
 
     // double layer density is 2 * outer product of normals with density
     for (int node = 0; node < n_nodes; ++node)
@@ -134,22 +215,22 @@ Eigen::MatrixXd BodyContainer::flow_body_spherical(const std::vector<const Body 
                 f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node);
 
     spdlog::debug("body_stresslet");
-    Eigen::MatrixXd v_bdy2all =
-        (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, n_trg) / eta;
+    MatrixXd v_bdy2all = (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, n_trg) / eta;
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Section: Oseen kernel
     spdlog::debug("body_oseen");
-    Eigen::MatrixXd center_positions = get_local_center_positions(); //< Distributed center positions for FMM calls
-    Eigen::MatrixXd forces = forces_torques.block(0, 0, 3, center_positions.cols());
+    MatrixXd center_positions =
+        get_local_center_positions(spherical_bodies); //< Distributed center positions for FMM calls
+    MatrixXd forces, torques;
+    std::tie(forces, torques) = get_global_forces_torques(spherical_bodies);
     v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
     // rank gets the body centers and calculates the center->target rotlet
     spdlog::debug("body_rotlet");
-    center_positions = get_global_center_positions();
-    Eigen::MatrixXd torques = forces_torques.block(3, 0, 3, n_bodies_global);
+    center_positions = get_global_center_positions(spherical_bodies);
 
     v_bdy2all += kernels::rotlet(center_positions, r_trg, torques, eta);
 
@@ -157,9 +238,14 @@ Eigen::MatrixXd BodyContainer::flow_body_spherical(const std::vector<const Body 
     return v_bdy2all;
 }
 
-Eigen::MatrixXd BodyContainer::flow_body_deformable(const std::vector<const Body *> &bodies, MatrixRef &r_trg,
-                                                    VectorRef &body_solution, double eta) const {
-    return Eigen::MatrixXd::Zero();
+MatrixXd BodyContainer::flow_deformable(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const {
+    if (!deformable_bodies.size())
+        return MatrixXd::Zero(3, r_trg.cols());
+
+    const VectorXd spherical_solution = get_local_solution(deformable_bodies, body_solutions);
+
+    MatrixXd v_bdy2all = MatrixXd::Zero(3, r_trg.cols());
+    return v_bdy2all;
 }
 
 /// @brief Calculate velocity at target coordinates due to the bodies
@@ -168,37 +254,10 @@ Eigen::MatrixXd BodyContainer::flow_body_deformable(const std::vector<const Body
 /// @param[in] forces_torques [6 x n_bodies] Matrix of body center-of-mass forces and torques
 /// @param[in] eta Fluid viscosity
 /// @return [3 x n_trg_local] Matrix of velocities due to bodies at target coordinates
-Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const {
-    std::unordered_map<std::type_index, std::vector<const Body *>> sorted_body_map;
-    std::unordered_map<std::type_index, Eigen::VectorXd> solution_map;
-    int solution_offset = 0;
-    for (const auto &body : bodies) {
-        const auto index = std::type_index(typeid(*body));
-        if (sorted_body_map.find(index) == sorted_body_map.end()) {
-            sorted_body_map[index] = std::vector<const Body *>();
-            solution_map[index] = Eigen::VectorXd();
-        }
-        sorted_body_map[index].push_back(body.get());
-        const int solution_size = body->get_solution_size();
-        const int old_solution_size = solution_map[index].size();
-        solution_map[index].resize(old_solution_size + solution_size);
-        solution_map[index].segment(old_solution_size, solution_size) =
-            body_solutions.segment(solution_offset, solution_size);
-        solution_offset += solution_size;
-    }
-
-    for (const auto &body_index_list : sorted_body_map) {
-        const auto &index = body_index_list.first;
-        const auto &body_vec = body_index_list.second;
-        if (index == std::type_index(typeid(SphericalBody))) {
-            flow_body_spherical(body_vec, r_trg, solution_map[index], eta);
-            flow_body_spherical(body_vec, r_trg, solution_map[index], eta);
-        } else if (index == std::type_index(typeid(DeformableBody))) {
-            flow_body_deformable(body_vec, r_trg, solution_map[index], eta);
-        } else {
-            throw std::runtime_error("Unknown Body type found in BodyContainer::flow routine");
-        }
-    }
+MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const {
+    MatrixXd v_spherical = flow_spherical(r_trg, body_solutions, eta);
+    MatrixXd v_deformable = flow_deformable(r_trg, body_solutions, eta);
+    return v_spherical + v_deformable;
 }
 
 /// @brief Apply body portion of matrix-free operator given densities/velocities
@@ -209,8 +268,8 @@ Eigen::MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions,
 /// @param[in] body_densities [3 x n_body_nodes_local] matrix of body source strength "densities"
 /// @param[in] body_velocities [6 x n_bodies_global] vector of body velocities + angular velocities,
 /// @return [body_local_solution_size] vector 'y' in the formulation above
-Eigen::VectorXd BodyContainer::matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const {
-    Eigen::VectorXd res(get_local_solution_size());
+VectorXd BodyContainer::matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const {
+    VectorXd res(get_local_solution_size());
     if (world_rank_ == 0) {
         int node_offset = 0;
         int solution_offset = 0;
@@ -231,8 +290,8 @@ Eigen::VectorXd BodyContainer::matvec(MatrixRef &v_bodies, VectorRef &x_bodies) 
 ///
 /// \f[ P^{-1}_{\textrm{bodies}} * x_\textrm{bodies} = y_{\textrm{bodies}} \f]
 /// @return [body_local_solution_size] preconditioned vector 'y' in the formulation above
-Eigen::VectorXd BodyContainer::apply_preconditioner(VectorRef &x) const {
-    Eigen::VectorXd res(get_local_solution_size());
+VectorXd BodyContainer::apply_preconditioner(VectorRef &x) const {
+    VectorXd res(get_local_solution_size());
     if (world_rank_ == 0) {
         int offset = 0;
         for (const auto &b : bodies) {
@@ -242,6 +301,30 @@ Eigen::VectorXd BodyContainer::apply_preconditioner(VectorRef &x) const {
         }
     }
     return res;
+}
+
+void BodyContainer::populate_sublists() {
+    using std::static_pointer_cast;
+    spherical_bodies.clear();
+    deformable_bodies.clear();
+    solution_offsets_.clear();
+    node_offsets_.clear();
+    int solution_offset = 0;
+    int node_offset = 0;
+    for (const auto &body : bodies) {
+        using std::type_index;
+        if (typeid(*body) == typeid(SphericalBody)) {
+            spherical_bodies.push_back(static_pointer_cast<SphericalBody>(body));
+        } else if (typeid(*body) == typeid(DeformableBody)) {
+            deformable_bodies.push_back(static_pointer_cast<DeformableBody>(body));
+        }
+
+        solution_offsets_[body] = solution_offset;
+        solution_offset += body->get_solution_size();
+
+        node_offsets_[body] = node_offset;
+        node_offset += body->n_nodes_;
+    }
 }
 
 /// @brief Construct and fill BodyContainer from parsed toml and system parameters
@@ -273,4 +356,6 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
         // spdlog::info("Body {}: {} [ {}, {}, {} ]", i_body, body->node_weights_.size(), body->position_[0],
         //              body->position_[1], body->position_[2]);
     }
+
+    populate_sublists();
 }
