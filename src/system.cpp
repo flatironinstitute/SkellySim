@@ -367,8 +367,7 @@ void preprocess(toml::value &config) {
 /// @param[in] fibers_xt [4 x num_fiber_nodes_local] Vector of fiber node positions and tensions on current rank.
 /// Ordering is [fib1.nodes.x, fib1.nodes.y, fib1.nodes.z, fib1.T, fib2.nodes.x, ...]
 /// @param[in] body_velocities [6 x n_bodies] Matrix of body center of mass velocities and angular velocities
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions(VectorRef &fibers_xt,
-                                                                                 MatrixRef &body_velocities) {
+Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, MatrixRef &body_velocities) {
     using Eigen::ArrayXXd;
     using Eigen::MatrixXd;
     using Eigen::Vector3d;
@@ -381,6 +380,9 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions
 
     int xt_offset = 0;
     int i_fib = 0;
+    for (auto &body : bc.spherical_bodies)
+        body->force_torque_.setZero();
+
     for (const auto &fib : fc.fibers) {
         const auto &fib_mats = fib.matrices_.at(fib.n_nodes_);
         const int n_pts = fib.n_nodes_;
@@ -389,7 +391,8 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions
         if (i_body < 0)
             continue;
 
-        Vector3d site_pos = bc.get_nucleation_site(i_body, i_site) - bc.at(i_body).get_position();
+        auto body = std::static_pointer_cast<SphericalBody>(bc.bodies[i_body]);
+        Vector3d site_pos = bc.get_nucleation_site(i_body, i_site) - body->get_position();
         MatrixXd x_new(3, fib.n_nodes_);
         x_new.row(0) = fibers_xt.segment(xt_offset + 0 * fib.n_nodes_, fib.n_nodes_);
         x_new.row(1) = fibers_xt.segment(xt_offset + 1 * fib.n_nodes_, fib.n_nodes_);
@@ -420,8 +423,8 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions
         L_body += fib.bending_rigidity_ * xs_0.cross(xss_new_0);
 
         // Store the contribution of each fiber in this array
-        force_torque_on_bodies.col(i_body).segment(0, 3) += F_body;
-        force_torque_on_bodies.col(i_body).segment(3, 3) += L_body;
+        body->force_torque_.segment(0, 3) += F_body;
+        body->force_torque_.segment(3, 3) += L_body;
 
         // SECOND FROM BODY ON-TO FIBER
         // Translational and angular velocities at the attachment point are calculated
@@ -446,11 +449,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> calculate_body_fiber_link_conditions
         xt_offset += 4 * n_pts;
     }
 
-    // Sum up fiber contributions from all other ranks to body torques
-    MPI_Allreduce(MPI_IN_PLACE, force_torque_on_bodies.data(), force_torque_on_bodies.size(), MPI_DOUBLE, MPI_SUM,
-                  MPI_COMM_WORLD);
-
-    return std::make_pair(force_torque_on_bodies, velocities_on_fiber);
+    return velocities_on_fiber;
 }
 
 /// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
@@ -699,7 +698,7 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     auto [v_fibers, v_shell, v_bodies] = get_node_maps(v_all);
     r_fibers = fc.get_local_node_positions();
     r_shell = shell.get_local_node_positions();
-    r_bodies = bc.get_local_node_positions();
+    r_bodies = bc.get_local_node_positions(bc.bodies);
 
     auto [x_fibers, x_shell, x_bodies] = get_solution_maps(x.data());
     auto [res_fibers, res_shell, res_bodies] = get_solution_maps(res.data());
@@ -714,10 +713,9 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     r_fibbody.block(0, r_fibers.cols(), 3, r_bodies.cols()) = r_bodies;
     MatrixXd v_shell2fibbody = shell.flow(r_fibbody, x_shell, eta);
 
-    MatrixXd body_velocities, body_densities, v_fib_boundary, force_torque_bodies;
+    MatrixXd body_velocities, body_densities;
     std::tie(body_velocities, body_densities) = bc.unpack_solution_vector(x_bodies);
-    std::tie(force_torque_bodies, v_fib_boundary) =
-        System::calculate_body_fiber_link_conditions(x_fibers, body_velocities);
+    MatrixXd fib_boundary = System::calculate_body_fiber_link_conditions(x_fibers, body_velocities);
 
     v_all = v_fib2all;
     v_fibers += v_shell2fibbody.block(0, 0, 3, r_fibers.cols());

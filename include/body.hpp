@@ -42,7 +42,7 @@ class Body {
     virtual Eigen::VectorXd apply_preconditioner(VectorRef &x) const;
 
     /// @brief Make a copy of this instance
-    virtual std::unique_ptr<Body> clone() const { return std::make_unique<Body>(*this); }
+    virtual std::shared_ptr<Body> clone() const { return std::make_shared<Body>(*this); }
 
     /// @brief dummy method to be overriden by derived classes
     virtual bool check_collision(const Periphery &periphery, double threshold) const {
@@ -79,7 +79,11 @@ class BodyContainer {
 
   public:
     /// Vector of body pointers
-    std::vector<std::unique_ptr<Body>> bodies;
+    std::vector<std::shared_ptr<Body>> bodies;
+    std::vector<std::shared_ptr<SphericalBody>> spherical_bodies;
+    std::vector<std::shared_ptr<DeformableBody>> deformable_bodies;
+    std::unordered_map<std::shared_ptr<Body>, int> solution_offsets_;
+    std::unordered_map<std::shared_ptr<Body>, int> node_offsets_;
 
     /// Pointer to FMM stresslet kernel (Stokes)
     std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> stresslet_kernel_;
@@ -100,6 +104,7 @@ class BodyContainer {
         world_size_ = orig.world_size_;
         stresslet_kernel_ = orig.stresslet_kernel_;
         oseen_kernel_ = orig.oseen_kernel_;
+        populate_sublists();
     };
 
     /// @brief Assignment operator...
@@ -112,8 +117,29 @@ class BodyContainer {
         world_size_ = orig.world_size_;
         stresslet_kernel_ = orig.stresslet_kernel_;
         oseen_kernel_ = orig.oseen_kernel_;
+        populate_sublists();
         return *this;
     }
+
+    void populate_sublists();
+
+    template <typename T>
+    Eigen::VectorXd get_local_solution(const T &body_vec, VectorRef &body_solutions) const;
+
+    template <typename T>
+    Eigen::MatrixXd get_local_node_positions(const T &body_vec) const;
+
+    template <typename T>
+    Eigen::MatrixXd get_local_node_normals(const T &body_vec) const;
+
+    template <typename T>
+    Eigen::MatrixXd get_local_center_positions(const T &body_vec) const;
+
+    template <typename T>
+    Eigen::MatrixXd get_global_center_positions(const T &body_vec) const;
+
+    template <typename T>
+    std::pair<Eigen::MatrixXd, Eigen::MatrixXd> get_global_forces_torques(const T &body_vec) const;
 
     /// @brief Get total number of nodes associated with body
     ///
@@ -144,17 +170,12 @@ class BodyContainer {
 
     void update_RHS(MatrixRef &v_on_body);
     Eigen::VectorXd get_RHS() const;
-    Eigen::MatrixXd get_global_node_positions() const;
-    Eigen::MatrixXd get_local_node_positions() const;
-    Eigen::MatrixXd get_local_node_normals() const;
 
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &X) const;
     Eigen::MatrixXd flow(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const;
-    Eigen::MatrixXd flow_body_spherical(const std::vector<const Body *> &bodies, MatrixRef &r_trg,
-                                        VectorRef &body_solution, double eta) const;
-    Eigen::MatrixXd flow_body_deformable(const std::vector<const Body *> &bodies, MatrixRef &r_trg,
-                                         VectorRef &body_solution, double eta) const;
+    Eigen::MatrixXd flow_spherical(MatrixRef &r_trg, VectorRef &body_solution, double eta) const;
+    Eigen::MatrixXd flow_deformable(MatrixRef &r_trg, VectorRef &body_solution, double eta) const;
     void step(VectorRef &body_sol, double dt) const;
 
     /// @brief Update cache variables for each Body. @see Body::update_cache_variables
@@ -211,7 +232,7 @@ class SphericalBody : public Body {
     SphericalBody(const toml::value &body_table, const Params &params);
 
     /// Duplicate SphericalBody object
-    std::unique_ptr<Body> clone() const override { return std::make_unique<SphericalBody>(*this); };
+    std::shared_ptr<Body> clone() const override { return std::make_shared<SphericalBody>(*this); };
 
     // Parameters unique to spherical body
     double radius_;                  ///< Radius of body
@@ -265,7 +286,7 @@ class DeformableBody : public Body {
     DeformableBody(const toml::value &body_table, const Params &params) : Body(body_table, params){};
 
     /// Duplicate SphericalBody object
-    std::unique_ptr<Body> clone() const override { return std::make_unique<DeformableBody>(*this); };
+    std::shared_ptr<Body> clone() const override { return std::make_shared<DeformableBody>(*this); };
 
     void update_RHS(MatrixRef &v_on_body) override;
     void update_cache_variables(double eta) override;
