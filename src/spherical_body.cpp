@@ -26,7 +26,7 @@ void SphericalBody::step(double dt, VectorRef &body_solution) {
         orientation_new = Eigen::Quaterniond(s, p[0], p[1], p[2]) * orientation_;
         std::stringstream ss;
         ss << x_new.transpose();
-        spdlog::debug("Moving body {}: [{}]", this, ss.str());
+        spdlog::debug("Moving body {}: [{}]", (void *)this, ss.str());
 
         move(x_new, orientation_new);
     }
@@ -35,9 +35,8 @@ void SphericalBody::step(double dt, VectorRef &body_solution) {
 Eigen::VectorXd SphericalBody::matvec(MatrixRef &v_body, VectorRef &x_body) const {
     Eigen::VectorXd res(get_solution_size());
 
-    Eigen::MatrixXd d; // Body 'densities'
-    Eigen::MatrixXd U; // Body velocities
-    std::tie(U, d) = unpack_solution_vector(x_body);
+    CMatrixMap d(x_body.data(), 3, n_nodes_);      // Body 'densities'
+    CVectorMap U(x_body.data() + 3 * n_nodes_, 6); // Body velocities
 
     VectorMap res_nodes(res.data(), n_nodes_ * 3);
     VectorMap res_com(res.data() + n_nodes_ * 3, 6);
@@ -202,6 +201,12 @@ void SphericalBody::load_precompute_data(const std::string &precompute_file) {
 /// @see update_cache_variables
 SphericalBody::SphericalBody(const toml::value &body_table, const Params &params) : Body(body_table, params) {
     using parse_util::convert_array;
+    using namespace parse_util;
+    using std::string;
+    string precompute_file = toml::find<string>(body_table, "precompute_file");
+    load_precompute_data(precompute_file);
+    update_cache_variables(params.eta);
+
     radius_ = toml::find_or<double>(body_table, "radius", 0.0);
 
     // TODO: add body assertions so that input file and precompute data necessarily agree
