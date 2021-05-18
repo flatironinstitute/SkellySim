@@ -114,10 +114,13 @@ void resume_from_trajectory(std::string if_file) {
         new_fib.x_ = min_fib.x_;
         fc_.fibers.push_back(new_fib);
     }
-    for (int i = 0; i < bc_.bodies.size(); ++i) {
-        bc_.bodies[i]->position_ = min_state.bodies.bodies[i]->position_;
-        bc_.bodies[i]->orientation_ = min_state.bodies.bodies[i]->orientation_;
-    }
+
+    // make sure sublist pointers are initialized, and then fill them in
+    bc_.populate_sublists();
+    for (int i = 0; i < bc_.spherical_bodies.size(); ++i)
+        bc_.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
+    for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
+        bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
     output_map.rng_state = min_state.rng_state;
     RNG::init(output_map.rng_state);
 }

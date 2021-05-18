@@ -67,7 +67,6 @@ class Body {
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
 
-    MSGPACK_DEFINE_MAP(n_nodes_);
     /// For structures with fixed size Eigen::Vector types, this ensures alignment if the
     /// structure is allocated via `new`
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -202,7 +201,7 @@ class BodyContainer {
     }
 
     /// @brief msgpack serialization routine
-    MSGPACK_DEFINE(bodies);
+    MSGPACK_DEFINE(spherical_bodies, deformable_bodies);
 };
 
 /// @brief Spherical Body...
@@ -212,6 +211,7 @@ class SphericalBody : public Body {
     /// @param[in] body_table Parsed TOML body table. Must have 'radius' key defined.
     /// @param[in] params Initialized Params object
     SphericalBody(const toml::value &body_table, const Params &params);
+    SphericalBody() = default;
 
     /// Duplicate SphericalBody object
     std::shared_ptr<Body> clone() const override { return std::make_shared<SphericalBody>(*this); };
@@ -240,6 +240,7 @@ class SphericalBody : public Body {
     void update_preconditioner(double eta) override;
     void load_precompute_data(const std::string &input_file) override;
     void step(double dt, VectorRef &body_solution) override;
+    void min_copy(const std::shared_ptr<SphericalBody> &other);
 
     int get_solution_size() const override { return n_nodes_ * 3 + 6; };
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
@@ -265,9 +266,12 @@ class DeformableBody : public Body {
     /// @param[in] body_table Parsed TOML body table
     /// @param[in] params Initialized Params object
     DeformableBody(const toml::value &body_table, const Params &params) : Body(body_table, params){};
+    DeformableBody() = default;
 
     /// Duplicate SphericalBody object
     std::shared_ptr<Body> clone() const override { return std::make_shared<DeformableBody>(*this); };
+
+    void min_copy(const std::shared_ptr<DeformableBody> &other);
 
     // void update_RHS(MatrixRef &v_on_body) override;
     // void update_cache_variables(double eta) override;

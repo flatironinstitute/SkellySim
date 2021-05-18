@@ -58,6 +58,11 @@ Eigen::VectorXd SphericalBody::matvec(MatrixRef &v_body, VectorRef &x_body) cons
     return res;
 }
 
+void SphericalBody::min_copy(const std::shared_ptr<SphericalBody> &other) {
+    this->position_ = other->position_;
+    this->orientation_ = other->orientation_;
+}
+
 /// @brief Update internal SphericalBody::K_ matrix variable
 /// @see update_preconditioner
 void SphericalBody::update_K_matrix() {
