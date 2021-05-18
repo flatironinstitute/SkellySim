@@ -22,13 +22,7 @@ using Eigen::VectorXd;
 ///   surface).
 ///   @return Body object that has been appropriately rotated. Other internal cache variables are _not_ updated.
 /// @see update_cache_variables
-Body::Body(const toml::value &body_table, const Params &params) {
-    using namespace parse_util;
-    using std::string;
-    string precompute_file = toml::find<string>(body_table, "precompute_file");
-    load_precompute_data(precompute_file);
-    update_cache_variables(params.eta);
-}
+Body::Body(const toml::value &body_table, const Params &params) {}
 
 /// @brief Update the RHS for all bodies for given velocities
 ///
@@ -96,6 +90,7 @@ MatrixXd BodyContainer::get_local_node_positions(const T &body_vec) const {
 
     return r_body_nodes;
 }
+template MatrixXd BodyContainer::get_local_node_positions(const decltype(BodyContainer::bodies) &) const;
 
 /// @brief Return copy of local node positions (all bodies on rank 0, empty otherwise)
 /// @param[in] std::vector of shared_ptr<DerivedBody>
@@ -328,6 +323,33 @@ void BodyContainer::populate_sublists() {
         node_offsets_[body] = node_offset;
         node_offset += body->n_nodes_;
     }
+}
+
+// FIXME: remove redundant code in =/copy
+/// @brief Copy constructor...
+BodyContainer::BodyContainer(const BodyContainer &orig) {
+    for (auto &body : orig.bodies) {
+        bodies.push_back(body->clone());
+    }
+    world_rank_ = orig.world_rank_;
+    world_size_ = orig.world_size_;
+    stresslet_kernel_ = orig.stresslet_kernel_;
+    oseen_kernel_ = orig.oseen_kernel_;
+    populate_sublists();
+};
+
+/// @brief Assignment operator...
+BodyContainer &BodyContainer::operator=(const BodyContainer orig) {
+    bodies.clear();
+    for (auto &body : orig.bodies) {
+        bodies.push_back(body->clone());
+    }
+    world_rank_ = orig.world_rank_;
+    world_size_ = orig.world_size_;
+    stresslet_kernel_ = orig.stresslet_kernel_;
+    oseen_kernel_ = orig.oseen_kernel_;
+    populate_sublists();
+    return *this;
 }
 
 /// @brief Construct and fill BodyContainer from parsed toml and system parameters

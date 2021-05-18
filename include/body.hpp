@@ -31,16 +31,16 @@ class Body {
     Body(const toml::value &body_table, const Params &params);
     Body() = default; ///< default constructor...
 
-    virtual void update_RHS(MatrixRef &v_on_body);
-    virtual void update_cache_variables(double eta);
-    virtual void update_preconditioner(double eta);
-    virtual void load_precompute_data(const std::string &input_file);
-    virtual void step(double dt, VectorRef &body_solution);
+    virtual void update_RHS(MatrixRef &v_on_body){};
+    virtual void update_cache_variables(double eta){};
+    virtual void update_preconditioner(double eta){};
+    virtual void load_precompute_data(const std::string &input_file){};
+    virtual void step(double dt, VectorRef &body_solution){};
 
-    virtual int get_solution_size() const;
-    virtual const Eigen::Vector3d &get_position() const;
-    virtual Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const;
-    virtual Eigen::VectorXd apply_preconditioner(VectorRef &x) const;
+    virtual int get_solution_size() const {};
+    virtual const Eigen::Vector3d &get_position() const {};
+    virtual Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const {};
+    virtual Eigen::VectorXd apply_preconditioner(VectorRef &x) const {};
 
     /// @brief Make a copy of this instance
     virtual std::shared_ptr<Body> clone() const { return std::make_shared<Body>(*this); }
@@ -67,6 +67,7 @@ class Body {
         throw std::runtime_error("Collision undefined on base Body class\n");
     };
 
+    MSGPACK_DEFINE_MAP(n_nodes_);
     /// For structures with fixed size Eigen::Vector types, this ensures alignment if the
     /// structure is allocated via `new`
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -97,30 +98,10 @@ class BodyContainer {
 
     // FIXME: remove redundant code in =/copy
     /// @brief Copy constructor...
-    BodyContainer(const BodyContainer &orig) {
-        for (auto &body : orig.bodies) {
-            bodies.push_back(body->clone());
-        }
-        world_rank_ = orig.world_rank_;
-        world_size_ = orig.world_size_;
-        stresslet_kernel_ = orig.stresslet_kernel_;
-        oseen_kernel_ = orig.oseen_kernel_;
-        populate_sublists();
-    };
+    BodyContainer(const BodyContainer &orig);
 
     /// @brief Assignment operator...
-    BodyContainer &operator=(const BodyContainer orig) {
-        bodies.clear();
-        for (auto &body : orig.bodies) {
-            bodies.push_back(body->clone());
-        }
-        world_rank_ = orig.world_rank_;
-        world_size_ = orig.world_size_;
-        stresslet_kernel_ = orig.stresslet_kernel_;
-        oseen_kernel_ = orig.oseen_kernel_;
-        populate_sublists();
-        return *this;
-    }
+    BodyContainer &operator=(const BodyContainer orig);
 
     void populate_sublists();
 
@@ -267,7 +248,6 @@ class SphericalBody : public Body {
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
     void update_K_matrix();
     void update_singularity_subtraction_vecs(double eta);
-    std::pair<Eigen::MatrixXd, Eigen::MatrixXd> unpack_solution_vector(VectorRef &x) const;
 
     bool check_collision(const Periphery &periphery, double threshold) const override;
     bool check_collision(const Body &body, double threshold) const override;
@@ -281,26 +261,26 @@ class SphericalBody : public Body {
 /// @brief Spherical Body...
 class DeformableBody : public Body {
   public:
-    /// @brief Construct spherical body. @see Body
-    /// @param[in] body_table Parsed TOML body table. Must have 'radius' key defined.
+    /// @brief Construct deformable body. @see Body
+    /// @param[in] body_table Parsed TOML body table
     /// @param[in] params Initialized Params object
     DeformableBody(const toml::value &body_table, const Params &params) : Body(body_table, params){};
 
     /// Duplicate SphericalBody object
     std::shared_ptr<Body> clone() const override { return std::make_shared<DeformableBody>(*this); };
 
-    void update_RHS(MatrixRef &v_on_body) override;
-    void update_cache_variables(double eta) override;
-    void update_preconditioner(double eta) override;
-    void load_precompute_data(const std::string &input_file) override;
-    void step(double dt, VectorRef &body_solution) override;
-    int get_solution_size() const override { return n_nodes_ * 4; };
-    Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
+    // void update_RHS(MatrixRef &v_on_body) override;
+    // void update_cache_variables(double eta) override;
+    // void update_preconditioner(double eta) override;
+    // void load_precompute_data(const std::string &input_file) override;
+    // void step(double dt, VectorRef &body_solution) override;
+    // int get_solution_size() const override { return n_nodes_ * 4; };
+    // Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
 
-    bool check_collision(const Periphery &periphery, double threshold) const override;
-    bool check_collision(const Body &body, double threshold) const override;
-    bool check_collision(const SphericalBody &body, double threshold) const override;
-    bool check_collision(const DeformableBody &body, double threshold) const override;
+    // bool check_collision(const Periphery &periphery, double threshold) const override;
+    // bool check_collision(const Body &body, double threshold) const override;
+    // bool check_collision(const SphericalBody &body, double threshold) const override;
+    // bool check_collision(const DeformableBody &body, double threshold) const override;
     MSGPACK_DEFINE_MAP(node_positions_, node_normals_);
 };
 
