@@ -721,7 +721,11 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     r_fibbody.block(0, r_fibers.cols(), 3, r_bodies.cols()) = r_bodies;
     MatrixXd v_shell2fibbody = shell.flow(r_fibbody, x_shell, eta);
 
-    MatrixXd v_fib_boundary = System::calculate_body_fiber_link_conditions(x_fibers, x_bodies);
+    Eigen::VectorXd x_bodies_global(bc.get_global_solution_size());
+    if (rank_ == 0)
+        x_bodies_global = x_bodies;
+    MPI_Bcast(x_bodies_global.data(), x_bodies_global.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MatrixXd v_fib_boundary = System::calculate_body_fiber_link_conditions(x_fibers, x_bodies_global);
 
     v_all = v_fib2all;
     v_fibers += v_shell2fibbody.block(0, 0, 3, r_fibers.cols());
@@ -768,7 +772,8 @@ bool step() {
     bool external_force_body = false;
     for (auto &body : bc.spherical_bodies) {
         body->force_torque_.setZero();
-        body->force_torque_.segment(0, 3) = body->external_force_;
+        // Hack so that when you sum global forces, it should sum back to the external force
+        body->force_torque_.segment(0, 3) = body->external_force_ / bc.spherical_bodies.size();
         external_force_body = external_force_body | body->external_force_.any();
     }
 
