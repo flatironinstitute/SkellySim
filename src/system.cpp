@@ -813,6 +813,8 @@ bool step() {
         offset += 4 * fib.n_nodes_;
     }
 
+    bc_.step(body_sol, dt);
+
     // Re-pin fibers to bodies
     for (auto &fib : fc.fibers) {
         if (fib.binding_site_.first >= 0) {
