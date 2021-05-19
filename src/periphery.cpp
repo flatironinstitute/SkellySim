@@ -75,6 +75,11 @@ bool SphericalPeriphery::check_collision(const SphericalBody &body, double thres
     return max_distance > (radius_ - threshold);
 }
 
+bool SphericalPeriphery::check_collision(const DeformableBody &body, double threshold) const {
+    spdlog::warn("check_collision not implemented for SphericalPeriphy->DeformableBody");
+    return false;
+}
+
 bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {
     const double r2 = pow(radius_ - threshold, 2);
     for (int i = 0; i < point_cloud.cols(); ++i)
