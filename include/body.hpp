@@ -31,41 +31,31 @@ class Body {
     Body(const toml::value &body_table, const Params &params);
     Body() = default; ///< default constructor...
 
-    virtual void update_RHS(MatrixRef &v_on_body){};
-    virtual void update_cache_variables(double eta){};
-    virtual void update_preconditioner(double eta){};
-    virtual void load_precompute_data(const std::string &input_file){};
-    virtual void step(double dt, VectorRef &body_solution){};
+    virtual void update_RHS(MatrixRef &v_on_body) = 0;
+    virtual void update_cache_variables(double eta) = 0;
+    virtual void update_preconditioner(double eta) = 0;
+    virtual void load_precompute_data(const std::string &input_file) = 0;
+    virtual void step(double dt, VectorRef &body_solution) = 0;
 
-    virtual int get_solution_size() const {};
-    virtual const Eigen::Vector3d &get_position() const {};
-    virtual Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const {};
-    virtual Eigen::VectorXd apply_preconditioner(VectorRef &x) const {};
+    virtual int get_solution_size() const = 0;
+    virtual const Eigen::Vector3d &get_position() const = 0;
+    virtual Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const = 0;
+    virtual Eigen::VectorXd apply_preconditioner(VectorRef &x) const = 0;
 
     /// @brief Make a copy of this instance
-    virtual std::shared_ptr<Body> clone() const { return std::make_shared<Body>(*this); }
+    virtual std::shared_ptr<Body> clone() const = 0;
 
     /// @brief dummy method to be overriden by derived classes
-    virtual bool check_collision(const Periphery &periphery, double threshold) const {
-        // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
-        // you make this a pure virtual function, so instead we just throw an error.
-        throw std::runtime_error("Collision undefined on base Body class\n");
-    };
+    virtual bool check_collision(const Periphery &periphery, double threshold) const = 0;
 
     /// @brief dummy method to be overriden by derived classes
-    virtual bool check_collision(const Body &body, double threshold) const {
-        throw std::runtime_error("Collision undefined on base Body class\n");
-    };
+    virtual bool check_collision(const Body &body, double threshold) const = 0;
 
     /// @brief dummy method to be overriden by derived classes
-    virtual bool check_collision(const SphericalBody &body, double threshold) const {
-        throw std::runtime_error("Collision undefined on base Body class\n");
-    };
+    virtual bool check_collision(const SphericalBody &body, double threshold) const = 0;
 
     /// @brief dummy method to be overriden by derived classes
-    virtual bool check_collision(const DeformableBody &body, double threshold) const {
-        throw std::runtime_error("Collision undefined on base Body class\n");
-    };
+    virtual bool check_collision(const DeformableBody &body, double threshold) const = 0;
 
     /// For structures with fixed size Eigen::Vector types, this ensures alignment if the
     /// structure is allocated via `new`
@@ -244,6 +234,7 @@ class SphericalBody : public Body {
 
     int get_solution_size() const override { return n_nodes_ * 3 + 6; };
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
+    Eigen::VectorXd apply_preconditioner(VectorRef &x) const override;
 
     const Eigen::Vector3d &get_position() const override { return position_; }
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
@@ -273,18 +264,21 @@ class DeformableBody : public Body {
 
     void min_copy(const std::shared_ptr<DeformableBody> &other);
 
-    // void update_RHS(MatrixRef &v_on_body) override;
-    // void update_cache_variables(double eta) override;
-    // void update_preconditioner(double eta) override;
-    // void load_precompute_data(const std::string &input_file) override;
-    // void step(double dt, VectorRef &body_solution) override;
-    // int get_solution_size() const override { return n_nodes_ * 4; };
-    // Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
+    void update_RHS(MatrixRef &v_on_body) override;
+    void update_cache_variables(double eta) override;
+    void update_preconditioner(double eta) override;
+    void load_precompute_data(const std::string &input_file) override;
+    void step(double dt, VectorRef &body_solution) override;
+    int get_solution_size() const override { return n_nodes_ * 4; };
+    Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
+    Eigen::VectorXd apply_preconditioner(VectorRef &x) const override;
+    const Eigen::Vector3d &get_position() const override;
 
-    // bool check_collision(const Periphery &periphery, double threshold) const override;
-    // bool check_collision(const Body &body, double threshold) const override;
-    // bool check_collision(const SphericalBody &body, double threshold) const override;
-    // bool check_collision(const DeformableBody &body, double threshold) const override;
+    bool check_collision(const Periphery &periphery, double threshold) const override;
+    bool check_collision(const Body &body, double threshold) const override;
+    bool check_collision(const SphericalBody &body, double threshold) const override;
+    bool check_collision(const DeformableBody &body, double threshold) const override;
+
     MSGPACK_DEFINE_MAP(node_positions_, node_normals_);
 };
 
