@@ -38,7 +38,7 @@ class Body {
     virtual void step(double dt, VectorRef &body_solution) = 0;
 
     virtual int get_solution_size() const = 0;
-    virtual const Eigen::Vector3d &get_position() const = 0;
+    virtual Eigen::Vector3d get_position() const = 0;
     virtual Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const = 0;
     virtual Eigen::VectorXd apply_preconditioner(VectorRef &x) const = 0;
 
@@ -236,7 +236,7 @@ class SphericalBody : public Body {
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
     Eigen::VectorXd apply_preconditioner(VectorRef &x) const override;
 
-    const Eigen::Vector3d &get_position() const override { return position_; }
+    Eigen::Vector3d get_position() const override { return position_; }
     void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
     void update_K_matrix();
     void update_singularity_subtraction_vecs(double eta);
@@ -272,7 +272,7 @@ class DeformableBody : public Body {
     int get_solution_size() const override { return n_nodes_ * 4; };
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
     Eigen::VectorXd apply_preconditioner(VectorRef &x) const override;
-    const Eigen::Vector3d &get_position() const override;
+    Eigen::Vector3d get_position() const override;
 
     bool check_collision(const Periphery &periphery, double threshold) const override;
     bool check_collision(const Body &body, double threshold) const override;
