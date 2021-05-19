@@ -60,7 +60,7 @@ void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
         bodies_solution_global = bodies_solution;
     MPI_Bcast(bodies_solution_global.data(), global_solution_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    int sol_offset = get_local_solution_size();
+    int sol_offset = 0;
     for (auto &body : bodies) {
         const int sol_size = body->get_solution_size();
         body->step(dt, bodies_solution.segment(sol_offset, sol_size));
