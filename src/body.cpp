@@ -217,6 +217,10 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
         get_local_center_positions(spherical_bodies); //< Distributed center positions for FMM calls
     MatrixXd forces, torques;
     std::tie(forces, torques) = get_global_forces_torques(spherical_bodies);
+
+    // We actually only need the summed forces on the first rank
+    if (world_rank_)
+        forces.resize(3, 0);
     v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
     redirect.flush(spdlog::level::debug, "STKFMM");
 
