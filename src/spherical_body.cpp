@@ -32,6 +32,8 @@ void SphericalBody::step(double dt, VectorRef &body_solution) {
     }
 }
 
+Eigen::VectorXd SphericalBody::apply_preconditioner(VectorRef &x) const { return A_LU_.solve(x); }
+
 Eigen::VectorXd SphericalBody::matvec(MatrixRef &v_body, VectorRef &x_body) const {
     Eigen::VectorXd res(get_solution_size());
 
