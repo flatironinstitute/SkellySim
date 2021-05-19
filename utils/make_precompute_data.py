@@ -125,30 +125,22 @@ def precompute_periphery(config):
                  normals=normals_periphery,
                  nodes=nodes_periphery)
 
-
-def precompute_body(config, body):
+def precompute_body_sphere(body):
     precompute_file = body['precompute_file']
-    body_shape = body['shape']
     num_nodes = body['num_nodes']
-    eta = config['params']['eta']
 
-    # Build shape
-    if body_shape == 'sphere':
-        radius = body['radius']
-        if radius < body_quadrature_radius_threshold:
-            radius -= body_quadrature_radius_offset_low
-        else:
-            radius -= body_quadrature_radius_offset_high
-
-        node_positions_ref, node_normals_ref, h_body, gradh_body = \
-            shape_gallery.shape_gallery(
-                body_shape,
-                num_nodes,
-                radius=radius,
-            )
+    radius = body['radius']
+    if radius < body_quadrature_radius_threshold:
+        radius -= body_quadrature_radius_offset_low
     else:
-        print("Invalid body shape: " + body_shape)
-        sys.exit()
+        radius -= body_quadrature_radius_offset_high
+
+    node_positions_ref, node_normals_ref, h_body, gradh_body = \
+        shape_gallery.shape_gallery(
+            'sphere',
+            num_nodes,
+            radius=radius,
+        )
 
     # Normals are in the opposite direction to bodies' normals
     node_hull = ConvexHull(node_positions_ref)
@@ -167,13 +159,28 @@ def precompute_body(config, body):
                  node_normals_ref=node_normals_ref,
                  node_positions_ref=node_positions_ref)
 
+def precompute_body_deformable(body: dict):
+    print("Deformable body precompute not implemented")
+
+def precompute_body(body: dict):
+    body_shape = body['shape']
+
+    # Build shape
+    if body_shape == 'sphere':
+        precompute_body_sphere(body)
+    elif body_shape == 'deformable':
+        precompute_body_deformable(body)
+    else:
+        print("Invalid body shape: " + body_shape)
+        sys.exit()
+
 
 visited_precomputes = []
 if "bodies" in config:
-    for body in config["bodies"]:
-        if body['precompute_file'] not in visited_precomputes:
-            visited_precomputes.append(body['precompute_file'])
-            print(body)
-            precompute_body(config, body)
+    for b in config["bodies"]:
+        if b['precompute_file'] not in visited_precomputes:
+            visited_precomputes.append(b['precompute_file'])
+            print(b)
+            precompute_body(b)
 
 precompute_periphery(config)
