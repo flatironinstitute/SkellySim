@@ -73,14 +73,10 @@ void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
 /// @return [3 x n_body_nodes_local] matrix of body node positions
 template <typename T>
 MatrixXd BodyContainer::get_local_node_positions(const T &body_vec) const {
-    MatrixXd r_body_nodes;
-    int n_nodes = 0;
-    for (auto &body : body_vec)
-        n_nodes += body->n_nodes_;
+    const int n_nodes = get_local_node_count();
+    MatrixXd r_body_nodes(3, n_nodes);
 
-    r_body_nodes.resize(3, n_nodes);
     if (world_rank_ == 0) {
-        r_body_nodes.resize(3, n_nodes);
         int offset = 0;
         for (const auto &body : body_vec) {
             r_body_nodes.block(0, offset, 3, body->n_nodes_) = body->node_positions_;
@@ -97,12 +93,9 @@ template MatrixXd BodyContainer::get_local_node_positions(const decltype(BodyCon
 /// @return [3 x n_body_nodes_local] matrix of body node positions
 template <typename T>
 MatrixXd BodyContainer::get_local_node_normals(const T &body_vec) const {
-    MatrixXd normals;
-    int n_nodes = 0;
-    for (auto &body : body_vec)
-        n_nodes += body->n_nodes_;
+    const int n_nodes = get_local_node_count();
+    MatrixXd normals(3, n_nodes);
 
-    normals.resize(3, n_nodes);
     if (world_rank_ == 0) {
         int offset = 0;
         for (const auto &body : body_vec) {
@@ -116,18 +109,23 @@ MatrixXd BodyContainer::get_local_node_normals(const T &body_vec) const {
 
 template <typename T>
 VectorXd BodyContainer::get_local_solution(const T &body_vec, VectorRef &body_solutions) const {
-    int solution_size = 0;
-    for (const auto &body : body_vec)
-        solution_size += body->get_solution_size();
+    VectorXd sub_solution;
 
-    VectorXd sub_solution(solution_size);
-    int solution_offset = 0;
-    for (auto &body : body_vec) {
-        const int body_solution_size = body->get_solution_size();
-        sub_solution.segment(solution_offset, body_solution_size) =
-            body_solutions.segment(solution_offsets_.at(body), body_solution_size);
-        solution_offset += body->get_solution_size();
+    if (world_rank_ == 0) {
+        int solution_size = 0;
+        for (const auto &body : body_vec)
+            solution_size += body->get_solution_size();
+        sub_solution.resize(solution_size);
+
+        int solution_offset = 0;
+        for (auto &body : body_vec) {
+            const int body_solution_size = body->get_solution_size();
+            sub_solution.segment(solution_offset, body_solution_size) =
+                body_solutions.segment(solution_offsets_.at(body), body_solution_size);
+            solution_offset += body->get_solution_size();
+        }
     }
+
     return sub_solution;
 }
 
@@ -189,10 +187,12 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
     const int n_nodes = node_positions.cols();
     MatrixXd densities(3, n_nodes);
     int node_offset = 0;
-    for (auto &body : spherical_bodies) {
-        densities.block(0, node_offset, 3, body->n_nodes_) =
-            CMatrixMap(body_solutions.data() + solution_offsets_.at(body), 3, body->n_nodes_);
-        node_offset += body->n_nodes_;
+    if (world_rank_ == 0) {
+        for (auto &body : spherical_bodies) {
+            densities.block(0, node_offset, 3, body->n_nodes_) =
+                CMatrixMap(body_solutions.data() + solution_offsets_.at(body), 3, body->n_nodes_);
+            node_offset += body->n_nodes_;
+        }
     }
     const int n_trg = r_trg.cols();
     const MatrixXd null_matrix; //< Empty matrix for dummy arguments to kernels
@@ -375,10 +375,18 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
 
     for (int i_body = 0; i_body < n_bodies_tot; ++i_body) {
         toml::value &body_table = body_tables.at(i_body);
-        bodies.emplace_back(new SphericalBody(body_table, params));
-        // auto &body = bodies.back();
-        // spdlog::info("Body {}: {} [ {}, {}, {} ]", i_body, body->node_weights_.size(), body->position_[0],
-        //              body->position_[1], body->position_[2]);
+        const std::string shape = toml::find_or(body_table, "shape", "");
+        if (shape == std::string("sphere"))
+            bodies.emplace_back(new SphericalBody(body_table, params));
+        else if (shape == std::string("deformable")) {
+            bodies.emplace_back(new DeformableBody(body_table, params));
+        } else {
+            throw std::runtime_error("Unknown body shape: " + shape);
+        }
+
+        auto &body = bodies.back();
+        auto position = body->get_position();
+        spdlog::info("Body {}: [ {}, {}, {} ]", i_body, position[0], position[1], position[2]);
     }
 
     populate_sublists();
