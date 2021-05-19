@@ -63,7 +63,7 @@ void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
     int sol_offset = 0;
     for (auto &body : bodies) {
         const int sol_size = body->get_solution_size();
-        body->step(dt, bodies_solution.segment(sol_offset, sol_size));
+        body->step(dt, bodies_solution_global.segment(sol_offset, sol_size));
         sol_offset += sol_size;
     }
 }
