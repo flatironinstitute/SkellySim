@@ -10,6 +10,7 @@
 #include <params.hpp>
 
 class SphericalBody;
+class DeformableBody;
 
 /// Class to represent the containing boundary of the simulated system
 ///
@@ -59,6 +60,14 @@ class Periphery {
     /// MPI_WORLD_SIZE+1 array that specifies row displacements. Is essentially the CDF of row_counts_
     Eigen::VectorXi row_displs_;
 
+    virtual bool check_collision(const DeformableBody &body, double threshold) const {
+        if (!n_nodes_global_)
+            return false;
+        // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
+        // you make this a pure virtual function, so instead we just throw an error.
+        throw std::runtime_error("Collision undefined on base Periphery class\n");
+    };
+
     virtual bool check_collision(const SphericalBody &body, double threshold) const {
         if (!n_nodes_global_)
             return false;
@@ -88,6 +97,7 @@ class SphericalPeriphery : public Periphery {
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
+    virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
 };
 

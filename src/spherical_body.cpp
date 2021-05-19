@@ -212,7 +212,6 @@ SphericalBody::SphericalBody(const toml::value &body_table, const Params &params
     using std::string;
     string precompute_file = toml::find<string>(body_table, "precompute_file");
     load_precompute_data(precompute_file);
-    update_cache_variables(params.eta);
 
     radius_ = toml::find_or<double>(body_table, "radius", 0.0);
 
@@ -279,6 +278,6 @@ bool SphericalBody::check_collision(const SphericalBody &body, double threshold)
 /// @param[in] threshold Minimum between surfaces to consider it a collision
 /// @return true if collision detected, false otherwise
 bool SphericalBody::check_collision(const DeformableBody &body, double threshold) const {
-    throw std::runtime_error("Collision not implemented between SphericalBody and Deformable body");
+    spdlog::warn("check_collision not defined for SphericalBody->DeformableBody");
     return false;
 }

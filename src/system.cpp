@@ -2,7 +2,6 @@
 
 #include <rng.hpp>
 
-#include <Eigen/Core>
 #include <fstream>
 #include <unordered_map>
 
