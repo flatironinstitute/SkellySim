@@ -773,7 +773,7 @@ bool step() {
     for (auto &body : bc.spherical_bodies) {
         body->force_torque_.setZero();
         // Hack so that when you sum global forces, it should sum back to the external force
-        body->force_torque_.segment(0, 3) = body->external_force_ / bc.spherical_bodies.size();
+        body->force_torque_.segment(0, 3) = body->external_force_ / size_;
         external_force_body = external_force_body | body->external_force_.any();
     }
 
