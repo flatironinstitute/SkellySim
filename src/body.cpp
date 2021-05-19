@@ -117,7 +117,6 @@ MatrixXd BodyContainer::get_local_node_normals(const T &body_vec) const {
 template <typename T>
 VectorXd BodyContainer::get_local_solution(const T &body_vec, VectorRef &body_solutions) const {
     int solution_size = 0;
-    int n_nodes = 0;
     for (const auto &body : body_vec)
         solution_size += body->get_solution_size();
 

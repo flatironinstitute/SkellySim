@@ -16,9 +16,11 @@ void DeformableBody::update_cache_variables(double eta) {}
 void DeformableBody::update_preconditioner(double eta) {}
 void DeformableBody::load_precompute_data(const std::string &input_file) {}
 void DeformableBody::step(double dt, VectorRef &body_solution) {}
-Eigen::VectorXd DeformableBody::matvec(MatrixRef &v_bodies, VectorRef &body_solution) const {}
-Eigen::VectorXd DeformableBody::apply_preconditioner(VectorRef &x) const {}
-const Eigen::Vector3d &DeformableBody::get_position() const {}
+Eigen::VectorXd DeformableBody::matvec(MatrixRef &v_bodies, VectorRef &body_solution) const {
+    return Eigen::VectorXd();
+}
+Eigen::VectorXd DeformableBody::apply_preconditioner(VectorRef &x) const { return Eigen::VectorXd(); }
+Eigen::Vector3d DeformableBody::get_position() const { return Eigen::Vector3d(); }
 
 bool DeformableBody::check_collision(const Periphery &periphery, double threshold) const { return false; }
 bool DeformableBody::check_collision(const Body &body, double threshold) const { return false; }
