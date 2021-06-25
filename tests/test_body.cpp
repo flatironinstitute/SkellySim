@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     toml::value config = toml::parse(config_file);
     Params params(config.at("params"));
     toml::array &body_configs = config.at("bodies").as_array();
-    Body body(body_configs.at(0).as_table(), params);
+    SphericalBody body(body_configs.at(0).as_table(), params);
 
     System::init(config_file);
     FiberContainer &fc = *System::get_fiber_container();

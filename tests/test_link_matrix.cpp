@@ -37,6 +37,7 @@ int main(int argc, char *argv[]) {
     std::string config_file("test_link_matrix.toml");
     System::init(config_file);
     FiberContainer &fc = *System::get_fiber_container();
+    BodyContainer &bc = *System::get_body_container();
     toml::value &param_table = *System::get_param_table();
 
     toml::table special = param_table["special"].as_table();
@@ -48,9 +49,11 @@ int main(int argc, char *argv[]) {
 
     fc.update_derivatives();
 
-    MatrixXd force_torque, velocities_on_fiber;
-    std::tie(force_torque, velocities_on_fiber) =
-        System::calculate_body_fiber_link_conditions(fibers_xt, body_velocities);
+    MatrixXd force, torque, force_torque, velocities_on_fiber;
+    velocities_on_fiber = System::calculate_body_fiber_link_conditions(fibers_xt, body_velocities);
+    std::tie(force, torque) = bc.get_global_forces_torques(bc.spherical_bodies);
+    force_torque.block(0, 0, 3, force.cols()) = force;
+    force_torque.block(3, 0, 3, force.cols()) = torque;
 
     assert(allclose(force_torque, force_torque_ref, 1E-7));
     assert(allclose(velocities_on_fiber, velocities_on_fiber_ref));
