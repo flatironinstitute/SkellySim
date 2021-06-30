@@ -89,6 +89,30 @@ bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double th
     return false;
 }
 
+Eigen::MatrixXd SphericalPeriphery::point_cloud_interaction(const MatrixRef &point_cloud,
+                                                            const fiber_periphery_interaction_t &fp_params) const {
+    if (!n_nodes_global_)
+        return Eigen::MatrixXd::Zero(point_cloud.rows(), point_cloud.cols());
+
+    const MatrixRef &pc = point_cloud;
+    Eigen::MatrixXd f_points = Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
+
+    for (int i = 0; i < pc.cols(); ++i) {
+        double r_mag = pc.col(i).norm();
+
+        Eigen::VectorXd u_hat = pc.col(i) / r_mag;
+        Eigen::Vector3d dr = pc.col(i) - u_hat * radius_;
+        double d = dr.norm();
+
+        if (r_mag < radius_)
+            f_points.col(i) = fp_params.f_0 * dr / d * exp(-(radius_ - r_mag) / fp_params.lambda);
+        else
+            spdlog::debug("Fiber collision detected in force routine.");
+    }
+
+    return f_points;
+}
+
 Periphery::Periphery(const std::string &precompute_file, const toml::value &body_table, const Params &params) {
     {
         using namespace kernels;

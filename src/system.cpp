@@ -763,7 +763,11 @@ bool step() {
 
     fc.update_cache_variables(dt, eta);
 
+    // Implicit motor forces
     MatrixXd f_on_fibers = fc.generate_constant_force();
+
+    // Fiber-periphery forces (if periphery exists)
+    f_on_fibers += shell.point_cloud_interaction(fc.get_local_node_positions(), params.fiber_periphery_interaction);
     MatrixXd v_all = fc.flow(f_on_fibers, r_trg_external, eta);
 
     bc.update_cache_variables(eta);

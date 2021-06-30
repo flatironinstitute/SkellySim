@@ -21,4 +21,10 @@ typedef const Eigen::Ref<const Eigen::ArrayXd> ArrayRef;
 typedef const Eigen::Ref<const Eigen::VectorXd> VectorRef;
 typedef const Eigen::Ref<const Eigen::MatrixXd> MatrixRef;
 
+/// Struct of parameters for exponentially decaying fiber-periphery interaction
+typedef struct  {
+    double f_0; ///< strength of interaction
+    double lambda; ///< characteristic length of interaction
+} fiber_periphery_interaction_t;
+
 #endif
