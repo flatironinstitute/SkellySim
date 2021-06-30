@@ -55,5 +55,11 @@ Params::Params(toml::value &pt) {
             toml::find_or(s, "periphery_stresslet_max_points", stkfmm.periphery_stresslet_max_points);
     }
 
+    if (pt.contains("fiber_periphery_interaction")) {
+        const auto fp = pt.at("fiber_periphery_interaction");
+        fiber_periphery_interaction.f_0 = toml::find_or(fp, "f_0", 20.0);
+        fiber_periphery_interaction.lambda = toml::find_or(fp, "lambda", 0.5);
+    }
+
     shell_precompute_file = toml::find_or(pt, "shell_precompute_file", "");
 }

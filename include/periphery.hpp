@@ -82,6 +82,13 @@ class Periphery {
         throw std::runtime_error("Collision undefined on base Periphery class\n");
     };
 
+    virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
+                                                    const fiber_periphery_interaction_t &fp_params) const {
+        if (!n_nodes_global_)
+            return Eigen::MatrixXd();
+        throw std::runtime_error("Point cloud interaction undefined on base Periphery class\n");
+    }
+
     int n_nodes_global_ = 0; ///< Number of nodes across ALL MPI ranks
   private:
     int world_size_;
@@ -99,6 +106,8 @@ class SphericalPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
+    virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
+                                                    const fiber_periphery_interaction_t &fp_params) const;
 };
 
 #endif

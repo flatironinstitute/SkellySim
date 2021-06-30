@@ -30,6 +30,8 @@ class Params {
     } dynamic_instability;
     unsigned long seed;
 
+    fiber_periphery_interaction_t fiber_periphery_interaction;
+
     struct {
         int body_stresslet_multipole_order = 8;
         int body_stresslet_max_points = 2000;
