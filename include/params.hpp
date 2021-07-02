@@ -17,6 +17,7 @@ class Params {
     double dt_max;
     double dt_write;
     bool periphery_binding_flag;
+    bool velocity_field_flag;
     struct {
         int n_nodes = 0;
         double v_growth;
@@ -31,6 +32,13 @@ class Params {
     unsigned long seed;
 
     fiber_periphery_interaction_t fiber_periphery_interaction;
+
+    struct {
+        bool moving_volume;
+        double dt_write_field;
+        double resolution;
+        double moving_volume_radius;
+    } velocity_field;
 
     struct {
         int body_stresslet_multipole_order = 8;

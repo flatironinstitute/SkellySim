@@ -85,7 +85,7 @@ class Periphery {
     virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
                                                     const fiber_periphery_interaction_t &fp_params) const {
         if (!n_nodes_global_)
-            return Eigen::MatrixXd();
+            return Eigen::MatrixXd::Zero(point_cloud.rows(), point_cloud.cols());
         throw std::runtime_error("Point cloud interaction undefined on base Periphery class\n");
     }
 

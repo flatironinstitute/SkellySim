@@ -16,6 +16,7 @@ Params::Params(toml::value &pt) {
     dt_write = toml::find_or(pt, "dt_write", 0.25);
     seed = toml::find_or(pt, "seed", 1);
     periphery_binding_flag = toml::find_or(pt, "periphery_binding_flag", false);
+    velocity_field_flag = toml::find_or(pt, "velocity_field_flag", false);
 
     if (pt.contains("dynamic_instability")) {
         const auto &di = pt.at("dynamic_instability");
@@ -59,6 +60,14 @@ Params::Params(toml::value &pt) {
         const auto fp = pt.at("fiber_periphery_interaction");
         fiber_periphery_interaction.f_0 = toml::find_or(fp, "f_0", 20.0);
         fiber_periphery_interaction.lambda = toml::find_or(fp, "lambda", 0.5);
+    }
+
+    if (pt.contains("velocity_field")) {
+        const auto vf = pt.at("velocity_field");
+        velocity_field.moving_volume = toml::find_or(vf, "moving_volume", false);
+        velocity_field.dt_write_field = toml::find_or(vf, "dt_write_field", 10 * dt_write);
+        velocity_field.resolution = toml::find_or(vf, "resolution", 1.0);
+        velocity_field.moving_volume_radius = toml::find_or(vf, "moving_volume_radius", 20.0);
     }
 
     shell_precompute_file = toml::find_or(pt, "shell_precompute_file", "");
