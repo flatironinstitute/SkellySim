@@ -26,7 +26,9 @@ Params params_;                    ///< Simulation input parameters
 FiberContainer fc_;                ///< Fibers
 BodyContainer bc_;                 ///< Bodies
 std::unique_ptr<Periphery> shell_; ///< Periphery
+Eigen::VectorXd curr_solution_;
 std::ofstream ofs_;                ///< Trajectory output file stream. Opened at initialization
+std::ofstream ofs_vf_;             ///< Velocity field output file stream. Opened at initialization
 
 FiberContainer fc_bak_;   ///< Copy of fibers for timestep reversion
 BodyContainer bc_bak_;    ///< Copy of bodies for timestep reversion
@@ -73,6 +75,19 @@ void write() {
     msgpack::pack(ofs_, output_map);
     ofs_.flush();
 }
+
+class VelocityField {
+  public:
+    double time;
+    Eigen::MatrixXd x_grid;
+    Eigen::MatrixXd v_grid;
+    void compute();
+    void write() {
+        msgpack::pack(ofs_vf_, *this);
+        ofs_vf_.flush();
+    };
+    MSGPACK_DEFINE_MAP(time, x_grid, v_grid);
+};
 
 /// @brief Set system state to last state found in trajectory files
 ///
@@ -713,8 +728,7 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
 
     // calculate fiber-fiber velocity
     MatrixXd fw = fc.apply_fiber_force(x_fibers);
-    Block<MatrixXd> r_shellbody = r_all.block(0, r_fibers.cols(), 3, r_shell.cols() + r_bodies.cols());
-    MatrixXd v_fib2all = fc.flow(fw, r_shellbody, eta);
+    MatrixXd v_fib2all = fc.flow(r_all, fw, eta);
 
     MatrixXd r_fibbody(3, r_fibers.cols() + r_bodies.cols());
     r_fibbody.block(0, 0, 3, r_fibers.cols()) = r_fibers;
@@ -739,6 +753,81 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     return res;
 }
 
+Eigen::MatrixXd make_grid() {
+    const auto &vf = params_.velocity_field;
+    Eigen::MatrixXd grid_master;
+    std::unordered_map<long int, Eigen::Vector3d> grid_map;
+    using Vector3l = Eigen::Matrix<long int, 3, 1>;
+    const Vector3l key_map(1, 100000, 10000000000);
+
+    if (rank_ == 0) {
+        const double res = vf.resolution;
+        if (vf.moving_volume) {
+            Eigen::MatrixXd sphere_centers = bc_.get_global_center_positions(bc_.spherical_bodies);
+            int n_points = 1 + (2.0 * vf.moving_volume_radius / res);
+
+            for (int i_grid = 0; i_grid < sphere_centers.cols(); ++i_grid) {
+                Vector3l bottom_left =
+                    (sphere_centers.col(i_grid).array() - vf.moving_volume_radius).floor().cast<long int>();
+                for (int i = 0; i < n_points; ++i) {
+                    for (int j = 0; j < n_points; ++j) {
+                        for (int k = 0; k < n_points; ++k) {
+                            Vector3l coord_i = Vector3l{i, j, k} - bottom_left;
+                            long int key = key_map[0] * coord_i[0] + key_map[1] * coord_i[1] + key_map[2] * coord_i[2];
+                            grid_map[key] = res * coord_i.cast<double>();
+                        }
+                    }
+                }
+            }
+            grid_master.resize(3, grid_map.size());
+            int pos = 0;
+            for (const auto& point : grid_map) {
+                grid_master.col(pos) = point.second;
+                pos++;
+            }
+        }
+        // FIXME: Add fixed grids
+    }
+
+    Eigen::MatrixXd grid;
+    long int grid_size_global = grid_master.cols();
+    MPI_Bcast(&grid_size_global, 1, MPI_LONG_INT, 0, MPI_COMM_WORLD);
+
+    const int node_size_big = 3 * (grid_size_global / size_ + 1);
+    const int node_size_small = 3 * (grid_size_global / size_);
+    const int n_nodes_big = grid_size_global % size_;
+
+    std::vector<int> counts(size_);
+    std::vector<int> displs(size_ + 1);
+    for (int i = 0; i < size_; ++i) {
+        counts[i] = ((i < n_nodes_big) ? node_size_big : node_size_small);
+        displs[i + 1] = displs[i] + counts[i];
+    }
+
+    grid.resize(3, counts[rank_] / 3);
+    MPI_Scatterv(grid_master.data(), counts.data(), displs.data(), MPI_DOUBLE, grid.data(), counts[rank_], MPI_DOUBLE,
+                 0, MPI_COMM_WORLD);
+
+    return grid;
+}
+
+void VelocityField::compute() {
+    time = properties.time;
+
+    const double eta = params_.eta;
+    const auto [sol_fibers, sol_shell, sol_bodies] = get_solution_maps(curr_solution_.data());
+    const auto &fp = params_.fiber_periphery_interaction;
+
+    x_grid = make_grid();
+
+    Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
+    f_on_fibers += shell_->point_cloud_interaction(fc_.get_local_node_positions(), fp);
+
+    v_grid = fc_.flow(x_grid, f_on_fibers, eta, false);
+    v_grid += bc_.flow(x_grid, sol_bodies, eta);
+    v_grid += shell_->flow(x_grid, sol_shell, eta);
+}
+
 /// @brief Generate next trial system state for the current System::properties::dt
 ///
 /// @note Modifies anything that evolves in time.
@@ -757,9 +846,13 @@ bool step() {
 
     const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
 
-    MatrixXd r_trg_external(3, shell_node_count + body_node_count);
-    r_trg_external.block(0, 0, 3, shell_node_count) = shell.get_local_node_positions();
-    r_trg_external.block(0, shell_node_count, 3, body_node_count) = bc.get_local_node_positions(bc.bodies);
+    MatrixXd r_all(3, fib_node_count + shell_node_count + body_node_count);
+    {
+        auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
+        r_fibers = fc.get_local_node_positions();
+        r_shell = shell.get_local_node_positions();
+        r_bodies = bc.get_local_node_positions(bc.bodies);
+    }
 
     fc.update_cache_variables(dt, eta);
 
@@ -768,7 +861,7 @@ bool step() {
 
     // Fiber-periphery forces (if periphery exists)
     f_on_fibers += shell.point_cloud_interaction(fc.get_local_node_positions(), params.fiber_periphery_interaction);
-    MatrixXd v_all = fc.flow(f_on_fibers, r_trg_external, eta);
+    MatrixXd v_all = fc.flow(r_all, f_on_fibers, eta);
 
     bc.update_cache_variables(eta);
 
@@ -799,21 +892,21 @@ bool step() {
     fc.apply_bc_rectangular(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
 
     shell.update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
+    Solver<P_inv_hydro, A_fiber_hydro> solver_; /// < Wrapper class for solving system
 
-    Solver<P_inv_hydro, A_fiber_hydro> solver_;
     solver_.set_RHS();
     bool converged = solver_.solve();
-    CVectorMap sol = solver_.get_solution();
+    curr_solution_ = solver_.get_solution();
 
     double residual = solver_.get_residual();
     spdlog::info("Residual: {}", residual);
 
-    auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(sol.data());
+    auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
 
     size_t offset = 0;
     for (auto &fib : fc.fibers) {
         for (int i = 0; i < 3; ++i)
-            fib.x_.row(i) = sol.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
+            fib.x_.row(i) = curr_solution_.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
         offset += 4 * fib.n_nodes_;
     }
 
@@ -848,6 +941,7 @@ void run() {
     Params &params = params_;
 
     System::write();
+
     while (properties.time < params.t_final) {
         System::backup();
         bool converged = System::step();
@@ -890,6 +984,16 @@ void run() {
             double &dt_write = params_.dt_write;
             if ((int)(properties.time / dt_write) > (int)((properties.time - properties.dt) / dt_write))
                 System::write();
+            if (params_.velocity_field_flag) {
+                double dt_write_field = params_.velocity_field.dt_write_field;
+                bool write_flag =
+                    (int)(properties.time / dt_write_field) > (int)((properties.time - properties.dt) / dt_write_field);
+                if (write_flag) {
+                    VelocityField vf_curr;
+                    vf_curr.compute();
+                    vf_curr.write();
+                }
+            }
         } else {
             spdlog::info("Rejecting timestep");
             System::restore();
@@ -993,6 +1097,11 @@ void init(const std::string &input_file, bool resume_flag) {
         ofs_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary | std::ofstream::app);
     } else {
         ofs_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary);
+    }
+
+    if (params_.velocity_field_flag) {
+        filename = "skelly_sim.vf." + std::to_string(rank_);
+        ofs_vf_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary);
     }
 }
 } // namespace System

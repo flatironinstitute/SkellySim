@@ -238,6 +238,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
 MatrixXd BodyContainer::flow_deformable(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const {
     if (!deformable_bodies.size())
         return MatrixXd::Zero(3, r_trg.cols());
+    throw std::runtime_error("BodyContainer::flow_deformable not yet supported.");
     utils::LoggerRedirect redirect(std::cout);
 
     const VectorXd spherical_solution = get_local_solution(deformable_bodies, body_solutions);

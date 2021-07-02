@@ -660,12 +660,13 @@ MatrixXd FiberContainer::get_local_node_positions() const {
     return r;
 }
 
-MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, double eta) const {
+MatrixXd FiberContainer::flow(const MatrixRef &r_trg, const MatrixRef &fib_forces, double eta,
+                              bool subtract_self) const {
     spdlog::debug("Starting fiber flow");
     const size_t n_src = fib_forces.cols();
-    const size_t n_trg_external = r_trg_external.cols();
+    const size_t n_trg = r_trg.cols();
     if (!get_global_count())
-        return Eigen::MatrixXd::Zero(3, n_trg_external);
+        return Eigen::MatrixXd::Zero(3, n_trg);
 
     MatrixXd weighted_forces(3, n_src);
     MatrixXd r_src(3, n_src);
@@ -684,10 +685,6 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
     }
 
     // All-to-all
-    MatrixXd r_trg(3, n_src + n_trg_external);
-    r_trg.block(0, 0, 3, n_src) = r_src;
-    if (n_trg_external)
-        r_trg.block(0, n_src, 3, n_trg_external) = r_trg_external;
     MatrixXd r_dl_dummy, f_dl_dummy;
     utils::LoggerRedirect redirect(std::cout);
     MatrixXd vel = (*stokeslet_kernel_)(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
@@ -695,11 +692,13 @@ MatrixXd FiberContainer::flow(MatrixRef &fib_forces, MatrixRef &r_trg_external, 
 
     // Subtract self term
     offset = 0;
-    for (const auto &fib : fibers) {
-        VectorMap wf_flat(weighted_forces.data() + offset * 3, fib.n_nodes_ * 3);
-        VectorMap vel_flat(vel.data() + offset * 3, fib.n_nodes_ * 3);
-        vel_flat -= fib.stokeslet_ * wf_flat;
-        offset += fib.n_nodes_;
+    if (subtract_self) {
+        for (const auto &fib : fibers) {
+            VectorMap wf_flat(weighted_forces.data() + offset * 3, fib.n_nodes_ * 3);
+            VectorMap vel_flat(vel.data() + offset * 3, fib.n_nodes_ * 3);
+            vel_flat -= fib.stokeslet_ * wf_flat;
+            offset += fib.n_nodes_;
+        }
     }
 
     spdlog::debug("Finished fiber flow");
