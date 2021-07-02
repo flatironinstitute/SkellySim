@@ -28,6 +28,9 @@ def load_frame(fhs, fpos, index):
 
 
 def get_frame_sizes(filenames):
+    if not filenames:
+        return [], []
+
     unpackers = []
     fhs = []
     for filename in filenames:
