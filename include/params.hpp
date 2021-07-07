@@ -31,7 +31,10 @@ class Params {
     } dynamic_instability;
     unsigned long seed;
 
-    fiber_periphery_interaction_t fiber_periphery_interaction;
+    fiber_periphery_interaction_t fiber_periphery_interaction{
+        .f_0 = 20.0,
+        .lambda = 0.5,
+    };
 
     struct {
         bool moving_volume;

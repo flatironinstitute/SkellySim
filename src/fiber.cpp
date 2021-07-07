@@ -669,18 +669,16 @@ MatrixXd FiberContainer::flow(const MatrixRef &r_trg, const MatrixRef &fib_force
         return Eigen::MatrixXd::Zero(3, n_trg);
 
     MatrixXd weighted_forces(3, n_src);
-    MatrixXd r_src(3, n_src);
+    MatrixXd r_src = get_local_node_positions();
     size_t offset = 0;
 
     for (const auto &fib : fibers) {
         const ArrayXd &weights = 0.5 * fib.length_ * fib.matrices_.at(fib.n_nodes_).weights_0;
 
-        for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt) {
-            for (int i = 0; i < 3; ++i) {
+        for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt)
+            for (int i = 0; i < 3; ++i)
                 weighted_forces(i, i_pt + offset) = weights(i_pt) * fib_forces(i, i_pt + offset);
-                r_src(i, i_pt + offset) = fib.x_(i, i_pt);
-            }
-        }
+
         offset += fib.n_nodes_;
     }
 
