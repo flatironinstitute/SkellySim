@@ -772,7 +772,7 @@ Eigen::MatrixXd make_grid() {
                 for (int i = 0; i < n_points; ++i) {
                     for (int j = 0; j < n_points; ++j) {
                         for (int k = 0; k < n_points; ++k) {
-                            Vector3l coord_i = Vector3l{i, j, k} - bottom_left;
+                            Vector3l coord_i = Vector3l{i, j, k} + bottom_left;
                             long int key = key_map[0] * coord_i[0] + key_map[1] * coord_i[1] + key_map[2] * coord_i[2];
                             grid_map[key] = res * coord_i.cast<double>();
                         }
