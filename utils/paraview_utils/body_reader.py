@@ -8,7 +8,13 @@ if outInfo.Has(vtk.vtkStreamingDemandDrivenPipeline.UPDATE_TIME_STEP()):
 else:
     time = 0
 
-frame = load_frame(self.fhs, self.fpos, int(time))
+
+timestep = len(self.times) - 1
+for i in range(len(self.times) - 1):
+    if time < self.times[i+1] and time >= self.times[i]:
+        timestep = i
+
+frame = load_frame(self.fhs, self.fpos, timestep)
 
 mb = vtk.vtkMultiBlockDataSet()
 offset = 0

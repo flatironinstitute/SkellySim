@@ -27,12 +27,22 @@ def load_frame(fhs, fpos, index):
     return data[0]
 
 
-def get_frame_sizes(filenames):
+def load_field_frame(fhs, fpos, index):
+    data = []
+    for i in range(len(fhs)):
+        fhs[i].seek(fpos[i][index])
+        data.append(msgpack.Unpacker(fhs[i], raw=False).unpack())
+
+    return data
+
+
+def get_frame_info(filenames):
     if not filenames:
-        return [], []
+        return [], [], []
 
     unpackers = []
     fhs = []
+    times = []
     for filename in filenames:
         f = open(filename, "rb")
         fhs.append(f)
@@ -43,10 +53,19 @@ def get_frame_sizes(filenames):
         try:
             for i in range(len(unpackers)):
                 fpos[i].append(unpackers[i].tell())
-                unpackers[i].skip()
+                if i == 0:
+                    n_keys = unpackers[i].read_map_header()
+                    for ikey in range(n_keys):
+                        key = unpackers[i].unpack()
+                        if key == 'time':
+                            times.append(unpackers[i].unpack())
+                        else:
+                            unpackers[i].skip()
+                else:
+                    unpackers[i].skip()
 
         except msgpack.exceptions.OutOfData:
             fpos[0].pop()
             break
 
-    return fhs, fpos
+    return fhs, fpos, times

@@ -33,3 +33,23 @@ print("Finished loading body source")
 sf = Smooth(bodies)
 Show(sf)
 SetDisplayProperties(DiffuseColor=[143 / 255, 255 / 255, 246 / 255])
+
+if os.path.exists('skelly_sim.vf.0'):
+    print("Loading velocity field")
+    vf = ProgrammableSource(
+        PythonPath="'{}'".format(sourcepath),
+        Script=open(os.path.join(sourcepath, "field_reader.py"), "r").read(),
+        ScriptRequestInformation=open(os.path.join(sourcepath, "field_reader_request.py"), "r").read(),
+        OutputDataSetType="vtkPolyData",
+        guiName="Velocity Field",
+    )
+    print("Finished loading velocity field source")
+
+    glyph = Glyph(vf, guiName="Velocity Field Glyphs")
+    glyph.ScaleFactor = 2.0
+    glyph.OrientationArray = ('POINTS', 'velocities')
+    display = Show(glyph)
+    ColorBy(display, ('POINTS', 'magnitudes'))
+    colorMap = GetColorTransferFunction('magnitudes')
+    scalarBar = GetScalarBar(colorMap)
+    scalarBar.Visibility = 1
