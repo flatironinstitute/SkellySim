@@ -49,7 +49,34 @@ if os.path.exists('skelly_sim.vf.0'):
     glyph.ScaleFactor = 2.0
     glyph.OrientationArray = ('POINTS', 'velocities')
     display = Show(glyph)
-    ColorBy(display, ('POINTS', 'magnitudes'))
-    colorMap = GetColorTransferFunction('magnitudes')
+    ColorBy(display, ('POINTS', 'velocities'))
+    Hide(glyph)
+
+    vi = PointVolumeInterpolator(Input=vf, Source='Bounded Volume', guiName="Volume Interpolator")
+
+    st = StreamTracer(Input=vi, Vectors=('POINTS', 'velocities'), SeedType='Point Cloud', guiName="Stream Trace")
+    st.SeedType.Radius = 6.0
+    st.SeedType.Center = [0.0, 0.0, 0.0]
+    st.MaximumStreamlineLength = 60.0
+
+    sttube = Tube(st, guiName="StreamTracer Tube Filter")
+    sttube.Radius = 0.05
+    display = Show(sttube)
+    ColorBy(display, ('POINTS', 'velocities'))
+
+    stglyph = Glyph(st, guiName="StreamTracer Glyph Filter")
+    stglyph.OrientationArray = ('POINTS', 'velocities')
+    stglyph.ScaleArray = ('POINTS', 'No scale array')
+    stglyph.ScaleFactor = 2.0
+    stglyph.GlyphMode = 'Every Nth Point'
+    stglyph.Stride = 20
+
+    display = Show(stglyph)
+    ColorBy(display, ('POINTS', 'velocities'))
+
+    colorMap = GetColorTransferFunction('velocities')
     scalarBar = GetScalarBar(colorMap)
+    scalarBar.Title = 'Velocity Magnitude'
     scalarBar.Visibility = 1
+
+Show(AnnotateTime(guiName='Time'))
