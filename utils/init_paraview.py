@@ -75,8 +75,9 @@ if os.path.exists('skelly_sim.vf.0'):
     ColorBy(display, ('POINTS', 'velocities'))
 
     colorMap = GetColorTransferFunction('velocities')
+    colorMap.VectorMode = 'Magnitude'
     scalarBar = GetScalarBar(colorMap)
-    scalarBar.Title = 'Velocity Magnitude'
+    scalarBar.Title = 'Velocity'
     scalarBar.Visibility = 1
 
 Show(AnnotateTime(guiName='Time'))
