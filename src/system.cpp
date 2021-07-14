@@ -826,6 +826,16 @@ void VelocityField::compute() {
     v_grid = fc_.flow(x_grid, f_on_fibers, eta, false);
     v_grid += bc_.flow(x_grid, sol_bodies, eta);
     v_grid += shell_->flow(x_grid, sol_shell, eta);
+
+    // FIXME: move this to body logic with overloading
+    // Replace points inside a body to have velocity v_body + w_body x r
+    for (int i = 0; i < x_grid.cols(); ++i) {
+        for (auto &body : bc_.spherical_bodies) {
+            Eigen::Vector3d dx = x_grid.col(i) - body->position_;
+            if (dx.norm() < body->radius_)
+                v_grid.col(i) = body->velocity_ + body->angular_velocity_.cross(dx);
+        }
+    }
 }
 
 /// @brief Generate next trial system state for the current System::properties::dt
