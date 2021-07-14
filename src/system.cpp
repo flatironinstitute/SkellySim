@@ -980,14 +980,15 @@ void run() {
 
         if (accept) {
             spdlog::info("Accepting timestep and advancing time");
+            double t_old = properties.time;
             properties.time += properties.dt;
             double &dt_write = params_.dt_write;
             if ((int)(properties.time / dt_write) > (int)((properties.time - properties.dt) / dt_write))
                 System::write();
             if (params_.velocity_field_flag) {
                 double dt_write_field = params_.velocity_field.dt_write_field;
-                bool write_flag =
-                    (int)(properties.time / dt_write_field) > (int)((properties.time - properties.dt) / dt_write_field);
+                bool write_flag = t_old == 0.0 || (int)(properties.time / dt_write_field) >
+                                                      (int)((properties.time - properties.dt) / dt_write_field);
                 if (write_flag) {
                     VelocityField vf_curr;
                     vf_curr.compute();
