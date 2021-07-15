@@ -76,7 +76,7 @@ bool SphericalPeriphery::check_collision(const SphericalBody &body, double thres
 }
 
 bool SphericalPeriphery::check_collision(const DeformableBody &body, double threshold) const {
-    spdlog::warn("check_collision not implemented for SphericalPeriphy->DeformableBody");
+    spdlog::warn("check_collision not implemented for SphericalPeriphery->DeformableBody");
     return false;
 }
 
@@ -100,14 +100,76 @@ Eigen::MatrixXd SphericalPeriphery::point_cloud_interaction(const MatrixRef &poi
     for (int i = 0; i < pc.cols(); ++i) {
         double r_mag = pc.col(i).norm();
 
-        Eigen::VectorXd u_hat = pc.col(i) / r_mag;
-        Eigen::Vector3d dr = pc.col(i) - u_hat * radius_;
-        double d = dr.norm();
-
-        if (r_mag < radius_)
+        if (r_mag < radius_) {
+            Eigen::VectorXd u_hat = pc.col(i) / r_mag;
+            Eigen::Vector3d dr = pc.col(i) - u_hat * radius_;
+            double d = dr.norm();
             f_points.col(i) = fp_params.f_0 * dr / d * exp(-(radius_ - r_mag) / fp_params.lambda);
-        else
+        } else
             spdlog::debug("Fiber collision detected in force routine.");
+    }
+
+    return f_points;
+}
+
+bool EllipsoidalPeriphery::check_collision(const SphericalBody &body, double threshold) const {
+    static bool first_call = true;
+    if (!world_rank_ && first_call) {
+        spdlog::warn("check_collision not implemented for EllipsoidalPeriphery->SphericalBody");
+        first_call = false;
+    }
+    return false;
+}
+
+bool EllipsoidalPeriphery::check_collision(const DeformableBody &body, double threshold) const {
+    spdlog::warn("check_collision not implemented for EllipsoidalPeriphery->DeformableBody");
+    return false;
+}
+
+bool EllipsoidalPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {
+    const MatrixRef &pc = point_cloud;
+    for (int i = 0; i < pc.cols(); ++i) {
+        Eigen::Vector3d r_scaled = pc.col(i).array() / Eigen::Array3d{a_, b_, c_};
+        double r_scaled_mag = r_scaled.norm();
+        double phi = atan2(r_scaled.y(), (r_scaled.x() + 1E-12));
+        double theta = acos(r_scaled.z() / (1E-12 + r_scaled_mag));
+        double sintheta = sin(theta);
+
+        Eigen::Vector3d r_cortex{a_ * sintheta * cos(phi), b_ * sintheta * sin(phi), c_ * cos(theta)};
+        if (pc.col(i).squaredNorm() >= r_cortex.squaredNorm())
+            return true;
+    }
+
+    return false;
+}
+
+Eigen::MatrixXd EllipsoidalPeriphery::point_cloud_interaction(const MatrixRef &point_cloud,
+                                                              const fiber_periphery_interaction_t &fp_params) const {
+    if (!n_nodes_global_)
+        return Eigen::MatrixXd::Zero(point_cloud.rows(), point_cloud.cols());
+
+    const MatrixRef &pc = point_cloud;
+    Eigen::MatrixXd f_points = Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
+
+    for (int i = 0; i < pc.cols(); ++i) {
+        Eigen::Vector3d r_scaled = pc.col(i).array() / Eigen::Array3d{a_, b_, c_};
+        double r_scaled_mag = r_scaled.norm();
+        double r_mag = pc.col(i).norm();
+
+        double phi = atan2(r_scaled.y(), (r_scaled.x() + 1E-12));
+        double theta = acos(r_scaled.z() / (1E-12 + r_scaled_mag));
+        double sintheta = sin(theta);
+
+        Eigen::Vector3d r_cortex{a_ * sintheta * cos(phi), b_ * sintheta * sin(phi), c_ * cos(theta)};
+
+        double r_cortex_mag = r_cortex.norm();
+        if (r_mag < r_cortex_mag) {
+            Eigen::Vector3d dr = pc.col(i) - r_cortex;
+            double d = dr.norm();
+            f_points.col(i) = fp_params.f_0 * dr / d * exp(-(r_cortex_mag - r_mag) / fp_params.lambda);
+        } else {
+            spdlog::debug("Fiber collision detected in force routine.");
+        }
     }
 
     return f_points;

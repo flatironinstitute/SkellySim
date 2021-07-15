@@ -90,7 +90,7 @@ class Periphery {
     }
 
     int n_nodes_global_ = 0; ///< Number of nodes across ALL MPI ranks
-  private:
+  protected:
     int world_size_;
     int world_rank_ = -1;
 };
@@ -109,5 +109,25 @@ class SphericalPeriphery : public Periphery {
     virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
                                                     const fiber_periphery_interaction_t &fp_params) const;
 };
+
+class EllipsoidalPeriphery : public Periphery {
+  public:
+    double a_;
+    double b_;
+    double c_;
+    EllipsoidalPeriphery(const std::string &precompute_file, const toml::value &periphery_table, const Params &params)
+        : Periphery(precompute_file, periphery_table, params) {
+        a_ = toml::find_or<double>(periphery_table, "a", 0.0);
+        b_ = toml::find_or<double>(periphery_table, "b", 0.0);
+        c_ = toml::find_or<double>(periphery_table, "c", 0.0);
+    };
+
+    virtual bool check_collision(const SphericalBody &body, double threshold) const;
+    virtual bool check_collision(const DeformableBody &body, double threshold) const;
+    virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
+    virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
+                                                    const fiber_periphery_interaction_t &fp_params) const;
+};
+
 
 #endif
