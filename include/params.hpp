@@ -18,6 +18,8 @@ class Params {
     double dt_write;
     bool periphery_binding_flag;
     bool velocity_field_flag;
+    bool periphery_interaction_flag;
+
     struct {
         int n_nodes = 0;
         double v_growth;

@@ -870,7 +870,8 @@ bool step() {
     MatrixXd f_on_fibers = fc.generate_constant_force();
 
     // Fiber-periphery forces (if periphery exists)
-    f_on_fibers += shell.point_cloud_interaction(fc.get_local_node_positions(), params.fiber_periphery_interaction);
+    if (params_.periphery_interaction_flag)
+        f_on_fibers += shell.point_cloud_interaction(fc.get_local_node_positions(), params.fiber_periphery_interaction);
     MatrixXd v_all = fc.flow(r_all, f_on_fibers, eta);
 
     bc.update_cache_variables(eta);
