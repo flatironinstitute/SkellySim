@@ -33,6 +33,7 @@ class Fiber {
     // FIXME: Magic numbers in linear operator calculation
     double beta_tstep_ = 1.0; ///< penalty parameter to ensure inextensibility
     double epsilon_ = 1E-3;   ///< slenderness parameter
+    bool minus_clamped_ = false;
 
     /// (body, site) pair for minus end binding. -1 implies unbound
     std::pair<int, int> binding_site_{-1, -1};
@@ -128,6 +129,7 @@ class Fiber {
     void update_derivatives();
     void update_stokeslet(double);
     bool attached_to_body() { return binding_site_.first >= 0; };
+    bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
     MSGPACK_DEFINE_MAP(n_nodes_, length_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_, epsilon_,
                        binding_site_, x_);
 };

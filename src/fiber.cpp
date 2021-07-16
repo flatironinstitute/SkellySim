@@ -44,6 +44,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     force_scale_ = toml::find_or<double>(fiber_table, "force_scale", 0.0);
     binding_site_.first = toml::find_or<int>(fiber_table, "parent_body", -1);
     binding_site_.second = toml::find_or<int>(fiber_table, "parent_site", -1);
+    minus_clamped_ = toml::find_or<bool>(fiber_table, "minus_clamped", false);
 }
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
@@ -54,7 +55,7 @@ void FiberContainer::update_boundary_conditions(Periphery &shell, bool periphery
     /// FIXME: magic number in cortex interaction
     const double threshold = 0.75;
     for (auto &fib : fibers) {
-        fib.bc_minus_ = fib.attached_to_body()
+        fib.bc_minus_ = fib.is_minus_clamped()
                             ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
                             : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
         fib.near_periphery = shell.check_collision(fib.x_, threshold);
@@ -794,7 +795,8 @@ FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
             fibers.emplace_back(fiber_table, params.eta);
 
             auto &fib = fibers.back();
-            spdlog::info("Fiber {}: {} {} {}", i_fib, fib.n_nodes_, fib.bending_rigidity_, fib.length_);
+            spdlog::get("SkellySim global")
+                ->debug("Fiber {}: {} {} {}", i_fib, fib.n_nodes_, fib.bending_rigidity_, fib.length_);
         }
     }
 }
