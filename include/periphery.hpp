@@ -89,6 +89,12 @@ class Periphery {
         throw std::runtime_error("Point cloud interaction undefined on base Periphery class\n");
     }
 
+    virtual std::tuple<double, double, double> get_dimensions() {
+        if (!n_nodes_global_)
+            return {0.0, 0.0, 0.0};
+        throw std::runtime_error("Point cloud interaction undefined on base Periphery class\n");
+    }
+
     int n_nodes_global_ = 0; ///< Number of nodes across ALL MPI ranks
   protected:
     int world_size_;
@@ -108,6 +114,7 @@ class SphericalPeriphery : public Periphery {
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
     virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
                                                     const fiber_periphery_interaction_t &fp_params) const;
+    virtual std::tuple<double, double, double> get_dimensions() { return {radius_, radius_, radius_}; };
 };
 
 class EllipsoidalPeriphery : public Periphery {
@@ -127,6 +134,7 @@ class EllipsoidalPeriphery : public Periphery {
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
     virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
                                                     const fiber_periphery_interaction_t &fp_params) const;
+    virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
 };
 
 

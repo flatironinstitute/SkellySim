@@ -786,7 +786,27 @@ Eigen::MatrixXd make_grid() {
                 pos++;
             }
         }
-        // FIXME: Add fixed grids
+        else {
+            auto [a, b, c] = shell_->get_dimensions();
+            int n_points_x = 1 + 2.0 * a / res;
+            int n_points_y = 1 + 2.0 * b / res;
+            int n_points_z = 1 + 2.0 * c / res;
+            grid_master.resize(3, n_points_x * n_points_y * n_points_z);
+
+            int i_col = 0;
+            for (int i = 0; i < n_points_x; ++i) {
+                for (int j = 0; j < n_points_y; ++j) {
+                    for (int k = 0; k < n_points_z; ++k) {
+                        Eigen::Vector3d x{-a + i * res, -b + j * res, -c + k * res};
+                        if (!shell_->check_collision(x, 0.0)) {
+                            grid_master.col(i_col) = x;
+                            i_col++;
+                        }
+                    }
+                }
+            }
+            grid_master.conservativeResize(3, i_col);
+        }
     }
 
     Eigen::MatrixXd grid;
