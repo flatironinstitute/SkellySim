@@ -841,7 +841,8 @@ void VelocityField::compute() {
     x_grid = make_grid();
 
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
-    f_on_fibers += shell_->point_cloud_interaction(fc_.get_local_node_positions(), fp);
+    if (params_.periphery_interaction_flag)
+        f_on_fibers += shell_->point_cloud_interaction(fc_.get_local_node_positions(), fp);
 
     v_grid = fc_.flow(x_grid, f_on_fibers, eta, false);
     v_grid += bc_.flow(x_grid, sol_bodies, eta);
