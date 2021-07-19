@@ -21,8 +21,19 @@ else:
     with open(toml_file) as f:
         skelly_config = toml.load(f)
 
+    if 'periphery' in skelly_config:
+        p = skelly_config['periphery']
+        if p['shape'] == 'sphere':
+            sphere = Sphere(ThetaResolution=16, PhiResolution=32, Radius=p['radius'])
+            Show(sphere)
+        elif p['shape'] == 'ellipsoid':
+            sphere = Sphere(ThetaResolution=16, PhiResolution=32, Radius=p['a'])
+            elongate = Transform()
+            elongate.Transform.Scale = [1.0, p['b']/p['a'], p['c']/p['a']]
+            # Show(elongate)
 
-    if skelly_config['fibers']:
+
+    if 'fibers' in skelly_config:
         print("Loading fiber source")
 
         fibers = ProgrammableSource(
@@ -42,7 +53,7 @@ else:
         Show(tf)
         SetDisplayProperties(DiffuseColor=[0 / 255, 255 / 255, 127 / 255])
 
-    if skelly_config['bodies']:
+    if 'bodies' in skelly_config:
         print("Loading body source")
         bodies = ProgrammableSource(
             PythonPath="'{}'".format(sourcepath),
