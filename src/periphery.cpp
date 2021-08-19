@@ -175,6 +175,44 @@ Eigen::MatrixXd EllipsoidalPeriphery::point_cloud_interaction(const MatrixRef &p
     return f_points;
 }
 
+bool GenericPeriphery::check_collision(const SphericalBody &body, double threshold) const {
+    static bool first_call = true;
+    if (!world_rank_ && first_call) {
+        spdlog::warn("check_collision not implemented for GenericPeriphery->SphericalBody");
+        first_call = false;
+    }
+    return false;
+}
+
+bool GenericPeriphery::check_collision(const DeformableBody &body, double threshold) const {
+    static bool first_call = true;
+    if (!world_rank_ && first_call) {
+        spdlog::warn("check_collision not implemented for GenericPeriphery->SphericalBody");
+        first_call = false;
+    }
+    return false;
+}
+
+bool GenericPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {
+    static bool first_call = true;
+    if (!world_rank_ && first_call) {
+        spdlog::warn("check_collision not implemented for GenericPeriphery->SphericalBody");
+        first_call = false;
+    }
+    return false;
+}
+
+Eigen::MatrixXd GenericPeriphery::point_cloud_interaction(const MatrixRef &point_cloud,
+                                                          const fiber_periphery_interaction_t &fp_params) const {
+    static bool first_call = true;
+    if (!world_rank_ && first_call) {
+        spdlog::warn("point_cloud_interaction not implemented for GenericPeriphery->PointCloud");
+        first_call = false;
+    }
+
+    return Eigen::MatrixXd::Zero(point_cloud.rows(), point_cloud.cols());
+}
+
 Periphery::Periphery(const std::string &precompute_file, const toml::value &body_table, const Params &params) {
     {
         using namespace kernels;

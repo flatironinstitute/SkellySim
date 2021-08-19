@@ -138,4 +138,25 @@ class EllipsoidalPeriphery : public Periphery {
 };
 
 
+class GenericPeriphery : public Periphery {
+  public:
+    double a_;
+    double b_;
+    double c_;
+    GenericPeriphery(const std::string &precompute_file, const toml::value &periphery_table, const Params &params)
+        : Periphery(precompute_file, periphery_table, params) {
+        a_ = node_pos_.row(0).array().abs().maxCoeff();
+        b_ = node_pos_.row(1).array().abs().maxCoeff();
+        c_ = node_pos_.row(2).array().abs().maxCoeff();
+    };
+
+    virtual bool check_collision(const SphericalBody &body, double threshold) const;
+    virtual bool check_collision(const DeformableBody &body, double threshold) const;
+    virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
+    virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
+                                                    const fiber_periphery_interaction_t &fp_params) const;
+    virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
+};
+
+
 #endif
