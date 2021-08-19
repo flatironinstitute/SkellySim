@@ -12,6 +12,7 @@
 #include <periphery.hpp>
 #include <solver_hydro.hpp>
 #include <system.hpp>
+#include <point_source.hpp>
 
 #include <mpi.h>
 #include <sys/mman.h>
@@ -25,7 +26,10 @@ namespace System {
 Params params_;                    ///< Simulation input parameters
 FiberContainer fc_;                ///< Fibers
 BodyContainer bc_;                 ///< Bodies
+PointSourceContainer psc_;         ///< Point Sources
 std::unique_ptr<Periphery> shell_; ///< Periphery
+std::vector<PointSource> points_;  ///< External point sources
+
 Eigen::VectorXd curr_solution_;
 std::ofstream ofs_;                ///< Trajectory output file stream. Opened at initialization
 std::ofstream ofs_vf_;             ///< Velocity field output file stream. Opened at initialization
@@ -917,6 +921,8 @@ bool step() {
         v_all += bc.flow(r_all, Eigen::VectorXd::Zero(bc.get_local_solution_size()), eta);
     }
 
+    v_all += psc_.flow(r_all, eta);
+
     bc.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
 
     fc.update_RHS(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
@@ -1125,6 +1131,10 @@ void init(const std::string &input_file, bool resume_flag) {
     if (param_table_.contains("bodies"))
         bc_ = BodyContainer(param_table_.at("bodies").as_array(), params_);
     properties.dt = params_.dt_initial;
+
+    if (param_table_.contains("point_sources")) {
+        psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
+    }
 
     std::string filename = "skelly_sim.out." + std::to_string(rank_);
     if (resume_flag) {
