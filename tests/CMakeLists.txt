@@ -19,14 +19,7 @@ foreach(file ${files})
   target_link_libraries(${file_without_ext} skelly z OpenMP::OpenMP_CXX MPI::MPI_CXX trng4_static
     ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
   
-  target_include_directories(${file_without_ext} PRIVATE
-    ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/extern/spdlog/include
-    ${PROJECT_SOURCE_DIR}/extern/toml11
-    ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
-    ${PVFMM_INCLUDE_DIR}/pvfmm
-    ${PVFMM_DEP_INCLUDE_DIR}
-    )
+  target_include_directories(${file_without_ext} PRIVATE ${SKELLY_INCLUDES})
 
   add_test(${file_without_ext} ${file_without_ext})
 
