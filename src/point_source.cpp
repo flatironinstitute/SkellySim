@@ -11,14 +11,19 @@ PointSource::PointSource(const toml::value &point_table) {
         force_ = parse_util::convert_array<>(point_table.at("force").as_array());
     if (point_table.contains("torque"))
         torque_ = parse_util::convert_array<>(point_table.at("torque").as_array());
+    if (point_table.contains("time_to_live"))
+        time_to_live_ = point_table.at("time_to_live").as_floating();
 }
 
-Eigen::MatrixXd PointSourceContainer::flow(const MatrixRef &r_trg, double eta) {
+Eigen::MatrixXd PointSourceContainer::flow(const MatrixRef &r_trg, double eta, double time) {
     Eigen::MatrixXd vel = Eigen::MatrixXd::Zero(3, r_trg.cols());
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> forcers;
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> torquers;
 
     for (auto &point : points) {
+        // Check if deactivated. ttl of 0.0 implies always alive
+        if (point.time_to_live_ && time >= point.time_to_live_)
+            continue;
         if (point.force_.any())
             forcers.push_back(std::make_pair(point.position_, point.force_));
         if (point.torque_.any())

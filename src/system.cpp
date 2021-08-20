@@ -921,7 +921,7 @@ bool step() {
         v_all += bc.flow(r_all, Eigen::VectorXd::Zero(bc.get_local_solution_size()), eta);
     }
 
-    v_all += psc_.flow(r_all, eta);
+    v_all += psc_.flow(r_all, eta, properties.time);
 
     bc.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
 
