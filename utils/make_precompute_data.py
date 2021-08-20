@@ -56,6 +56,20 @@ def precompute_periphery(config):
                 b=periphery_b,
                 c=periphery_c,
             )
+    elif periphery_type == 'oocyte':
+        T = config['periphery']['T']
+        p1 = config['periphery']['p1']
+        p2 = config['periphery']['p2']
+        length = config['periphery']['length']
+        nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
+            shape_gallery.shape_gallery(
+                periphery_type,
+                n_periphery,
+                T=T,
+                p1=p1,
+                p2=p2,
+                length=length,
+            )
     else:
         print("Invalid periphery " + periphery_type)
         sys.exit()

@@ -77,4 +77,59 @@ def shape_gallery(shape, Number_of_Nodes, *args, **kwargs):
         nodes_normal = gradh(quadrature_nodes)
         nodes_normal /= np.linalg.norm(nodes_normal, axis=1, keepdims=True)
 
+    elif shape == 'oocyte':
+        # Constants and nodes
+        target_nodes = Number_of_Nodes
+        N_x = int(round(np.sqrt(target_nodes)))
+        length = kwargs.get('length')
+        T = kwargs.get('T')
+        p1 = kwargs.get('p1')
+        p2 = kwargs.get('p2')
+
+        def height(x):
+            return 0.5 * T * ((1 + 2*x/length)**p1) * ((1 - 2*x/length)**p2) * length
+
+        def h(p):
+            return height(p[:, 0])**2 - p[:, 1]**2 - p[:, 2]**2
+
+        def gradh(points):
+            normvec = np.zeros(shape=(len(points), 3))
+            for i in range(len(points)):
+                x, y, z = points[i]
+                if np.abs(x + 0.5 * length) < 1E-12:
+                    normvec[i, :] = np.array([-1.0, 0.0, 0.0])
+                elif np.abs(x - 0.5 * length) < 1E-12:
+                    normvec[i, :] = np.array([1.0, 0.0, 0.0])
+                else:
+                    h = np.sqrt(y**2 + z**2)
+                    dh = h * 2 * (p1 / (length + 2*x) - p2 / (length - 2*x))
+
+                    normvec[i, :] = -np.array([h * dh, -y, -z])
+                    normvec[i, :] = normvec[i, :] / np.linalg.norm(normvec[i, :])
+            return normvec
+
+        # FIXME: Bonkers sampling because stupid function's slope is -infinity as x->L/2
+        x = np.hstack([np.linspace(-0.5*length, 0.5*length, 100000), [0.5*length]])
+        r = height(x)
+        xd = np.diff(x)
+        rd = np.diff(r)
+        dist = np.sqrt(xd**2+rd**2)
+        u = np.hstack([[0.0], np.cumsum(dist)])
+
+        t = np.linspace(0, u.max(), N_x)
+        xn = np.interp(t, u, x)
+        rn = height(xn)
+
+        ds = np.mean(np.sqrt(np.diff(xn)**2+np.diff(rn)**2))
+        points = [[xn[0], 0.0, 0.0]]
+        for i in range(1, len(xn)-1):
+            N_radial = int(round(2 * np.pi * rn[i] / ds))
+            for j in range(N_radial):
+                theta = j * 2 * np.pi / N_radial
+                points.append([xn[i], rn[i] * np.cos(theta), rn[i] * np.sin(theta)])
+
+        points.append([xn[-1], 0.0, 0.0])
+        quadrature_nodes = np.array(points)
+        nodes_normal = gradh(points)
+
     return quadrature_nodes, nodes_normal, h, gradh
