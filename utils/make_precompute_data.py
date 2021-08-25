@@ -3,6 +3,7 @@ import scipy.linalg as scla
 from scipy.spatial import ConvexHull
 import sys
 import toml
+import copy
 
 import lib.shape_gallery as shape_gallery
 import lib.Smooth_Closed_Surface_Quadrature_RBF as quadlib
@@ -31,11 +32,11 @@ def precompute_periphery(config):
         return
     shell_precompute_file = config['params']['shell_precompute_file']
     periphery_type = config['periphery']['shape']
-    n_periphery = config['periphery']['n_nodes']
     eta = config['params']['eta']
 
     # Build shape
     if periphery_type == 'sphere':
+        n_periphery = config['periphery']['n_nodes']
         periphery_radius = config['periphery']['radius'] * periphery_node_scale_factor
         nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
             shape_gallery.shape_gallery(
@@ -44,6 +45,7 @@ def precompute_periphery(config):
                 radius=periphery_radius,
             )
     elif periphery_type == 'ellipsoid':
+        n_periphery = config['periphery']['n_nodes']
         periphery_a = config['periphery']['a'] * periphery_node_scale_factor
         periphery_b = config['periphery']['b'] * periphery_node_scale_factor
         periphery_c = config['periphery']['c'] * periphery_node_scale_factor
@@ -56,20 +58,15 @@ def precompute_periphery(config):
                 b=periphery_b,
                 c=periphery_c,
             )
-    elif periphery_type == 'oocyte':
-        T = config['periphery']['T']
-        p1 = config['periphery']['p1']
-        p2 = config['periphery']['p2']
-        length = config['periphery']['length']
+    elif periphery_type == 'surface_of_revolution':
+        envelope_config = config['periphery']['envelope']
         nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
             shape_gallery.shape_gallery(
                 periphery_type,
-                n_periphery,
-                T=T,
-                p1=p1,
-                p2=p2,
-                length=length,
+                0,
+                envelope_config=envelope_config,
             )
+        config['periphery']['n_nodes'] = nodes_periphery.shape[0]
     else:
         print("Invalid periphery " + periphery_type)
         sys.exit()
@@ -197,4 +194,13 @@ if "bodies" in config:
             print(b)
             precompute_body(b)
 
+config_orig = copy.deepcopy(config)
 precompute_periphery(config)
+
+if (config_orig != config):
+    print("Config changed dynamically (surface_of_revolution likely culprit). Backing up and updating input config.")
+    import shutil
+    input_file = sys.argv[1]
+    shutil.copy(input_file, input_file + '.bak')
+    with open(sys.argv[1], 'w') as fh:
+        toml.dump(config, fh)

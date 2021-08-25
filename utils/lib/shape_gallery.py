@@ -1,6 +1,43 @@
 from __future__ import division, print_function
 import numpy as np
 from functools import partial
+from function_generator import FunctionGenerator
+
+
+class Envelope(FunctionGenerator):
+    def __init__(self, config):
+        self.lower_bound_target = config['lower_bound']
+        self.upper_bound_target = config['upper_bound']
+
+        import numpy as np
+        locals().update(config)
+
+        self.raw_height_func = eval("lambda x: " + config['height'], locals())
+
+        delta = 1E-10
+        lb = self.lower_bound_target
+        ub = self.upper_bound_target
+        while delta < 0.005 * (ub - lb):
+            try:
+                super().__init__(self.raw_height_func, lb, ub)
+            except Exception:
+                lb = self.lower_bound_target + delta
+                ub = self.upper_bound_target - delta
+                delta *= 10
+                continue
+            break
+
+        try:
+            self.a
+        except NameError:
+            raise RuntimeError("Unable to fit height function")
+        print("Height fit succeeded with bounds", (lb, ub))
+
+    def export(self, filename):
+        with open(filename, 'wb') as fh:
+            np.savez(fh, n=self.n, a=self.a, b=self.b,
+                     lbs=self.lbs, ubs=self.ubs, coef_mat=self.coef_mat,
+                     bounds_table=self.bounds_table)
 
 
 def shape_gallery(shape, Number_of_Nodes, *args, **kwargs):
@@ -77,40 +114,16 @@ def shape_gallery(shape, Number_of_Nodes, *args, **kwargs):
         nodes_normal = gradh(quadrature_nodes)
         nodes_normal /= np.linalg.norm(nodes_normal, axis=1, keepdims=True)
 
-    elif shape == 'oocyte':
+    elif shape == 'surface_of_revolution':
+        envelope_config = kwargs.get('envelope_config')
+        envelope = Envelope(envelope_config)
+
         # Constants and nodes
-        target_nodes = Number_of_Nodes
+        target_nodes = envelope_config['n_nodes_target']
         N_x = int(round(np.sqrt(target_nodes)))
-        length = kwargs.get('length')
-        T = kwargs.get('T')
-        p1 = kwargs.get('p1')
-        p2 = kwargs.get('p2')
 
-        def height(x):
-            return 0.5 * T * ((1 + 2*x/length)**p1) * ((1 - 2*x/length)**p2) * length
-
-        def h(p):
-            return height(p[:, 0])**2 - p[:, 1]**2 - p[:, 2]**2
-
-        def gradh(points):
-            normvec = np.zeros(shape=(len(points), 3))
-            for i in range(len(points)):
-                x, y, z = points[i]
-                if np.abs(x + 0.5 * length) < 1E-12:
-                    normvec[i, :] = np.array([-1.0, 0.0, 0.0])
-                elif np.abs(x - 0.5 * length) < 1E-12:
-                    normvec[i, :] = np.array([1.0, 0.0, 0.0])
-                else:
-                    h = np.sqrt(y**2 + z**2)
-                    dh = h * 2 * (p1 / (length + 2*x) - p2 / (length - 2*x))
-
-                    normvec[i, :] = -np.array([h * dh, -y, -z])
-                    normvec[i, :] = normvec[i, :] / np.linalg.norm(normvec[i, :])
-            return normvec
-
-        # FIXME: Bonkers sampling because stupid function's slope is -infinity as x->L/2
-        x = np.hstack([np.linspace(-0.5*length, 0.5*length, 100000), [0.5*length]])
-        r = height(x)
+        x = np.hstack([np.linspace(envelope.lower_bound_target, envelope.upper_bound_target, 1000000), [envelope.upper_bound_target]])
+        r = envelope.raw_height_func(x)
         xd = np.diff(x)
         rd = np.diff(r)
         dist = np.sqrt(xd**2+rd**2)
@@ -118,17 +131,38 @@ def shape_gallery(shape, Number_of_Nodes, *args, **kwargs):
 
         t = np.linspace(0, u.max(), N_x)
         xn = np.interp(t, u, x)
-        rn = height(xn)
+        rn = envelope.raw_height_func(xn)
 
         ds = np.mean(np.sqrt(np.diff(xn)**2+np.diff(rn)**2))
-        points = [[xn[0], 0.0, 0.0]]
-        for i in range(1, len(xn)-1):
+        points = []
+        for i in range(0, len(xn)):
             N_radial = int(round(2 * np.pi * rn[i] / ds))
+            if N_radial <= 1:
+                points.append([xn[i], 0.0, 0.0])
+                continue
             for j in range(N_radial):
                 theta = j * 2 * np.pi / N_radial
                 points.append([xn[i], rn[i] * np.cos(theta), rn[i] * np.sin(theta)])
 
-        points.append([xn[-1], 0.0, 0.0])
+        def h(points):
+            return envelope.raw_height_func(points[:, 0])**2 - points[:, 1]**2 - points[:, 2]**2
+
+        def gradh(points):
+            normvec = np.zeros(shape=(len(points), 3))
+            for i in range(len(points)):
+                x, y, z = points[i]
+                if x < envelope.a:
+                    normvec[i, :] = np.array([-1.0, 0.0, 0.0])
+                elif x > envelope.b:
+                    normvec[i, :] = np.array([1.0, 0.0, 0.0])
+                else:
+                    h = envelope(x)
+                    dh = envelope.differentiate(x)
+
+                    normvec[i, :] = -np.array([h * dh, -y, -z])
+                    normvec[i, :] = normvec[i, :] / np.linalg.norm(normvec[i, :])
+            return normvec
+
         quadrature_nodes = np.array(points)
         nodes_normal = gradh(points)
 
