@@ -5,7 +5,7 @@ import sys
 import toml
 import copy
 
-import lib.shape_gallery as shape_gallery
+from lib.shape_gallery import ShapeGallery
 import lib.Smooth_Closed_Surface_Quadrature_RBF as quadlib
 import lib.periphery as periphery
 import lib.quaternion as quaternion
@@ -38,48 +38,47 @@ def precompute_periphery(config):
     if periphery_type == 'sphere':
         n_periphery = config['periphery']['n_nodes']
         periphery_radius = config['periphery']['radius'] * periphery_node_scale_factor
-        nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
-            shape_gallery.shape_gallery(
-                periphery_type,
-                n_periphery,
-                radius=periphery_radius,
-            )
+        boundary = ShapeGallery(
+            periphery_type,
+            n_periphery,
+            radius=periphery_radius,
+        )
     elif periphery_type == 'ellipsoid':
         n_periphery = config['periphery']['n_nodes']
         periphery_a = config['periphery']['a'] * periphery_node_scale_factor
         periphery_b = config['periphery']['b'] * periphery_node_scale_factor
         periphery_c = config['periphery']['c'] * periphery_node_scale_factor
 
-        nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
-            shape_gallery.shape_gallery(
-                periphery_type,
-                n_periphery,
-                a=periphery_a,
-                b=periphery_b,
-                c=periphery_c,
-            )
+        boundary = ShapeGallery(
+            periphery_type,
+            n_periphery,
+            a=periphery_a,
+            b=periphery_b,
+            c=periphery_c,
+        )
     elif periphery_type == 'surface_of_revolution':
         envelope_config = config['periphery']['envelope']
-        nodes_periphery, normals_periphery, h_periphery, gradh_periphery = \
-            shape_gallery.shape_gallery(
-                periphery_type,
-                0,
-                envelope_config=envelope_config,
-            )
-        config['periphery']['n_nodes'] = nodes_periphery.shape[0]
+        boundary = ShapeGallery(
+            periphery_type,
+            0,
+            envelope_config=envelope_config,
+        )
+        config['periphery']['n_nodes'] = boundary.nodes.shape[0]
     else:
         print("Invalid periphery " + periphery_type)
         sys.exit()
 
     # Normals are in the opposite direction to bodies' normals
-    normals_periphery = -normals_periphery
+    nodes_periphery = boundary.nodes
+    normals_periphery = -boundary.node_normals
+
     hull_periphery = ConvexHull(nodes_periphery)
     triangles_periphery = hull_periphery.simplices
     # Get quadratures
     print('Building Quadrature Weights')
     quadrature_weights_periphery = \
         quadlib.Smooth_Closed_Surface_Quadrature_RBF(
-            nodes_periphery, triangles_periphery, h_periphery, gradh_periphery
+            nodes_periphery, triangles_periphery, boundary.h, boundary.gradh
         )
     print('Finished building Quadrature Weights')
 
@@ -134,7 +133,8 @@ def precompute_periphery(config):
                  stresslet_plus_complementary=shell_stresslet_plus_complementary,
                  M_inv=M_inv_periphery,
                  normals=normals_periphery,
-                 nodes=nodes_periphery)
+                 nodes=nodes_periphery,
+                 **boundary.envelope.get_state())
 
 def precompute_body_sphere(body):
     precompute_file = body['precompute_file']
@@ -146,21 +146,22 @@ def precompute_body_sphere(body):
     else:
         radius -= body_quadrature_radius_offset_high
 
-    node_positions_ref, node_normals_ref, h_body, gradh_body = \
-        shape_gallery.shape_gallery(
-            'sphere',
-            num_nodes,
-            radius=radius,
-        )
+    boundary = ShapeGallery(
+        'sphere',
+        num_nodes,
+        radius=radius,
+    )
 
     # Normals are in the opposite direction to bodies' normals
+    node_positions_ref = boundary.nodes
+    node_normals_ref = boundary.node_normals
     node_hull = ConvexHull(node_positions_ref)
     node_triangles = node_hull.simplices
     # Get quadratures
     print('Building Quadrature Weights')
     node_weights = \
         quadlib.Smooth_Closed_Surface_Quadrature_RBF(
-            node_positions_ref, node_triangles, h_body, gradh_body
+            node_positions_ref, node_triangles, boundary.h, boundary.gradh
         )
     print('Finished building Quadrature Weights')
 
