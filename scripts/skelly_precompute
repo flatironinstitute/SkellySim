@@ -7,11 +7,11 @@ import sys
 import toml
 import copy
 
-from lib.shape_gallery import ShapeGallery
-import lib.Smooth_Closed_Surface_Quadrature_RBF as quadlib
-import lib.periphery as periphery
-import lib.quaternion as quaternion
-import lib.kernels as kernels
+from skelly_sim.lib.shape_gallery import ShapeGallery
+import skelly_sim.lib.Smooth_Closed_Surface_Quadrature_RBF as quadlib
+import skelly_sim.lib.periphery as periphery
+import skelly_sim.lib.quaternion as quaternion
+import skelly_sim.lib.kernels as kernels
 
 if len(sys.argv) != 2:
     print("No input file supplied. Please supply input 'toml' file.")

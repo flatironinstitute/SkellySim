@@ -1,6 +1,6 @@
 import numpy as np
 from functools import partial
-from lib.function_generator.function_generator import FunctionGenerator
+from function_generator import FunctionGenerator
 from argparse import Namespace
 
 class Envelope(FunctionGenerator):
