@@ -3,7 +3,7 @@ SkellySim is a simulation package for simulating cellular components such as fle
 It's designed to be highly scalable, capable of both OpenMP and MPI style parallelism, while using the efficient STKFMM/PVFMM libraries for hydrodynamic resolution.
 
 # Running at FI
-* Basic setup
+## Basic setup
 There are (currently) two components to skelly_sim, the python portion, and the actual
 binary. The python portion is mostly for visualization, as well as generating config files and
 precompute data. The binary (C++) portion is for actually running the simulation.
@@ -23,7 +23,7 @@ module load gcc/7.4.0 python3/3.7.3 intel/mkl/2020-4 intel/compiler/2020-4 openm
     home/skelly_sim/latest-intel -f
 ```
 
-* Run workflow 
+## Run workflow 
 The workflow is relatively straight forward. First you make a 'toml' config, which I've
 provided some examples of in the 'examples' directory. You can either write this by hand, or use a python script to emit a config. The
 hand-writing is likely to become completely deprecated, since it adds to code complexity on the C++ side that is hard to manage. I suggest looking at 
