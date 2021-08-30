@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import scipy.linalg as scla
 from scipy.spatial import ConvexHull
@@ -62,6 +64,7 @@ def precompute_periphery(config):
             periphery_type,
             0,
             envelope_config=envelope_config,
+            scale_factor=periphery_node_scale_factor,
         )
         config['periphery']['n_nodes'] = boundary.nodes.shape[0]
     else:

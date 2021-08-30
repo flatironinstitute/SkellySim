@@ -1,13 +1,17 @@
 import numpy as np
 from functools import partial
-from function_generator import FunctionGenerator
-
+from lib.function_generator.function_generator import FunctionGenerator
+from argparse import Namespace
 
 class Envelope(FunctionGenerator):
     def __init__(self, config=None):
         if not config:
             self.init = False
             return
+        if isinstance(config, Namespace):
+            config = dict(filter(lambda keyval: not keyval[0].startswith('__'),
+                                 config.__dict__.items()))
+
         self.init = True
         self.lower_bound_target = config['lower_bound']
         self.upper_bound_target = config['upper_bound']
@@ -199,7 +203,7 @@ class ShapeGallery:
                         normvec[i, :] = normvec[i, :] / np.linalg.norm(normvec[i, :])
                 return normvec
 
-            nodes = np.array(nodes)
+            nodes = np.array(nodes) * kwargs['scale_factor']
             node_normals = gradh(nodes)
 
             self.nodes = nodes

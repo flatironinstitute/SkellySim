@@ -3,6 +3,7 @@ from dataclasses import dataclass, asdict, field, is_dataclass
 from scipy.special import ellipeinc, ellipe
 from scipy.optimize import fsolve
 import numpy as np
+from argparse import Namespace
 
 
 def unpack(obj):
@@ -14,6 +15,11 @@ def unpack(obj):
         return [unpack(value) for value in obj]
     elif is_dataclass(obj):
         return {key: unpack(value) for key, value in asdict(obj).items()}
+    elif isinstance(obj, Namespace):
+        return unpack(
+            dict(
+                filter(lambda keyval: not keyval[0].startswith('__'),
+                       obj.__dict__.items())))
     elif isinstance(obj, tuple):
         return tuple(unpack(value) for value in obj)
     else:
@@ -87,6 +93,13 @@ class EllipsoidalPeriphery(Periphery):
 
 
 @dataclass
+class RevolutionPeriphery(Periphery):
+    shape: str = 'surface_of_revolution'  # fixed, don't change
+    n_nodes: int = 0
+    envelope: Namespace = field(default_factory=Namespace)
+
+
+@dataclass
 class Body():
     nucleation_type: str = 'auto'  # how nucleation sites are made (can be manually set)
     n_nucleation_sites: int = 500  # number of available MT sites. don't add more fibers than this to body
@@ -132,6 +145,11 @@ class ConfigEllipsoidal(Config):
     periphery: EllipsoidalPeriphery = EllipsoidalPeriphery()
 
 
+@dataclass
+class ConfigRevolution(Config):
+    periphery: RevolutionPeriphery = RevolutionPeriphery()
+
+
 def sin_length(amplitude: float, xf: float):
     A2 = (2 * np.pi * amplitude / xf)**2
     return xf / np.pi * (ellipe(-A2) + np.sqrt(1 + A2) * ellipe(A2 / (1 + A2)))
@@ -140,7 +158,8 @@ def sin_length(amplitude: float, xf: float):
 def cos_length_full(amplitude: float, xi: float, xf: float, x_max: float):
     scale_factor = 2.0 * np.pi / x_max
     A2 = (scale_factor * amplitude)**2
-    return (ellipeinc(scale_factor * xf, -A2) - ellipeinc(scale_factor * xi, -A2)) / scale_factor
+    return (ellipeinc(scale_factor * xf, -A2) -
+            ellipeinc(scale_factor * xi, -A2)) / scale_factor
 
 
 def get_random_orthogonal_vector(x: np.array):
@@ -168,8 +187,9 @@ def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
     arc_length_per_segment = length / (n_nodes - 1)
     lin_pos = np.zeros(n_nodes)
     for i in range(1, n_nodes):
-        fun = lambda xf: cos_length_full(amplitude, lin_pos[i - 1], xf, x_max) - arc_length_per_segment
-        lin_pos[i] = fsolve(fun, lin_pos[i-1] + arc_length_per_segment)
+        fun = lambda xf: cos_length_full(amplitude, lin_pos[i - 1], xf, x_max
+                                         ) - arc_length_per_segment
+        lin_pos[i] = fsolve(fun, lin_pos[i - 1] + arc_length_per_segment)
 
     fiber_positions = np.outer(lin_pos, normal)
 
