@@ -2,7 +2,7 @@
 Small class to handle the periphery.
 """
 import numpy as np
-import skelly_sim.lib.kernels as kernels
+import skelly_sim.kernels as kernels
 
 
 class Periphery(object):
