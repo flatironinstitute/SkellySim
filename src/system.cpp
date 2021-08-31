@@ -10,9 +10,9 @@
 #include <params.hpp>
 #include <parse_util.hpp>
 #include <periphery.hpp>
+#include <point_source.hpp>
 #include <solver_hydro.hpp>
 #include <system.hpp>
-#include <point_source.hpp>
 
 #include <mpi.h>
 #include <sys/mman.h>
@@ -31,8 +31,8 @@ std::unique_ptr<Periphery> shell_; ///< Periphery
 std::vector<PointSource> points_;  ///< External point sources
 
 Eigen::VectorXd curr_solution_;
-std::ofstream ofs_;                ///< Trajectory output file stream. Opened at initialization
-std::ofstream ofs_vf_;             ///< Velocity field output file stream. Opened at initialization
+std::ofstream ofs_;    ///< Trajectory output file stream. Opened at initialization
+std::ofstream ofs_vf_; ///< Velocity field output file stream. Opened at initialization
 
 FiberContainer fc_bak_;   ///< Copy of fibers for timestep reversion
 BodyContainer bc_bak_;    ///< Copy of bodies for timestep reversion
@@ -73,20 +73,22 @@ typedef struct input_map_t {
     MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies); ///< Helper routine to specify serialization
 } input_map_t;
 
-/// Flush current simulation state to trajectory file.
+/// @brief Flush current simulation state to trajectory file(s)
 void write() {
     output_map.rng_state = RNG::dump_state();
     msgpack::pack(ofs_, output_map);
     ofs_.flush();
 }
 
+/// @brief Class representing a velocity field
+/// This allows for trivial dumping of the VF 'trajectory'
 class VelocityField {
   public:
-    double time;
-    Eigen::MatrixXd x_grid;
-    Eigen::MatrixXd v_grid;
-    void compute();
-    void write() {
+    double time;            ///< Current time
+    Eigen::MatrixXd x_grid; ///< [3 x n_grid_points] matrix of points to evaluate the field
+    Eigen::MatrixXd v_grid; ///< [3 x n_grid_points] matrix of velocities at x_grid
+    void compute();         ///< Compute the velocity field given the current system configuration, and x_grid
+    void write() {          ///< Flush the velocity field to disk
         msgpack::pack(ofs_vf_, *this);
         ofs_vf_.flush();
     };
@@ -560,17 +562,21 @@ void dynamic_instability() {
     size_t n_sites = 0;
     std::vector<int> body_offsets(bc.bodies.size() + 1);
     int i_body = 0;
+    // Build basically a cumulative distribution function of the number of binding sites over all the bodies
+    // This allows for fast mapping of (body_index, site_index) <-> site_index_flat
     for (const auto &body : bc.bodies) {
         n_sites += body->nucleation_sites_.cols();
         body_offsets[i_body + 1] = body_offsets[i_body] + body->nucleation_sites_.cols();
         i_body++;
     }
 
+    // Return a flat index given a (body_index, site_index) pair
     auto site_index = [&body_offsets](std::pair<int, int> binding_site) -> int {
         assert(binding_site.first >= 0 && binding_site.second >= 0);
         return body_offsets[binding_site.first] + binding_site.second;
     };
 
+    // Return a (body_index, site_index) pair given a flat index
     auto binding_site_from_index = [&body_offsets](int index) -> std::pair<int, int> {
         for (size_t i_body = 0; i_body < body_offsets.size() - 1; ++i_body) {
             if (index < body_offsets[i_body + 1]) {
@@ -580,6 +586,7 @@ void dynamic_instability() {
         return {-1, -1};
     };
 
+    // Array of occupied sites across all bodies
     std::vector<uint8_t> occupied_flat(bc.get_global_site_count(), 0);
     auto fib = fc.fibers.begin();
     while (fib != fc.fibers.end()) {
@@ -590,6 +597,7 @@ void dynamic_instability() {
             f_cat *= params.dynamic_instability.f_catastrophe_collision_scale;
         }
 
+        // Remove fiber if catastrophe event
         if (RNG::uniform() > exp(-dt * f_cat)) {
             fib = fc.fibers.erase(fib);
         } else {
@@ -601,11 +609,15 @@ void dynamic_instability() {
         }
     }
 
+    // Let rank 0 know which sites are occupied
     MPI_Reduce(rank_ == 0 ? MPI_IN_PLACE : occupied_flat.data(), occupied_flat.data(), occupied_flat.size(), MPI_BYTE,
                MPI_LOR, 0, MPI_COMM_WORLD);
 
+    // Map of filled sites. active_sites[flat_index] = true. Could easily be a list
     std::unordered_map<int, bool> active_sites;
+    // Map of empty sites. inactive_sites[flat_index] = true. Use map for fast deletion when site is filled
     std::unordered_map<int, bool> inactive_sites;
+    // Vector of (body_index, site_index) pairs that will have a new fiber attached to them
     std::vector<std::pair<int, int>> to_nucleate;
     if (rank_ == 0) {
         for (size_t i = 0; i < occupied_flat.size(); ++i) {
@@ -617,6 +629,8 @@ void dynamic_instability() {
 
         // FIXME: Is this right? I feel like the nucleation rate should be proportional to the
         // sites, or the area, or something rather than a global parameter
+
+        // Number of sites to nucleate this timestep
         int n_to_nucleate = std::min(RNG::poisson_int(dt * params.dynamic_instability.nucleation_rate),
                                      static_cast<int>(inactive_sites.size()));
         int n_trials = 100;
@@ -628,8 +642,11 @@ void dynamic_instability() {
             Eigen::Vector3d site_pos_i = bc.at(i_body).nucleation_sites_.col(i_site);
             bool valid_site = true;
             const double min_ds2 = pow(params.dynamic_instability.min_separation, 2);
+            // Reject if two sites are too close to one another on same body
             for (auto &[active_site_index, dum] : active_sites) {
                 auto [j_body, j_site] = binding_site_from_index(active_site_index);
+                if (j_body != i_body)
+                    continue;
                 Eigen::Vector3d site_pos_j = bc.at(j_body).nucleation_sites_.col(j_site);
 
                 if ((site_pos_j - site_pos_i).squaredNorm() < min_ds2) {
@@ -639,27 +656,34 @@ void dynamic_instability() {
             }
 
             if (valid_site) {
+                // Found valid site. Update data structures
                 n_trials = 100;
                 active_sites[passive_site_index] = true;
                 inactive_sites.erase(passive_site_index);
                 to_nucleate.push_back({i_body, i_site});
                 n_to_nucleate--;
             } else {
+                // Try again
                 n_trials--;
             }
         }
     }
 
+    // Total number of (current) fibers on this rank
     int n_fibers = fc.fibers.size();
+    // Total number of (current) fibers across ranks
     std::vector<int> fiber_counts(rank_ == 0 ? size_ : 0);
     MPI_Gather(&n_fibers, 1, MPI_INT, fiber_counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+    // Structure to communicate new fibers to their ranks
     using fiber_struct = struct {
         int rank;
         std::pair<int, int> binding_site;
     };
 
+    // List of fibers to nucleate with their rank tagged
     std::vector<fiber_struct> new_fibers;
+    // Find ranks with fewest fibers and fill them first, to balance load
     for (const auto &binding_site : to_nucleate) {
         const int fiber_rank = std::min_element(fiber_counts.begin(), fiber_counts.end()) - fiber_counts.begin();
         new_fibers.push_back({fiber_rank, binding_site});
@@ -669,12 +693,14 @@ void dynamic_instability() {
     }
 
     int n_new = new_fibers.size();
+    // Let all MPI ranks know about the fibers to be nucleated
     MPI_Bcast(&n_new, 1, MPI_INT, 0, MPI_COMM_WORLD);
     new_fibers.resize(n_new);
     MPI_Bcast(new_fibers.data(), sizeof(fiber_struct) * new_fibers.size(), MPI_CHAR, 0, MPI_COMM_WORLD);
     if (n_new)
         spdlog::info("Sent {} fibers to nucleate", new_fibers.size());
 
+    // Nucleate the fibers
     for (const auto &min_fib : new_fibers) {
         if (min_fib.rank == rank_) {
             Fiber fib(params.dynamic_instability.n_nodes, params.dynamic_instability.bending_rigidity, params.eta);
@@ -757,6 +783,11 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     return res;
 }
 
+/// @brief Create 'grid' for velocity field base on the vf parameters. Remove points from the
+/// grid where they lie outside the periphery or repeat (if multiple bodies and a 'moving'
+/// grid)
+///
+/// @return 3D list of points defining the grid
 Eigen::MatrixXd make_grid() {
     const auto &vf = params_.velocity_field;
     Eigen::MatrixXd grid_master;
@@ -785,12 +816,11 @@ Eigen::MatrixXd make_grid() {
             }
             grid_master.resize(3, grid_map.size());
             int pos = 0;
-            for (const auto& point : grid_map) {
+            for (const auto &point : grid_map) {
                 grid_master.col(pos) = point.second;
                 pos++;
             }
-        }
-        else {
+        } else {
             auto [a, b, c] = shell_->get_dimensions();
             int n_points_x = 1 + 2.0 * a / res;
             int n_points_y = 1 + 2.0 * b / res;
@@ -981,8 +1011,11 @@ void run() {
     System::write();
 
     while (properties.time < params.t_final) {
+        // Store system state so we can revert if the timestep fails
         System::backup();
+        // Run the system timestep and store convergence
         bool converged = System::step();
+        // Maximum error in the fiber derivative
         double fiber_error = 0.0;
         for (const auto &fib : fc_.fibers) {
             const auto &mats = fib.matrices_.at(fib.n_nodes_);
@@ -992,6 +1025,7 @@ void run() {
         }
         MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
+        // Now all the acceptance/adaptive timestepping logic
         double dt_new = properties.dt;
         bool accept = false;
         if (converged && fiber_error <= params.fiber_error_tol) {
@@ -1045,6 +1079,8 @@ void run() {
 }
 
 /// @brief Check for any collisions between objects
+///
+/// @return true if any collision detected, false otherwise
 bool check_collision() {
     BodyContainer &bc = bc_;
     FiberContainer &fc = fc_;
@@ -1109,6 +1145,8 @@ void init(const std::string &input_file, bool resume_flag) {
     RNG::init(params_.seed);
     preprocess(param_table_);
 
+    properties.dt = params_.dt_initial;
+
     if (param_table_.contains("fibers"))
         fc_ = FiberContainer(param_table_.at("fibers").as_array(), params_);
 
@@ -1121,7 +1159,7 @@ void init(const std::string &input_file, bool resume_flag) {
             shell_ = std::make_unique<SphericalPeriphery>(params_.shell_precompute_file, periphery_table, params_);
         else if (toml::find_or(periphery_table, "shape", "") == std::string("ellipsoid"))
             shell_ = std::make_unique<EllipsoidalPeriphery>(params_.shell_precompute_file, periphery_table, params_);
-        else // Assume generic periphery
+        else // Assume generic periphery for all other shapes
             shell_ = std::make_unique<GenericPeriphery>(params_.shell_precompute_file, periphery_table, params_);
     } else {
         shell_ = std::make_unique<Periphery>();
@@ -1129,23 +1167,21 @@ void init(const std::string &input_file, bool resume_flag) {
 
     if (param_table_.contains("bodies"))
         bc_ = BodyContainer(param_table_.at("bodies").as_array(), params_);
-    properties.dt = params_.dt_initial;
 
-    if (param_table_.contains("point_sources")) {
+    if (param_table_.contains("point_sources"))
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
-    }
 
     std::string filename = "skelly_sim.out." + std::to_string(rank_);
+    auto open_mode = std::ofstream::out | std::ofstream::binary;
     if (resume_flag) {
         resume_from_trajectory(filename);
-        ofs_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary | std::ofstream::app);
-    } else {
-        ofs_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary);
+        open_mode = open_mode | std::ofstream::app;
     }
+    ofs_ = std::ofstream(filename, open_mode);
 
     if (params_.velocity_field_flag) {
         filename = "skelly_sim.vf." + std::to_string(rank_);
-        ofs_vf_ = std::ofstream(filename, std::ofstream::out | std::ofstream::binary);
+        ofs_vf_ = std::ofstream(filename, open_mode);
     }
 }
 } // namespace System
