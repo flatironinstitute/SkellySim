@@ -10,7 +10,7 @@ precompute data. The binary (C++) portion is for actually running the simulation
 
 To install the python portion (in your virtual environment, conda environment, or using the `pip3 --user` option)
 ```python
-pip3 install https://github.com/flatironinstitute/SkellySim
+pip3 install git+https://github.com/flatironinstitute/SkellySim
 ```
 
 Due to the complex dependencies of the C++ portion, until I finish packaging things, you can use my modules. 
