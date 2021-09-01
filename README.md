@@ -49,6 +49,7 @@ The basic workflow then simply looks like
 mkdir my_simulation_dir
 # make your gen_config.py
 python3 gen_config.py myconfig.toml
+skelly_precompute myconfig.toml
 skelly_sim --config-file=myconfig.toml
 ```
 though you should probably be using mpirun. See an example submit.sh script.
