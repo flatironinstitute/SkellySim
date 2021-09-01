@@ -8,8 +8,17 @@ There are (currently) two components to skelly_sim, the python portion, and the 
 binary. The python portion is mostly for visualization, as well as generating config files and
 precompute data. The binary (C++) portion is for actually running the simulation.
 
-To install the python portion (in your virtual environment, conda environment, or using the `pip3 --user` option)
-```python
+To install the python portion (in your virtual environment, conda environment, or using the `pip3 --user` option). For a virtualenv
+```bash
+module load gcc python3
+python3 -m venv /path/to/my/virtualenv
+source /path/to/my/virtualenv/bin/activate
+pip3 install git+https://github.com/flatironinstitute/SkellySim
+```
+or for a conda environment
+```
+conda create -n myenvname
+conda activate myenvname
 pip3 install git+https://github.com/flatironinstitute/SkellySim
 ```
 
