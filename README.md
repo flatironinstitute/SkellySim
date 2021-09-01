@@ -27,6 +27,7 @@ The best modules are likely to change, but this is good for now.
 ```bash
 module purge;
 module use ~rblackwell/modules
+# REMOVE python3 module from this if you are using conda!!!!
 module load gcc/7.4.0 python3/3.7.3 intel/mkl/2020-4 intel/compiler/2020-4 openmpi4/4.0.5-intel \
     home/trilinos/13.0.0-intel home/pvfmm/903054-intel-openmpi4 home/stkfmm/bbcb21a-intel-openmpi4 \
     home/skelly_sim/latest-intel -f
