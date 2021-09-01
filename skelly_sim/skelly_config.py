@@ -82,7 +82,7 @@ class Periphery():
 @dataclass
 class SphericalPeriphery(Periphery):
     shape: str = 'sphere'  # fixed, don't change
-
+    radius: float = 6.0  # radius
 
 @dataclass
 class EllipsoidalPeriphery(Periphery):
