@@ -19,7 +19,7 @@ class DeformableBody;
 class Periphery {
   public:
     Periphery() = default;
-    Periphery(const std::string &precompute_file, const toml::value &body_table, const Params &params);
+    Periphery(const std::string &precompute_file, const toml::value &periphery_table, const Params &params);
 
     Eigen::MatrixXd flow(MatrixRef &trg, MatrixRef &density, double eta) const;
 
