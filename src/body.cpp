@@ -145,6 +145,10 @@ std::pair<MatrixXd, MatrixXd> BodyContainer::get_global_forces_torques(const T &
 
     return std::make_pair(forces_torques.block(0, 0, 3, n_bodies), forces_torques.block(3, 0, 3, n_bodies));
 }
+template std::pair<MatrixXd, MatrixXd>
+BodyContainer::get_global_forces_torques(const std::vector<std::shared_ptr<SphericalBody>> &) const;
+// template std::pair<MatrixXd, MatrixXd>
+// BodyContainer::get_global_forces_torques(const std::vector<std::shared_ptr<DeformableBody>> &) const;
 
 /// @brief Get center positions regardless of rank
 /// @param[in] std::vector of shared_ptr<DerivedBody>
@@ -158,6 +162,8 @@ MatrixXd BodyContainer::get_global_center_positions(const T &body_vec) const {
 
     return centers;
 }
+template MatrixXd BodyContainer::get_global_center_positions(const std::vector<std::shared_ptr<SphericalBody>> &) const;
+template MatrixXd BodyContainer::get_global_center_positions(const std::vector<std::shared_ptr<DeformableBody>> &) const;
 
 /// @brief Get center positions on rank 0, otherwise empty
 /// @param[in] std::vector of shared_ptr<DerivedBody>
