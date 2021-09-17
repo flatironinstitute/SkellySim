@@ -6,7 +6,7 @@ project(
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
-option(USE_EIGEN_MKL_ALL "Use MKL as the backend for various Eigen calls" ON)
+option(EIGEN_USE_BLAS "Use BLAS as the backend for various Eigen calls" ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -22,15 +22,11 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 endif()
 
-if(EIGEN_USE_MKL_ALL)
-  add_compile_definitions("EIGEN_USE_MKL_ALL")
-  message("Using MKL backend for Eigen")
+if(EIGEN_USE_BLAS)
+  add_compile_definitions("EIGEN_USE_BLAS")
+  message("Using BLAS backend for Eigen")
 endif()
 
-set(MPI_CXX_SKIP_MPICXX
-  true
-  CACHE BOOL "The MPI-2 C++ bindings are disabled."
-  )
 
 # required compiler features
 find_package(MPI REQUIRED)
