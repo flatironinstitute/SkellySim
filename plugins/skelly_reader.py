@@ -2,19 +2,17 @@ import vtk
 from pathlib import Path
 from vtkmodules.vtkCommonDataModel import vtkDataSet, vtkPolyData, vtkMultiBlockDataSet
 from vtkmodules.util.vtkAlgorithm import VTKPythonAlgorithmBase
-
-from time import time as timer
 from paraview.util.vtkAlgorithm import smproxy, smproperty, smdomain
 
 class SkellyReader(VTKPythonAlgorithmBase):
-    def __init__(self,
-                 nInputPorts=0,
-                 nOutputPorts=1,
-                 outputType='vtkPolyData'):
-        VTKPythonAlgorithmBase.__init__(self, nInputPorts=nInputPorts, nOutputPorts=nOutputPorts, outputType=outputType)
+    def __init__(self, outputType, static=False):
+        VTKPythonAlgorithmBase.__init__(self, nInputPorts=0, nOutputPorts=1, outputType=outputType)
 
-        from skelly_sim.paraview_utils.trajectory_utility import get_frame_info
-        self.fhs, self.fpos, self.times = get_frame_info(sorted(Path('.').glob('skelly_sim.out.*')))
+        if static:
+            self.times = []
+        else:
+            from skelly_sim.paraview_utils.trajectory_utility import get_frame_info
+            self.fhs, self.fpos, self.times = get_frame_info(sorted(Path('.').glob('skelly_sim.out.*')))
 
         # FIXME: Get this from user
         toml_file = sorted(Path('.').glob('*.toml'))[0]
@@ -72,10 +70,7 @@ class SkellyReader(VTKPythonAlgorithmBase):
 @smproxy.source(label="Fiber Reader")
 class FiberReader(SkellyReader):
     def __init__(self):
-        SkellyReader.__init__(self,
-                              nInputPorts=0,
-                              nOutputPorts=1,
-                              outputType='vtkPolyData')
+        SkellyReader.__init__(self, outputType='vtkPolyData')
 
     @smproperty.doublevector(name="TimestepValues", information_only="1", si_class="vtkSITimeStepsProperty")
     def GetTimestepValues(self):
@@ -115,14 +110,8 @@ class FiberReader(SkellyReader):
 
 @smproxy.source(label="Body Reader")
 class BodyReader(SkellyReader):
-    """This is dummy VTKPythonAlgorithmBase subclass that
-    simply puts out a Superquadric poly data using a vtkSuperquadricSource
-    internally"""
     def __init__(self):
-        SkellyReader.__init__(self,
-                              nInputPorts=0,
-                              nOutputPorts=1,
-                              outputType='vtkMultiBlockDataSet')
+        SkellyReader.__init__(self, outputType='vtkMultiBlockDataSet')
 
     @smproperty.doublevector(name="TimestepValues", information_only="1", si_class="vtkSITimeStepsProperty")
     def GetTimestepValues(self):
@@ -151,5 +140,34 @@ class BodyReader(SkellyReader):
 
         output = vtkMultiBlockDataSet.GetData(outInfo, 0)
         output.ShallowCopy(mb)
+
+        return 1
+
+@smproxy.source(label="Periphery Reader")
+class PeripheryReader(SkellyReader):
+    def __init__(self):
+        SkellyReader.__init__(self, outputType='vtkPolyData', static=True)
+        p = self.skelly_config['periphery']
+        if p['shape'] == 'sphere':
+            self.source = vtk.vtkSphereSource()
+            self.source.SetRadius(p['radius'])
+            self.source.SetThetaResolution(32)
+            self.source.SetPhiResolution(32)
+        elif p['shape'] == 'ellipsoid':
+            s = vtk.vtkParametricEllipsoid()
+            s.SetXRadius(p['a'])
+            s.SetYRadius(p['b'])
+            s.SetZRadius(p['c'])
+
+            self.source = vtk.vtkParametricFunctionSource()
+            self.source.SetParametricFunction(s)
+
+    def RequestInformation(self, request, inInfo, outInfo):
+        return 1
+
+    def RequestData(self, request, inInfo, outInfo):
+        self.source.Update()
+        output = vtk.vtkPolyData.GetData(outInfo, 0)
+        output.ShallowCopy(self.source.GetOutput())
 
         return 1
