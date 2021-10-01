@@ -61,24 +61,26 @@ class SkellyReader(VTKPythonAlgorithmBase):
         with open(toml_file) as f:
             self.skelly_config = toml.load(f)
 
-    def _load_frame(self, index):
+    def _load_frame(self, index, keys=("fibers", "bodies")):
         data = []
-        for i in range(len(fhs)):
-            fhs[i].seek(self.fpos[i][index])
+        for i in range(len(self.fhs)):
+            self.fhs[i].seek(self.fpos[i][index])
             data.append(self.Unpacker(self.fhs[i], raw=False).unpack())
 
         time = data[0]["time"]
         dt = data[0]["dt"]
-        fibers = []
-        bodies = []
-        for el in data:
-            if el["time"] != time or el["dt"] != dt:
-                raise DesyncError
-            fibers.extend(el["fibers"][0])
-            el.pop("fibers")
+        if "fibers" in keys:
+            fibers = []
+            for el in data:
+                if el["time"] != time or el["dt"] != dt:
+                    raise DesyncError
+                fibers.extend(el["fibers"][0])
+                el.pop("fibers")
 
-        data[0]["fibers"] = fibers
-        data[0]["bodies"] = data[0]["bodies"][0]
+            data[0]["fibers"] = fibers
+
+        if "bodies" in keys:
+            data[0]["bodies"] = data[0]["bodies"][0]
 
         return data[0]
 
@@ -141,7 +143,7 @@ class FiberReader(SkellyReader):
     def RequestData(self, request, inInfo, outInfo):
         info = outInfo.GetInformationObject(0)
         timestep = self._get_update_timestep(info)
-        frame = self._load_frame(timestep)
+        frame = self._load_frame(timestep, keys=("fibers"))
 
         pts = vtk.vtkPoints()
         lines = vtk.vtkCellArray()
@@ -178,7 +180,7 @@ class BodyReader(SkellyReader):
     def RequestData(self, request, inInfo, outInfo):
         info = outInfo.GetInformationObject(0)
         timestep = self._get_update_timestep(info)
-        frame = self._load_frame(self.fhs, self.fpos)
+        frame = self._load_frame(timestep, keys=("bodies"))
 
         mb = vtk.vtkMultiBlockDataSet()
         offset = 0
@@ -204,26 +206,53 @@ class PeripheryReader(SkellyReader):
         SkellyReader.__init__(self, outputType='vtkPolyData', static=True)
         p = self.skelly_config['periphery']
         if p['shape'] == 'sphere':
-            self.source = vtk.vtkSphereSource()
-            self.source.SetRadius(p['radius'])
-            self.source.SetThetaResolution(32)
-            self.source.SetPhiResolution(32)
+            geom = vtk.vtkSphereSource()
+            geom.SetRadius(p['radius'])
+            geom.SetThetaResolution(32)
+            geom.SetPhiResolution(32)
+            geom.Update()
+            self.source = geom.GetOutput()
         elif p['shape'] == 'ellipsoid':
             s = vtk.vtkParametricEllipsoid()
             s.SetXRadius(p['a'])
             s.SetYRadius(p['b'])
             s.SetZRadius(p['c'])
 
-            self.source = vtk.vtkParametricFunctionSource()
-            self.source.SetParametricFunction(s)
+            geom = vtk.vtkParametricFunctionSource()
+            geom.SetParametricFunction(s)
+            geom.Update()
+            self.source = geom.GetOutput()
+        elif p['shape'] == 'surface_of_revolution':
+            import numpy as np
+            precompute_data = np.load(self.skelly_config['params']['shell_precompute_file'])
+            nodes = precompute_data['nodes']
+            nodes.reshape(nodes.size // 3, 3)
+
+            from scipy.spatial import ConvexHull
+            hull = ConvexHull(nodes)
+            faces = vtk.vtkCellArray()
+            points = vtk.vtkPoints()
+
+            nodes = nodes.ravel()
+            for i in range(nodes.size // 3):
+                points.InsertPoint(i, nodes[3 * i : 3* (i + 1)])
+
+            for face in hull.simplices:
+                faces.InsertNextCell(3)
+                for i in range(3):
+                    faces.InsertCellPoint(face[i])
+
+            self.source = vtkPolyData()
+            self.source.SetPoints(points)
+            self.source.SetPolys(faces)
+
 
     def RequestInformation(self, request, inInfo, outInfo):
         return 1
 
     def RequestData(self, request, inInfo, outInfo):
-        self.source.Update()
         output = vtk.vtkPolyData.GetData(outInfo, 0)
-        output.ShallowCopy(self.source.GetOutput())
+        output.ShallowCopy(self.source)
 
         return 1
 
