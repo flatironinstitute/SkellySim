@@ -1,4 +1,5 @@
 import vtk
+import os
 from pathlib import Path
 from vtkmodules.vtkCommonDataModel import vtkDataSet, vtkPolyData, vtkMultiBlockDataSet
 from vtkmodules.util.vtkAlgorithm import VTKPythonAlgorithmBase
@@ -55,11 +56,15 @@ class SkellyReader(VTKPythonAlgorithmBase):
         else:
             self.fhs, self.fpos, self.times = get_frame_info(sorted(Path('.').glob(filepattern)))
 
+        self.active = True
         # FIXME: Get this from user
-        toml_file = sorted(Path('.').glob('*.toml'))[0]
-        import toml
-        with open(toml_file) as f:
-            self.skelly_config = toml.load(f)
+        toml_files = sorted(Path('.').glob('*.toml'))
+        if len(toml_files):
+            import toml
+            with open(toml_files[0]) as f:
+                self.skelly_config = toml.load(f)
+        else:
+            self.active = False
 
     def _load_frame(self, index, keys=("fibers", "bodies")):
         data = []
@@ -116,6 +121,8 @@ class SkellyReader(VTKPythonAlgorithmBase):
         return timestep
 
     def RequestInformation(self, request, inInfo, outInfo):
+        if not self.active:
+            return 1
         executive = self.GetExecutive()
         info = outInfo.GetInformationObject(0)
         info.Remove(executive.TIME_STEPS())
@@ -130,17 +137,23 @@ class SkellyReader(VTKPythonAlgorithmBase):
 
         return 1
 
+    def RequestData(self, request, inInfo, outInfo):
+        if not self.active:
+            return 1
+        return self._RequestData(request, inInfo, outInfo)
 
-@smproxy.source(label="Fiber Reader")
+@smproxy.source(label="Skelly Fibers")
 class FiberReader(SkellyReader):
     def __init__(self):
         SkellyReader.__init__(self, outputType='vtkPolyData')
+        if self.active:
+            self.active = "fibers" in self.skelly_config
 
     @smproperty.doublevector(name="TimestepValues", information_only="1", si_class="vtkSITimeStepsProperty")
     def GetTimestepValues(self):
         return self._get_timesteps()
 
-    def RequestData(self, request, inInfo, outInfo):
+    def _RequestData(self, request, inInfo, outInfo):
         info = outInfo.GetInformationObject(0)
         timestep = self._get_update_timestep(info)
         frame = self._load_frame(timestep, keys=("fibers"))
@@ -168,16 +181,18 @@ class FiberReader(SkellyReader):
         return 1
 
 
-@smproxy.source(label="Body Reader")
+@smproxy.source(label="Skelly Bodies")
 class BodyReader(SkellyReader):
     def __init__(self):
         SkellyReader.__init__(self, outputType='vtkMultiBlockDataSet')
+        if self.active:
+            self.active = "bodies" in self.skelly_config
 
     @smproperty.doublevector(name="TimestepValues", information_only="1", si_class="vtkSITimeStepsProperty")
     def GetTimestepValues(self):
         return self._get_timesteps()
 
-    def RequestData(self, request, inInfo, outInfo):
+    def _RequestData(self, request, inInfo, outInfo):
         info = outInfo.GetInformationObject(0)
         timestep = self._get_update_timestep(info)
         frame = self._load_frame(timestep, keys=("bodies"))
@@ -200,10 +215,16 @@ class BodyReader(SkellyReader):
 
         return 1
 
-@smproxy.source(label="Periphery Reader")
+@smproxy.source(label="Skelly Periphery")
 class PeripheryReader(SkellyReader):
     def __init__(self):
         SkellyReader.__init__(self, outputType='vtkPolyData', static=True)
+        if self.active:
+            self.active = "periphery" in self.skelly_config
+
+        if not self.active:
+            return
+
         p = self.skelly_config['periphery']
         if p['shape'] == 'sphere':
             geom = vtk.vtkSphereSource()
@@ -251,17 +272,18 @@ class PeripheryReader(SkellyReader):
     def RequestInformation(self, request, inInfo, outInfo):
         return 1
 
-    def RequestData(self, request, inInfo, outInfo):
+    def _RequestData(self, request, inInfo, outInfo):
         output = vtk.vtkPolyData.GetData(outInfo, 0)
         output.ShallowCopy(self.source)
 
         return 1
 
 
-@smproxy.source(label="Velocity Field Reader")
+@smproxy.source(label="Skelly Velocity Field")
 class SkellyFieldReader(SkellyReader):
     def __init__(self):
         SkellyReader.__init__(self, outputType='vtkPolyData', filepattern="skelly_sim.vf.*")
+        self.active = self.active and os.path.exists('skelly_sim.vf.0')
 
     @smproperty.doublevector(name="TimestepValues", information_only="1", si_class="vtkSITimeStepsProperty")
     def GetTimestepValues(self):
@@ -275,7 +297,7 @@ class SkellyFieldReader(SkellyReader):
 
         return data
 
-    def RequestData(self, request, inInfo, outInfo):
+    def _RequestData(self, request, inInfo, outInfo):
         import numpy as np
         info = outInfo.GetInformationObject(0)
         timestep = self._get_update_timestep(info)
@@ -302,7 +324,6 @@ class SkellyFieldReader(SkellyReader):
             v_grid = data["v_grid"][3:]
             for i in range(n_points_local):
                 pts.InsertPoint(offset, x_grid[3 * i : 3* (i + 1)])
-                # verts.InsertNextCell(1, [offset])
                 mag = np.linalg.norm(np.array(v_grid[3*i:3*(i+1)]))
                 magnitudes.SetValue(offset, mag)
                 velocities.SetTuple(offset, v_grid[3 * i : 3* (i + 1)])
