@@ -225,7 +225,8 @@ class PeripheryReader(SkellyReader):
         elif p['shape'] == 'surface_of_revolution':
             import numpy as np
             precompute_data = np.load(self.skelly_config['params']['shell_precompute_file'])
-            nodes = precompute_data['nodes']
+            # FIXME: Fixed node_scale_factor is no bueno. Reconstruct from shape_gallery? Read from precompute/config?
+            nodes = precompute_data['nodes'] / 1.04
             nodes.reshape(nodes.size // 3, 3)
 
             from scipy.spatial import ConvexHull
