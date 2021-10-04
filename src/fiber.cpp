@@ -33,10 +33,10 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     std::vector<double> x_array = toml::find<std::vector<double>>(fiber_table, "x");
     n_nodes_ = x_array.size() / 3;
 
-    init(eta);
-
     x_ = Eigen::Map<Eigen::ArrayXd>(x_array.data(), x_array.size());
     x_.resize(3, n_nodes_);
+
+    init(eta);
 
     bending_rigidity_ = toml::find<double>(fiber_table, "bending_rigidity");
     length_ = toml::find<double>(fiber_table, "length");

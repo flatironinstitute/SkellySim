@@ -63,7 +63,7 @@ class Fiber {
     /// [ 3*n_nodes_ x 3*n_nodes_] Oseen tensor for fiber @see Fiber::update_stokeslet
     Eigen::MatrixXd stokeslet_;
 
-    Eigen::MatrixXd A_;                         ///< Fiber's linear operator for matrix solver
+    Eigen::MatrixXd A_;                      ///< Fiber's linear operator for matrix solver
     Eigen::FullPivLU<Eigen::MatrixXd> A_LU_; ///< Fiber preconditioner, LU decomposition of Fiber::A_
     /// Fiber force operator, @see Fiber::update_force_operator, FiberContainer::apply_fiber_force
     Eigen::MatrixXd force_operator_;
@@ -100,6 +100,12 @@ class Fiber {
     /// testing.
     Fiber(int n_nodes, double bending_rigidity, double eta) : n_nodes_(n_nodes), bending_rigidity_(bending_rigidity) {
         init(eta);
+        length_prev_ = length_;
+    };
+
+    Fiber(const Fiber &old_fib, const double eta) {
+        *this = old_fib;
+        init(eta);
     };
 
     ///< @brief Set some default values and resize arrays
@@ -108,13 +114,14 @@ class Fiber {
     ///
     /// Initializes: Fiber::x_, Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_, Fiber::c_0_, Fiber::c_1_
     void init(double eta) {
-        x_ = Eigen::MatrixXd::Zero(3, n_nodes_);
-        x_.row(0) = Eigen::ArrayXd::LinSpaced(n_nodes_, 0, 1.0).transpose();
+        if (x_.size() != 3 * n_nodes_) {
+            x_ = Eigen::MatrixXd::Zero(3, n_nodes_);
+            x_.row(0) = Eigen::ArrayXd::LinSpaced(n_nodes_, 0, 1.0).transpose();
+        }
         xs_.resize(3, n_nodes_);
         xss_.resize(3, n_nodes_);
         xsss_.resize(3, n_nodes_);
         xssss_.resize(3, n_nodes_);
-        length_prev_ = length_;
 
         c_0_ = -log(M_E * std::pow(epsilon_, 2)) / (8 * M_PI * eta);
         c_1_ = 2.0 / (8.0 * M_PI * eta);
@@ -130,8 +137,8 @@ class Fiber {
     void update_stokeslet(double);
     bool attached_to_body() { return binding_site_.first >= 0; };
     bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
-    MSGPACK_DEFINE_MAP(n_nodes_, length_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_, epsilon_,
-                       binding_site_, x_);
+    MSGPACK_DEFINE_MAP(n_nodes_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_,
+                       epsilon_, binding_site_, x_);
 };
 
 /// Class to hold the fiber objects.

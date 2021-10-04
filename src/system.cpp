@@ -128,12 +128,8 @@ void resume_from_trajectory(std::string if_file) {
     output_map.time = min_state.time;
     output_map.dt = min_state.dt;
     fc_.fibers.clear();
-    for (const auto &min_fib : min_state.fibers.fibers) {
-        Fiber new_fib = min_fib;
-        new_fib.init(params_.eta);
-        new_fib.x_ = min_fib.x_;
-        fc_.fibers.push_back(new_fib);
-    }
+    for (const auto &min_fib : min_state.fibers.fibers)
+        fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
 
     // make sure sublist pointers are initialized, and then fill them in
     bc_.populate_sublists();
