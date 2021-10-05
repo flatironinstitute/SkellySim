@@ -45,7 +45,7 @@ def get_frame_info(filenames):
 
 
 class SkellyReader(VTKPythonAlgorithmBase):
-    def __init__(self, outputType, static=False, filepattern="skelly_sim.out.*"):
+    def __init__(self, outputType, static=False, filepattern="skelly_sim.out"):
         VTKPythonAlgorithmBase.__init__(self, nInputPorts=0, nOutputPorts=1, outputType=outputType)
 
         import msgpack
@@ -54,7 +54,11 @@ class SkellyReader(VTKPythonAlgorithmBase):
         if static:
             self.times = None
         else:
-            self.fhs, self.fpos, self.times = get_frame_info(sorted(Path('.').glob(filepattern)))
+            if not os.path.exists(filepattern):
+                files = sorted(Path('.').glob(filepattern + ".*"))
+            else:
+                files = [ filepattern ]
+            self.fhs, self.fpos, self.times = get_frame_info(files)
 
         self.active = True
         # FIXME: Get this from user
@@ -282,8 +286,8 @@ class PeripheryReader(SkellyReader):
 @smproxy.source(label="Skelly Velocity Field")
 class SkellyFieldReader(SkellyReader):
     def __init__(self):
-        SkellyReader.__init__(self, outputType='vtkPolyData', filepattern="skelly_sim.vf.*")
-        self.active = self.active and os.path.exists('skelly_sim.vf.0')
+        SkellyReader.__init__(self, outputType='vtkPolyData', filepattern="skelly_sim.vf")
+        self.active = self.active and os.path.exists('skelly_sim.vf')
 
     @smproperty.doublevector(name="TimestepValues", information_only="1", si_class="vtkSITimeStepsProperty")
     def GetTimestepValues(self):
