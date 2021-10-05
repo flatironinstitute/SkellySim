@@ -126,12 +126,34 @@ class VelocityField {
     double time;            ///< Current time
     Eigen::MatrixXd x_grid; ///< [3 x n_grid_points] matrix of points to evaluate the field
     Eigen::MatrixXd v_grid; ///< [3 x n_grid_points] matrix of velocities at x_grid
-    void compute();         ///< Compute the velocity field given the current system configuration, and x_grid
-    void write() {          ///< Flush the velocity field to disk
+    void compute();         ///< Compute the velocity field given the current system configuration, and x_
+    Eigen::MatrixXd make_grid();
+    void write() { ///< Flush the velocity field to disk
+        int total_count = displs_.back();
+        Eigen::MatrixXd x_grid_tot;
+        Eigen::MatrixXd v_grid_tot;
+        if (rank_ == 0) {
+            x_grid_tot.resize(3, total_count / 3);
+            v_grid_tot.resize(3, total_count / 3);
+            spdlog::debug("I'm here... {} {} {}", counts_[rank_], total_count, displs_.back());
+        }
+
+        MPI_Gatherv(x_grid.data(), counts_[rank_], MPI_DOUBLE, x_grid_tot.data(), counts_.data(), displs_.data(),
+                    MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Gatherv(v_grid.data(), counts_[rank_], MPI_DOUBLE, v_grid_tot.data(), counts_.data(), displs_.data(),
+                    MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+        x_grid = x_grid_tot;
+        v_grid = v_grid_tot;
+
         msgpack::pack(ofs_vf_, *this);
         ofs_vf_.flush();
     };
     MSGPACK_DEFINE_MAP(time, x_grid, v_grid);
+
+  private:
+    std::vector<int> counts_;
+    std::vector<int> displs_;
 };
 
 /// @brief Set system state to last state found in trajectory files
@@ -823,7 +845,7 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
 /// grid)
 ///
 /// @return 3D list of points defining the grid
-Eigen::MatrixXd make_grid() {
+Eigen::MatrixXd VelocityField::make_grid() {
     const auto &vf = params_.velocity_field;
     Eigen::MatrixXd grid_master;
     std::unordered_map<long int, Eigen::Vector3d> grid_map;
@@ -886,16 +908,16 @@ Eigen::MatrixXd make_grid() {
     const int node_size_small = 3 * (grid_size_global / size_);
     const int n_nodes_big = grid_size_global % size_;
 
-    std::vector<int> counts(size_);
-    std::vector<int> displs(size_ + 1);
+    counts_.resize(size_);
+    displs_.resize(size_ + 1);
     for (int i = 0; i < size_; ++i) {
-        counts[i] = ((i < n_nodes_big) ? node_size_big : node_size_small);
-        displs[i + 1] = displs[i] + counts[i];
+        counts_[i] = ((i < n_nodes_big) ? node_size_big : node_size_small);
+        displs_[i + 1] = displs_[i] + counts_[i];
     }
 
-    grid.resize(3, counts[rank_] / 3);
-    MPI_Scatterv(grid_master.data(), counts.data(), displs.data(), MPI_DOUBLE, grid.data(), counts[rank_], MPI_DOUBLE,
-                 0, MPI_COMM_WORLD);
+    grid.resize(3, counts_[rank_] / 3);
+    MPI_Scatterv(grid_master.data(), counts_.data(), displs_.data(), MPI_DOUBLE, grid.data(), counts_[rank_],
+                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     return grid;
 }
@@ -1215,9 +1237,8 @@ void init(const std::string &input_file, bool resume_flag) {
     if (rank_ == 0)
         ofs_ = std::ofstream(filename, open_mode);
 
-    if (params_.velocity_field_flag) {
-        filename = "skelly_sim.vf." + std::to_string(rank_);
-        ofs_vf_ = std::ofstream(filename, open_mode);
+    if (params_.velocity_field_flag && rank_ == 0) {
+        ofs_vf_ = std::ofstream("skelly_sim.vf", open_mode);
     }
 }
 } // namespace System
