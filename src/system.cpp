@@ -3,6 +3,8 @@
 #include <rng.hpp>
 
 #include <fstream>
+#include <sstream>
+#include <string>
 #include <unordered_map>
 
 #include <body.hpp>
@@ -51,12 +53,12 @@ struct {
 /// This can be extended easily, so long as you update the corresponding input_map_t and potentially the System::write()
 /// function if you can't use a reference in the output_map for some reason.
 typedef struct output_map_t {
-    double &time = properties.time;                          ///< System::properties
-    double &dt = properties.dt;                              ///< System::properties
-    FiberContainer &fibers = fc_;                            ///< System::fc_
-    BodyContainer &bodies = bc_;                             ///< System::bc_
-    std::pair<std::string, std::string> rng_state;           ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies); ///< Helper routine to specify serialization
+    double &time = properties.time;                             ///< System::properties
+    double &dt = properties.dt;                                 ///< System::properties
+    FiberContainer &fibers = fc_;                               ///< System::fc_
+    BodyContainer &bodies = bc_;                                ///< System::bc_
+    std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);    ///< Helper routine to specify serialization
 } output_map_t;
 output_map_t output_map; ///< Output data for msgpack dump
 
@@ -65,19 +67,56 @@ output_map_t output_map; ///< Output data for msgpack dump
 /// We can't use output_map_t here, but rather a similar struct which uses copies of the member
 /// variables (rather than references) which are then used to update the System variables.
 typedef struct input_map_t {
-    double time;                                             ///< System::properties
-    double dt;                                               ///< System::properties
-    FiberContainer fibers;                                   ///< System::fc_
-    BodyContainer bodies;                                    ///< System::bc_
-    std::pair<std::string, std::string> rng_state;           ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies); ///< Helper routine to specify serialization
+    double time;                                                ///< System::properties
+    double dt;                                                  ///< System::properties
+    FiberContainer fibers;                                      ///< System::fc_
+    BodyContainer bodies;                                       ///< System::bc_
+    std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);    ///< Helper routine to specify serialization
 } input_map_t;
 
 /// @brief Flush current simulation state to trajectory file(s)
 void write() {
-    output_map.rng_state = RNG::dump_state();
-    msgpack::pack(ofs_, output_map);
-    ofs_.flush();
+    FiberContainer fc_global;
+    BodyContainer bc_empty;
+    BodyContainer &bc_global = (rank_ == 0) ? bc_ : bc_empty;
+
+    const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, {RNG::dump_state()}};
+    std::stringstream mergebuf;
+    msgpack::pack(mergebuf, to_merge);
+
+    std::string msg_local = mergebuf.str();
+    int msgsize_local = msg_local.size();
+    std::vector<int> msgsize(size_);
+    MPI_Gather(&msgsize_local, 1, MPI_INT, msgsize.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+    int msgsize_global = 0;
+    std::vector<int> displs(size_ + 1);
+    for (int i = 0; i < size_; ++i) {
+        msgsize_global += msgsize[i];
+        displs[i + 1] = displs[i] + msgsize[i];
+    }
+
+    std::vector<uint8_t> msg = (rank_ == 0) ? std::vector<uint8_t>(msgsize_global) : std::vector<uint8_t>();
+    MPI_Gatherv(msg_local.data(), msgsize_local, MPI_CHAR, msg.data(), msgsize.data(), displs.data(), MPI_CHAR, 0,
+                MPI_COMM_WORLD);
+
+    if (rank_ == 0) {
+        msgpack::object_handle oh;
+        std::size_t offset = 0;
+
+        output_map_t to_write{properties.time, properties.dt, fc_global, bc_global};
+
+        for (int i = 0; i < size_; ++i) {
+            msgpack::unpack(oh, (char *)msg.data(), msg.size(), offset);
+            msgpack::object obj = oh.get();
+            input_map_t const &min_state = obj.as<input_map_t>();
+            for (const auto &min_fib : min_state.fibers.fibers)
+                fc_global.fibers.emplace_back(Fiber(min_fib, params_.eta));
+            to_write.rng_state.push_back(min_state.rng_state[0]);
+        }
+        msgpack::pack(ofs_, to_write);
+        ofs_.flush();
+    }
 }
 
 /// @brief Class representing a velocity field
@@ -138,7 +177,7 @@ void resume_from_trajectory(std::string if_file) {
     for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
         bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
     output_map.rng_state = min_state.rng_state;
-    RNG::init(output_map.rng_state);
+    RNG::init(output_map.rng_state[0]);
 }
 
 // TODO: Refactor all preprocess stuff. It's awful
@@ -1167,13 +1206,14 @@ void init(const std::string &input_file, bool resume_flag) {
     if (param_table_.contains("point_sources"))
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
 
-    std::string filename = "skelly_sim.out." + std::to_string(rank_);
+    std::string filename = "skelly_sim.out";
     auto open_mode = std::ofstream::out | std::ofstream::binary;
     if (resume_flag) {
         resume_from_trajectory(filename);
         open_mode = open_mode | std::ofstream::app;
     }
-    ofs_ = std::ofstream(filename, open_mode);
+    if (rank_ == 0)
+        ofs_ = std::ofstream(filename, open_mode);
 
     if (params_.velocity_field_flag) {
         filename = "skelly_sim.vf." + std::to_string(rank_);
