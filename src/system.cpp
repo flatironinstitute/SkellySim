@@ -180,17 +180,30 @@ void resume_from_trajectory(std::string if_file) {
     while (offset != buflen)
         msgpack::unpack(oh, addr, buflen, offset);
 
-    // FIXME: add assertion that system time is the same across all ranks to resume functionality
-
-    // FIXME: This is a bug-prone way to unpack. Should make proper clone functions that merge
-    // the minimum representation with existing data automatically (node data, etc)
     msgpack::object obj = oh.get();
     input_map_t const &min_state = obj.as<input_map_t>();
-    output_map.time = min_state.time;
-    output_map.dt = min_state.dt;
+
+    const int n_fib_tot = min_state.fibers.fibers.size();
+    const int fib_count_big = n_fib_tot / size_ + 1;
+    const int fib_count_small = n_fib_tot / size_;
+    const int n_fib_big = n_fib_tot % size_;
+
+    std::vector<int> counts(size_);
+    std::vector<int> displs(size_ + 1);
+    for (int i = 0; i < size_; ++i) {
+        counts[i] = ((i < n_fib_big) ? fib_count_big : fib_count_small);
+        displs[i + 1] = displs[i] + counts[i];
+    }
+
+    properties.time = min_state.time;
+    properties.dt = min_state.dt;
     fc_.fibers.clear();
-    for (const auto &min_fib : min_state.fibers.fibers)
-        fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
+    int i_fib = 0;
+    for (const auto &min_fib : min_state.fibers.fibers) {
+        if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1])
+            fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
+        i_fib++;
+    }
 
     // make sure sublist pointers are initialized, and then fill them in
     bc_.populate_sublists();
@@ -199,7 +212,16 @@ void resume_from_trajectory(std::string if_file) {
     for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
         bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
     output_map.rng_state = min_state.rng_state;
-    RNG::init(output_map.rng_state[0]);
+    if (size_ > min_state.rng_state.size()) {
+        spdlog::error(
+            "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
+        MPI_Finalize();
+        exit(1);
+    } else if (size_ < min_state.rng_state.size()) {
+        spdlog::warn("Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
+                     "the RNG. This isn't really a problem, but runs will not be exactly reproducable.");
+    }
+    RNG::init(output_map.rng_state[rank_]);
 }
 
 // TODO: Refactor all preprocess stuff. It's awful
