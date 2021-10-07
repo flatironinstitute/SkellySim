@@ -10,7 +10,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='skelly_sim',
-    version='0.0.1',
+    version='0.9.0',
     description='Simulate cytoskeletal systems with full hydrodynamics',
     long_description=long_description,
     url='https://github.com/flatironinstitute/skelly_sim/',
