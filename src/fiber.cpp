@@ -49,7 +49,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
 ///
-/// Updates: flag Fiber::at_surface_
+/// Updates: Fiber::bc_minus, Fiber::bc_plus, Fiber::near_periphery
 /// @param[in] Periphery object
 void FiberContainer::update_boundary_conditions(Periphery &shell, bool periphery_binding_flag) {
     /// FIXME: magic number in cortex interaction
@@ -296,8 +296,16 @@ void Fiber::update_force_operator() {
     }
 }
 
+/// @brief Update the preconditioner.
+/// Make sure that your Fiber::A_ is current @see Fiber::update_linear_operator
+/// Updates: Fiber::A_LU_
 void Fiber::update_preconditioner() { A_LU_.compute(A_); }
 
+/// @brief Update linear operator and RHS due to boundary conditions
+/// Updates: Fiber::A_, Fiber::RHS_
+/// @param[in] dt current timestep size
+/// @param[in] v_on_fiber [3 x n_nodes_] matrix of velocities on fiber nodes
+/// @param[in] f_on_fiber [3 x n_nodes_] matrix of forces on fiber nodes
 void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber) {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
@@ -466,10 +474,10 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     }
 }
 
-// Return resampling matrix P_{N,-m}.
-// Inputs:
-//   x = Eigen array, N points x_k.
-//   y = Eigen array, N-m points.
+/// @brief Return resampling matrix P_{N,-m}.
+/// @param[in] x [N] vector of points x_k.
+/// @param[in] y [N-m] vector
+/// @return Resampling matrix P_{N, -m}
 MatrixXd barycentric_matrix(ArrayRef &x, ArrayRef &y) {
     int N = x.size();
     int M = y.size();
