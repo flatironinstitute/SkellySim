@@ -1,0 +1,19 @@
+#%Module1.0#####################################################################
+#
+# Module: skelly_sim ${GIT_TAG}
+#
+
+set pkg skelly_sim
+set root ${CMAKE_INSTALL_PREFIX}
+set version ${GIT_TAG}
+
+proc ModulesHelp { } {
+    puts stderr "Sets the environment for $pkg-$version"
+}
+
+module-whatis   "Sets the environment for $pkg-$version"
+
+prepend-path    PATH                            $root/bin
+setenv          SKELLYSIM_BASE                  $root
+setenv          SKELLYSIM_VERSION               $version
+setenv          PV_PLUGIN_PATH                  $root/share/skelly_sim/paraview/plugins
