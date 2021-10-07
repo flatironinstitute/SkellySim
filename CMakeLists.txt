@@ -37,6 +37,7 @@ if(EIGEN_USE_BLAS)
   message("Using BLAS backend for Eigen")
 endif()
 
+add_compile_options("$<$<CONFIG:RELEASE>:-g>")
 
 # required compiler features
 find_package(MPI REQUIRED)
@@ -81,3 +82,7 @@ target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
 
 include(CTest)
 add_subdirectory(tests)
+
+install(TARGETS skelly_sim
+  CONFIGURATIONS Release
+  RUNTIME DESTINATION bin)
