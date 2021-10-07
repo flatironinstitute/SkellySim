@@ -1,7 +1,17 @@
 cmake_minimum_required(VERSION 3.10)
+
+# Get the current git tag
+execute_process(
+  COMMAND git describe --tags
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_TAG
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+string(REPLACE "v" "" GIT_TAG ${GIT_TAG})
+
 project(
   skelly_sim
-  VERSION 0.0.1
+  VERSION ${GIT_TAG}
   LANGUAGES CXX)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
