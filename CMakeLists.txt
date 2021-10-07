@@ -2,12 +2,22 @@ cmake_minimum_required(VERSION 3.10)
 
 # Get the current git tag
 execute_process(
-  COMMAND git describe --tags
+  COMMAND git describe --tags --abbrev=0
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   OUTPUT_VARIABLE GIT_TAG
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 string(REPLACE "v" "" GIT_TAG ${GIT_TAG})
+
+# Get the current git commit
+execute_process(
+  COMMAND git describe --abbrev=8 --dirty --always
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_COMMIT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+message("SkellySim version: v${GIT_TAG} (${GIT_COMMIT})")
 
 project(
   skelly_sim
@@ -38,6 +48,9 @@ if(EIGEN_USE_BLAS)
 endif()
 
 add_compile_options("$<$<CONFIG:RELEASE>:-g>")
+
+add_definitions("-DGIT_TAG=\"${GIT_TAG}\"")
+add_definitions("-DGIT_COMMIT=\"${GIT_COMMIT}\"")
 
 # required compiler features
 find_package(MPI REQUIRED)

@@ -1219,6 +1219,8 @@ void init(const std::string &input_file, bool resume_flag) {
     spdlog::stdout_color_mt("SkellySim global");
     spdlog::cfg::load_env_levels();
 
+    spdlog::info("****** SkellySim {} ({}) ******", GIT_TAG, GIT_COMMIT);
+
     param_table_ = toml::parse(input_file);
     params_ = Params(param_table_.at("params"));
     RNG::init(params_.seed);
