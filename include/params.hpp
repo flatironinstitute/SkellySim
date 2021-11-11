@@ -16,6 +16,7 @@ class Params {
     double dt_min;
     double dt_max;
     double dt_write;
+    double implicit_motor_activation_delay;
     bool periphery_binding_flag;
     bool velocity_field_flag;
     bool periphery_interaction_flag;

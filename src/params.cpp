@@ -14,6 +14,7 @@ Params::Params(toml::value &pt) {
     seed = toml::find_or(pt, "seed", 1);
     dt_min = toml::find_or(pt, "dt_min", 1E-4);
     dt_write = toml::find_or(pt, "dt_write", 0.25);
+    implicit_motor_activation_delay = toml::find_or(pt, "implicit_motor_activation_delay", 0.0);
     seed = toml::find_or(pt, "seed", 1);
     periphery_binding_flag = toml::find_or(pt, "periphery_binding_flag", false);
     velocity_field_flag = toml::find_or(pt, "velocity_field_flag", false);

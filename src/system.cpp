@@ -1001,7 +1001,8 @@ bool step() {
     fc.update_cache_variables(dt, eta);
 
     // Implicit motor forces
-    MatrixXd f_on_fibers = fc.generate_constant_force();
+    MatrixXd f_on_fibers = params_.implicit_motor_activation_delay > properties.time ? MatrixXd::Zero(3, fib_node_count)
+                                                                                     : fc.generate_constant_force();
 
     // Fiber-periphery forces (if periphery exists)
     if (params_.periphery_interaction_flag)
