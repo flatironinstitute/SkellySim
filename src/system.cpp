@@ -960,6 +960,7 @@ void VelocityField::compute() {
     v_grid = fc_.flow(x_grid, f_on_fibers, eta, false);
     v_grid += bc_.flow(x_grid, sol_bodies, eta);
     v_grid += shell_->flow(x_grid, sol_shell, eta);
+    v_grid += psc_.flow(x_grid, eta, properties.time);
 
     // FIXME: move this to body logic with overloading
     // Replace points inside a body to have velocity v_body + w_body x r
