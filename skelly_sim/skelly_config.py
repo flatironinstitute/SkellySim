@@ -129,10 +129,19 @@ class Fiber():
 
 
 @dataclass
+class Point():
+    position: List[float] = field(default_factory=default_vector)
+    force: List[float] = field(default_factory=default_vector)
+    torque: List[float] = field(default_factory=default_vector)
+    time_to_live: float = 0.0
+
+
+@dataclass
 class Config():
     params: Params = Params()
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
+    point_sources: List[Point] = field(default_factory=list)
 
 
 @dataclass
