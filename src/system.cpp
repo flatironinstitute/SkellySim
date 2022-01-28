@@ -1106,32 +1106,35 @@ void run() {
         }
         MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-        // Now all the acceptance/adaptive timestepping logic
         double dt_new = properties.dt;
         bool accept = false;
-        if (converged && fiber_error <= params.fiber_error_tol) {
-            accept = true;
-            const double tol_window = 0.9 * params.fiber_error_tol;
-            if (fiber_error <= tol_window)
-                dt_new = std::min(params.dt_max, properties.dt * params.beta_up);
-        } else {
-            dt_new = properties.dt * params.beta_down;
-            accept = false;
-        }
+        if (params.adaptive_timestep_flag) {
+            // Now all the acceptance/adaptive timestepping logic
+            if (converged && fiber_error <= params.fiber_error_tol) {
+                accept = true;
+                const double tol_window = 0.9 * params.fiber_error_tol;
+                if (fiber_error <= tol_window)
+                    dt_new = std::min(params.dt_max, properties.dt * params.beta_up);
+            } else {
+                dt_new = properties.dt * params.beta_down;
+                accept = false;
+            }
 
-        if (converged && System::check_collision()) {
-            spdlog::info("Collision detected, rejecting solution and taking a smaller timestep");
-            dt_new = properties.dt * 0.5;
-            accept = false;
-        }
+            if (converged && System::check_collision()) {
+                spdlog::info("Collision detected, rejecting solution and taking a smaller timestep");
+                dt_new = properties.dt * 0.5;
+                accept = false;
+            }
 
-        if (dt_new < params.dt_min) {
-            spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
-            spdlog::critical("Timestep smaller than minimum allowed");
-            throw std::runtime_error("Timestep smaller than dt_min");
-        }
+            if (dt_new < params.dt_min) {
+                spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
+                spdlog::critical("Timestep smaller than minimum allowed");
+                throw std::runtime_error("Timestep smaller than dt_min");
+            }
 
-        if (accept) {
+            properties.dt = dt_new;
+        }
+        if (!params.adaptive_timestep_flag || accept) {
             spdlog::info("Accepting timestep and advancing time");
             double t_old = properties.time;
             properties.time += properties.dt;
@@ -1152,7 +1155,7 @@ void run() {
             spdlog::info("Rejecting timestep");
             System::restore();
         }
-        properties.dt = dt_new;
+
         spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
     }
 

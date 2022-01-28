@@ -72,7 +72,7 @@ class Params():
     dynamic_instability: DynamicInstability = DynamicInstability()
     velocity_field: VelocityField = VelocityField()
     periphery_interaction_flag: bool = True
-
+    adaptive_timestep_flag: bool = True
 
 @dataclass
 class Periphery():

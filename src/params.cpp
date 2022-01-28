@@ -19,6 +19,7 @@ Params::Params(toml::value &pt) {
     periphery_binding_flag = toml::find_or(pt, "periphery_binding_flag", false);
     velocity_field_flag = toml::find_or(pt, "velocity_field_flag", false);
     periphery_interaction_flag = toml::find_or(pt, "periphery_interaction_flag", true);
+    adaptive_timestep_flag = toml::find_or(pt, "adaptive_timestep_flag", true);
 
     if (pt.contains("dynamic_instability")) {
         const auto &di = pt.at("dynamic_instability");

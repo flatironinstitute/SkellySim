@@ -20,6 +20,7 @@ class Params {
     bool periphery_binding_flag;
     bool velocity_field_flag;
     bool periphery_interaction_flag;
+    bool adaptive_timestep_flag;
 
     struct {
         int n_nodes = 0;
