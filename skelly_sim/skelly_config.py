@@ -183,6 +183,13 @@ def get_random_orthogonal_vector(x: np.array):
     theta = 2 * np.pi * np.random.uniform()
     return b * np.cos(theta) + c * np.sin(theta)
 
+def get_random_point_on_sphere():
+    phi = np.random.uniform() * 2.0 * np.pi
+    u = 2 * np.random.uniform() - 1.0
+    factor = np.sqrt(1.0 - u * u)
+
+    return np.array([np.cos(phi) * factor, np.sin(phi) * factor, u])
+
 
 def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
 
