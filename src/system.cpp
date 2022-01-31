@@ -954,8 +954,13 @@ void VelocityField::compute() {
     x_grid = make_grid();
 
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
-    if (params_.periphery_interaction_flag)
-        f_on_fibers += shell_->point_cloud_interaction(fc_.get_local_node_positions(), fp);
+    if (params_.periphery_interaction_flag) {
+        int i_fib = 0;
+        for (const auto &fib : fc_.fibers) {
+            f_on_fibers.col(i_fib) += shell_->fiber_interaction(fib, fp);
+            i_fib++;
+        }
+    }
 
     v_grid = fc_.flow(x_grid, f_on_fibers, eta, false);
     v_grid += bc_.flow(x_grid, sol_bodies, eta);
@@ -1006,8 +1011,13 @@ bool step() {
                                                                                      : fc.generate_constant_force();
 
     // Fiber-periphery forces (if periphery exists)
-    if (params_.periphery_interaction_flag)
-        f_on_fibers += shell.point_cloud_interaction(fc.get_local_node_positions(), params.fiber_periphery_interaction);
+    if (params_.periphery_interaction_flag) {
+        int i_fib = 0;
+        for (const auto &fib : fc_.fibers) {
+            f_on_fibers.col(i_fib) += shell.fiber_interaction(fib, params.fiber_periphery_interaction);
+            i_fib++;
+        }
+    }
     MatrixXd v_all = fc.flow(r_all, f_on_fibers, eta);
 
     bc.update_cache_variables(eta);

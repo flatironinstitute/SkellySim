@@ -62,7 +62,7 @@ Params::Params(toml::value &pt) {
     if (pt.contains("fiber_periphery_interaction")) {
         const auto fp = pt.at("fiber_periphery_interaction");
         fiber_periphery_interaction.f_0 = toml::find_or(fp, "f_0", fiber_periphery_interaction.f_0);
-        fiber_periphery_interaction.lambda = toml::find_or(fp, "lambda", fiber_periphery_interaction.lambda);
+        fiber_periphery_interaction.l_0 = toml::find_or(fp, "lambda", fiber_periphery_interaction.l_0);
     }
 
     if (pt.contains("velocity_field")) {

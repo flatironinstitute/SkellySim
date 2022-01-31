@@ -37,7 +37,7 @@ class Params {
 
     fiber_periphery_interaction_t fiber_periphery_interaction{
         .f_0 = 20.0,
-        .lambda = 0.5,
+        .l_0 = 0.05,
     };
 
     struct {

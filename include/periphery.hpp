@@ -11,6 +11,7 @@
 
 class SphericalBody;
 class DeformableBody;
+class Fiber;
 
 /// Class to represent the containing boundary of the simulated system
 ///
@@ -82,11 +83,9 @@ class Periphery {
         throw std::runtime_error("Collision undefined on base Periphery class\n");
     };
 
-    virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
-                                                    const fiber_periphery_interaction_t &fp_params) const {
-        if (!n_nodes_global_)
-            return Eigen::MatrixXd::Zero(point_cloud.rows(), point_cloud.cols());
-        throw std::runtime_error("Point cloud interaction undefined on base Periphery class\n");
+    virtual Eigen::MatrixXd fiber_interaction(const Fiber &fiber,
+                                              const fiber_periphery_interaction_t &fp_params) const {
+        throw std::runtime_error("fiber_interaction undefined on base Periphery class\n");
     }
 
     virtual std::tuple<double, double, double> get_dimensions() {
@@ -112,8 +111,7 @@ class SphericalPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
-                                                    const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const Fiber &fiber, const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {radius_, radius_, radius_}; };
 };
 
@@ -132,8 +130,7 @@ class EllipsoidalPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
-                                                    const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const Fiber &fiber, const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
 };
 
@@ -153,8 +150,7 @@ class GenericPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd point_cloud_interaction(const MatrixRef &point_cloud,
-                                                    const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const Fiber &fiber, const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
 };
 
