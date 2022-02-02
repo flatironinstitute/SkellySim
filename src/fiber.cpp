@@ -74,7 +74,7 @@ void FiberContainer::update_boundary_conditions(Periphery &shell, bool periphery
 ///
 /// Updates: Fiber::stokeslet_
 /// @param[in] eta fluid viscosity
-void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_direct(x_, x_, eta = eta); }
+void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_direct(x_, x_, eta); }
 
 /// @brief Update all of the derivative internal cache variables
 ///
