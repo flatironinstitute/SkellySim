@@ -63,7 +63,7 @@ find_package(Tpetra REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 
-add_library(skelly STATIC src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
+add_library(skelly OBJECT src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
   src/system.cpp src/body.cpp src/solver_hydro.cpp src/rng.cpp src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp)
 
 set(SKELLY_INCLUDES
