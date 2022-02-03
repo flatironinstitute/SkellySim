@@ -57,9 +57,13 @@ typedef struct output_map_t {
     double &dt = properties.dt;     ///< System::properties
     FiberContainer &fibers = fc_;   ///< System::fc_
     BodyContainer &bodies = bc_;    ///< System::bc_
-    Periphery &shell = *shell_;
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
+#ifdef SKELLY_DEBUG
+    Periphery &shell = *shell_;
     MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
+#else
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies); ///< Helper routine to specify serialization
+#endif
 } output_map_t;
 output_map_t output_map; ///< Output data for msgpack dump
 
@@ -82,7 +86,12 @@ void write() {
     BodyContainer bc_empty;
     BodyContainer &bc_global = (rank_ == 0) ? bc_ : bc_empty;
 
+#ifdef SKELLY_DEBUG
     const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, *shell_, {RNG::dump_state()}};
+#else
+    const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, {RNG::dump_state()}};
+#endif
+
     std::stringstream mergebuf;
     msgpack::pack(mergebuf, to_merge);
 
