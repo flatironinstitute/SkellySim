@@ -730,7 +730,7 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
     size_t offset = 0;
     for (const auto &fib : fibers) {
         const int np = fib.n_nodes_;
-        auto force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
+        Eigen::VectorXd force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
         fw.block(0, offset, 1, np) = force_fibers.segment(0 * np, np).transpose();
         fw.block(1, offset, 1, np) = force_fibers.segment(1 * np, np).transpose();
         fw.block(2, offset, 1, np) = force_fibers.segment(2 * np, np).transpose();

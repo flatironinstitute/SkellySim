@@ -93,6 +93,12 @@ add_executable(skelly_sim src/skelly_sim.cpp)
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
+
+add_executable(skelly_debug src/skelly_debug.cpp)
+target_link_libraries(skelly_debug PUBLIC skelly z MPI::MPI_CXX trng4_static
+  ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
+
+
 include(CTest)
 add_subdirectory(tests)
 

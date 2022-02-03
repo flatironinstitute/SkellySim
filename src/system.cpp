@@ -53,12 +53,13 @@ struct {
 /// This can be extended easily, so long as you update the corresponding input_map_t and potentially the System::write()
 /// function if you can't use a reference in the output_map for some reason.
 typedef struct output_map_t {
-    double &time = properties.time;                             ///< System::properties
-    double &dt = properties.dt;                                 ///< System::properties
-    FiberContainer &fibers = fc_;                               ///< System::fc_
-    BodyContainer &bodies = bc_;                                ///< System::bc_
+    double &time = properties.time; ///< System::properties
+    double &dt = properties.dt;     ///< System::properties
+    FiberContainer &fibers = fc_;   ///< System::fc_
+    BodyContainer &bodies = bc_;    ///< System::bc_
+    Periphery &shell = *shell_;
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);    ///< Helper routine to specify serialization
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
 } output_map_t;
 output_map_t output_map; ///< Output data for msgpack dump
 
@@ -81,7 +82,7 @@ void write() {
     BodyContainer bc_empty;
     BodyContainer &bc_global = (rank_ == 0) ? bc_ : bc_empty;
 
-    const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, {RNG::dump_state()}};
+    const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, *shell_, {RNG::dump_state()}};
     std::stringstream mergebuf;
     msgpack::pack(mergebuf, to_merge);
 
@@ -978,18 +979,11 @@ void VelocityField::compute() {
     }
 }
 
-/// @brief Generate next trial system state for the current System::properties::dt
+/// @brief Calculate all initial velocities/forces/RHS/BCs
 ///
 /// @note Modifies anything that evolves in time.
-/// @return If the Matrix solver converged to the requested tolerance with no issue.
-bool step() {
+void prep_state_for_solver() {
     using Eigen::MatrixXd;
-    Params &params = params_;
-    Periphery &shell = *shell_;
-    FiberContainer &fc = fc_;
-    BodyContainer &bc = bc_;
-    const double eta = params.eta;
-    const double dt = properties.dt;
 
     // Since DI can change size of fiber containers, must call first.
     System::dynamic_instability();
@@ -999,32 +993,36 @@ bool step() {
     MatrixXd r_all(3, fib_node_count + shell_node_count + body_node_count);
     {
         auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
-        r_fibers = fc.get_local_node_positions();
-        r_shell = shell.get_local_node_positions();
-        r_bodies = bc.get_local_node_positions(bc.bodies);
+        r_fibers = fc_.get_local_node_positions();
+        r_shell = shell_->get_local_node_positions();
+        r_bodies = bc_.get_local_node_positions(bc_.bodies);
     }
 
-    fc.update_cache_variables(dt, eta);
+    fc_.update_cache_variables(properties.dt, params_.eta);
 
     // Implicit motor forces
-    MatrixXd f_on_fibers = params_.implicit_motor_activation_delay > properties.time ? MatrixXd::Zero(3, fib_node_count)
-                                                                                     : fc.generate_constant_force();
+    MatrixXd motor_force_fibers = params_.implicit_motor_activation_delay > properties.time
+                                      ? MatrixXd::Zero(3, fib_node_count)
+                                      : fc_.generate_constant_force();
 
+    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     // Fiber-periphery forces (if periphery exists)
     if (params_.periphery_interaction_flag) {
         int i_fib = 0;
+
         for (const auto &fib : fc_.fibers) {
-            f_on_fibers.col(i_fib) += shell.fiber_interaction(fib, params.fiber_periphery_interaction);
+            external_force_fibers.col(i_fib) += shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
             i_fib++;
         }
     }
-    MatrixXd v_all = fc.flow(r_all, f_on_fibers, eta);
+    // Don't include motor forces for initial calculation (explicitly handled elsewhere)
+    MatrixXd v_all = fc_.flow(r_all, external_force_fibers, params_.eta);
 
-    bc.update_cache_variables(eta);
+    bc_.update_cache_variables(params_.eta);
 
     // Check for an add external body forces
     bool external_force_body = false;
-    for (auto &body : bc.spherical_bodies) {
+    for (auto &body : bc_.spherical_bodies) {
         body->force_torque_.setZero();
         // Hack so that when you sum global forces, it should sum back to the external force
         body->force_torque_.segment(0, 3) = body->external_force_ / size_;
@@ -1035,25 +1033,38 @@ bool step() {
         const int total_node_count = fib_node_count + shell_node_count + body_node_count;
         MatrixXd r_all(3, total_node_count);
         auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
-        r_fibers = fc.get_local_node_positions();
-        r_shell = shell.get_local_node_positions();
-        r_bodies = bc.get_local_node_positions(bc.bodies);
+        r_fibers = fc_.get_local_node_positions();
+        r_shell = shell_->get_local_node_positions();
+        r_bodies = bc_.get_local_node_positions(bc_.bodies);
 
-        v_all += bc.flow(r_all, Eigen::VectorXd::Zero(bc.get_local_solution_size()), eta);
+        v_all += bc_.flow(r_all, Eigen::VectorXd::Zero(bc_.get_local_solution_size()), params_.eta);
     }
 
-    v_all += psc_.flow(r_all, eta, properties.time);
+    v_all += psc_.flow(r_all, params_.eta, properties.time);
 
-    bc.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
+    bc_.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
 
-    fc.update_RHS(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
-    fc.update_boundary_conditions(shell, params.periphery_binding_flag);
-    fc.apply_bc_rectangular(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
+    MatrixXd total_force_fibers = motor_force_fibers + external_force_fibers;
+    fc_.update_RHS(properties.dt, v_all.block(0, 0, 3, fib_node_count), total_force_fibers);
+    fc_.update_boundary_conditions(*shell_, params_.periphery_binding_flag);
+    fc_.apply_bc_rectangular(properties.dt, v_all.block(0, 0, 3, fib_node_count), total_force_fibers);
 
-    shell.update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
+    shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
+}
+
+/// @brief Generate next trial system state for the current System::properties::dt
+///
+/// @note Modifies anything that evolves in time.
+/// @return If the Matrix solver converged to the requested tolerance with no issue.
+bool step() {
+    const double dt = properties.dt;
+
+    prep_state_for_solver();
+
     Solver<P_inv_hydro, A_fiber_hydro> solver_; /// < Wrapper class for solving system
 
     solver_.set_RHS();
+
     bool converged = solver_.solve();
     curr_solution_ = solver_.get_solution();
 
@@ -1062,8 +1073,9 @@ bool step() {
 
     auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
 
+    // Unpack fiber solution
     size_t offset = 0;
-    for (auto &fib : fc.fibers) {
+    for (auto &fib : fc_.fibers) {
         for (int i = 0; i < 3; ++i)
             fib.x_.row(i) = curr_solution_.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
         offset += 4 * fib.n_nodes_;
@@ -1072,10 +1084,10 @@ bool step() {
     bc_.step(body_sol, dt);
 
     // Re-pin fibers to bodies
-    for (auto &fib : fc.fibers) {
+    for (auto &fib : fc_.fibers) {
         if (fib.binding_site_.first >= 0) {
             Eigen::Vector3d delta =
-                bc.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);
+                bc_.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);
             fib.x_.colwise() += delta;
         }
     }
