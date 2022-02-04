@@ -1,9 +1,18 @@
 from typing import List
 from dataclasses import dataclass, asdict, field, is_dataclass
+from argparse import Namespace
+import copy
+import numpy as np
 from scipy.special import ellipeinc, ellipe
 from scipy.optimize import fsolve
-import numpy as np
-from argparse import Namespace
+
+
+def get_random_point_on_sphere():
+    phi = np.random.uniform() * 2.0 * np.pi
+    u = 2 * np.random.uniform() - 1.0
+    factor = np.sqrt(1.0 - u * u)
+
+    return np.array([np.cos(phi) * factor, np.sin(phi) * factor, u])
 
 
 def unpack(obj):
@@ -32,6 +41,18 @@ def default_vector():
 
 def default_quaternion():
     return [0.0, 0.0, 0.0, 1.0]
+
+
+@dataclass
+class Fiber():
+    n_nodes: int = 32  # number of nodes
+    parent_body: int = 0  # body it's attached to. if you add more bodies, you'll have to specify 0,1,2,3,...
+    force_scale: float = -0.04  # tangential motor force on each node
+    bending_rigidity: float = 0.1  # bending rigidity
+    length: float = 10.0  # starting length
+    # Flattened (x0,y0,z0,x1,y1,z1,...) absolute positions in real space of all the nodes, don't set unless you know what you're doing
+    x: List[float] = field(default_factory=list)
+    minus_clamped: bool = False
 
 
 @dataclass
@@ -74,15 +95,33 @@ class Params():
     periphery_interaction_flag: bool = True
     adaptive_timestep_flag: bool = True
 
+
 @dataclass
 class Periphery():
     n_nodes: int = 6000  # number of nodes to represent sphere. larger peripheries = more nodes. don't exceed ~10000 :)
+
+    def find_binding_site(self, fibers: List[Fiber]):
+        return None
 
 
 @dataclass
 class SphericalPeriphery(Periphery):
     shape: str = 'sphere'  # fixed, don't change
     radius: float = 6.0  # radius
+
+    def find_binding_site(self, fibers: List[Fiber], ds_min):
+        while (True):
+            u0 = get_random_point_on_sphere()
+            x0 = 0.99999999 * u0 * self.radius
+
+            accept = True
+            for fib in fibers:
+                if np.linalg.norm(x0 - fib.x[0:3]) < ds_min:
+                    accept = False
+                    break
+            if accept:
+                return (x0, u0)
+
 
 @dataclass
 class EllipsoidalPeriphery(Periphery):
@@ -117,18 +156,6 @@ class Body():
 
 
 @dataclass
-class Fiber():
-    n_nodes: int = 32  # number of nodes
-    parent_body: int = 0  # body it's attached to. if you add more bodies, you'll have to specify 0,1,2,3,...
-    force_scale: float = -0.04  # tangential motor force on each node
-    bending_rigidity: float = 0.1  # bending rigidity
-    length: float = 10.0  # starting length
-    # Flattened (x0,y0,z0,x1,y1,z1,...) absolute positions in real space of all the nodes, don't set unless you know what you're doing
-    x: List[float] = field(default_factory=list)
-    minus_clamped: bool = False
-
-
-@dataclass
 class Point():
     position: List[float] = field(default_factory=default_vector)
     force: List[float] = field(default_factory=default_vector)
@@ -142,6 +169,20 @@ class Config():
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
+
+    def insert_fiber(self, fiber: Fiber, placement=None):
+        fib = copy.copy(fiber)
+        if placement:
+            if placement[0] == 'periphery':
+                x0, u0 = self.periphery.find_binding_site(
+                    self.fibers, placement[1])
+            else:
+                raise RuntimeError
+            fib.x = (
+                x0 -
+                np.linspace(0, u0 * fib.length, fib.n_nodes)).ravel().tolist()
+            fib.minus_clamped = True
+        self.fibers.append(fib)
 
 
 @dataclass
@@ -182,13 +223,6 @@ def get_random_orthogonal_vector(x: np.array):
 
     theta = 2 * np.pi * np.random.uniform()
     return b * np.cos(theta) + c * np.sin(theta)
-
-def get_random_point_on_sphere():
-    phi = np.random.uniform() * 2.0 * np.pi
-    u = 2 * np.random.uniform() - 1.0
-    factor = np.sqrt(1.0 - u * u)
-
-    return np.array([np.cos(phi) * factor, np.sin(phi) * factor, u])
 
 
 def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
