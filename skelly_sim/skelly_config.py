@@ -5,6 +5,7 @@ import copy
 import numpy as np
 from scipy.special import ellipeinc, ellipe
 from scipy.optimize import fsolve
+import toml
 
 
 def get_random_point_on_sphere():
@@ -183,6 +184,10 @@ class Config():
                 np.linspace(0, u0 * fib.length, fib.n_nodes)).ravel().tolist()
             fib.minus_clamped = True
         self.fibers.append(fib)
+
+    def save(self, filename: str):
+        with open(filename, 'w') as f:
+            toml.dump(unpack(self), f)
 
 
 @dataclass
