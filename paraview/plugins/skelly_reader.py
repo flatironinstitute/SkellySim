@@ -62,7 +62,7 @@ class SkellyReader(VTKPythonAlgorithmBase):
 
         self.active = True
         # FIXME: Get this from user
-        toml_files = sorted(Path('.').glob('*.toml'))
+        toml_files = sorted(Path('.').glob('[!.]*.toml'))
         if len(toml_files):
             import toml
             with open(toml_files[0]) as f:
