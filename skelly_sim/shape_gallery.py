@@ -16,7 +16,6 @@ class Envelope(FunctionGenerator):
         self.lower_bound_target = config['lower_bound']
         self.upper_bound_target = config['upper_bound']
 
-        import numpy as np
         locals().update(config)
 
         self.raw_height_func = eval("lambda x: " + config['height'], locals())
