@@ -291,8 +291,8 @@ void Fiber::update_force_operator() {
 
         force_operator_.block(i * np, 3 * np, np, np).diagonal() = xss_.row(i);
 
-        force_operator_.block(i * np, 3 * np, np, np) +=
-            (D_1.array().colwise() * xs_.row(i).transpose().array()).matrix().transpose();
+        Eigen::MatrixXd t2 = (D_1.array().rowwise() * xs_.row(i).array()).matrix().transpose();
+        force_operator_.block(i * np, 3 * np, np, np) += t2;
     }
 }
 
