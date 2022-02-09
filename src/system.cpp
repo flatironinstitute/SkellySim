@@ -1017,11 +1017,11 @@ void prep_state_for_solver() {
     MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     // Fiber-periphery forces (if periphery exists)
     if (params_.periphery_interaction_flag) {
-        int i_fib = 0;
+        int i_col = 0;
 
         for (const auto &fib : fc_.fibers) {
-            external_force_fibers.col(i_fib) += shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
-            i_fib++;
+            external_force_fibers.block(0, i_col, 3, fib.n_nodes_) += shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
+            i_col += fib.n_nodes_;
         }
     }
     // Don't include motor forces for initial calculation (explicitly handled elsewhere)
