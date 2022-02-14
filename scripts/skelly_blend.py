@@ -7,6 +7,7 @@ import bmesh
 import mathutils
 import time
 import os
+import pickle
 
 if '--' not in sys.argv:
     print(
@@ -123,23 +124,23 @@ class SkellySim:
 
         traj_file = os.path.join(os.path.dirname(toml_file), 'skelly_sim.out')
 
+        mtime = os.stat(traj_file).st_mtime
+        index_file = traj_file + '.index'
         self.fh = open(traj_file, "rb")
-        unpacker = msgpack.Unpacker(self.fh, raw=False)
 
-        while True:
-            try:
-                self.fpos.append(unpacker.tell())
-                n_keys = unpacker.read_map_header()
-                for key in range(n_keys):
-                    key = unpacker.unpack()
-                    if key == 'time':
-                        self.times.append(unpacker.unpack())
-                    else:
-                        unpacker.skip()
-
-            except msgpack.exceptions.OutOfData:
-                self.fpos.pop()
-                break
+        if os.path.isfile(index_file):
+            with open(index_file, 'rb') as f:
+                print("Loading trajectory index.")
+                index = pickle.load(f)
+                if index['mtime'] != mtime:
+                    print("Stale trajectory index file. Rebuilding.")
+                    self.build_index(mtime, index_file)
+                else:
+                    self.fpos = index['fpos']
+                    self.times = index['times']
+        else:
+            print("No trajectory index file. Building.")
+            self.build_index(mtime, index_file)
 
     def __len__(self):
         return len(self.times)
@@ -166,6 +167,32 @@ class SkellySim:
                 nurbs_cylinder(pos,
                                bpy.data.collections['Fibers'].objects[ifib])
 
+
+    def build_index(self, mtime, index_file):
+        unpacker = msgpack.Unpacker(self.fh, raw=False)
+
+        while True:
+            try:
+                self.fpos.append(unpacker.tell())
+                n_keys = unpacker.read_map_header()
+                for key in range(n_keys):
+                    key = unpacker.unpack()
+                    if key == 'time':
+                        self.times.append(unpacker.unpack())
+                    else:
+                        unpacker.skip()
+
+            except msgpack.exceptions.OutOfData:
+                self.fpos.pop()
+                break
+
+        index = {
+            'mtime': mtime,
+            'fpos': self.fpos,
+            'times': self.times,
+        }
+        with open(index_file, 'wb') as f:
+            pickle.dump(index, f)
 
 def clear_scene():
     if "Cube" in bpy.data.meshes:
@@ -267,24 +294,16 @@ def init_scene(sim: SkellySim):
 def main():
     init_collections()
     init_materials()
+
+    sim = SkellySim(argv[0])
+
     clear_scene()
     place_backdrop()
     place_camera()
     set_light()
     set_ambient_light()
 
-    sim = SkellySim(argv[0])
     init_scene(sim)
-
-    if len(argv) > 1:
-        render_dir = argv[1]
-        scene = bpy.context.scene
-        scene.render.image_settings.file_format = 'PNG'
-        for i in range(0, len(sim)):
-            scene.frame_set(i)
-            scene.render.filepath = os.path.join(
-                render_dir, "frame_{}.png".format(str(i).rjust(5, '0')))
-            bpy.ops.render.render(write_still=1)
 
 
 if __name__ == "__main__":
