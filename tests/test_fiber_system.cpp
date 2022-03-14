@@ -2,6 +2,11 @@
 #include <iostream>
 #include <mpi.h>
 
+#include <fiber.hpp>
+#include <omp.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+
 #ifdef NDEBUG
 #undef NDEBUG
 #include <cassert>
@@ -9,11 +14,6 @@
 #else
 #include <cassert>
 #endif
-
-#include <fiber.hpp>
-#include <omp.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
@@ -30,7 +30,6 @@ int main(int argc, char *argv[]) {
     const double length = 1.0;
     const double bending_rigidity = 10.0;
     const double dt = 0.005;
-    const double f_stall = 1.0;
     const std::string input_file = "2K_MTs_onCortex_R5_L1.toml";
 
     toml::value config = toml::parse(input_file);

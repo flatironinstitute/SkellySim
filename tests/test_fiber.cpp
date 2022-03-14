@@ -5,6 +5,8 @@
 #include <iostream>
 #include <mpi.h>
 
+#include <fiber.hpp>
+
 #ifdef NDEBUG
 #undef NDEBUG
 #include <cassert>
@@ -12,8 +14,6 @@
 #else
 #include <cassert>
 #endif
-
-#include <fiber.hpp>
 
 using Eigen::Map;
 using Eigen::MatrixXd;
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
         for (int j = 0; j < 4; ++j) {
             Eigen::MatrixXd Apy = A.block(i * np, j * np, np, np);
             Eigen::MatrixXd Acpp = fib.A_.block(i * np, j * np, np, np);
-            assert(allclose(Apy, Acpp, 0, 1E-9));
+            assert(allclose(Apy, Acpp, 0, 1E-10));
         }
     }
 
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     }
 
     fib.update_force_operator();
-    assert(allclose(force_operator, fib.force_operator_, 0, 1E-7));
+    assert(allclose(force_operator, fib.force_operator_, 0, 1E-12));
 
     std::cout << "Test passed\n";
     return 0;
