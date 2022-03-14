@@ -80,8 +80,8 @@ std::vector<char> &cnpy::operator+=(std::vector<char> &lhs, const char *rhs) {
 
 void cnpy::parse_npy_header(unsigned char *buffer, size_t &word_size, std::vector<size_t> &shape, bool &fortran_order) {
     // std::string magic_string(buffer,6);
-    uint8_t major_version = *reinterpret_cast<uint8_t *>(buffer + 6);
-    uint8_t minor_version = *reinterpret_cast<uint8_t *>(buffer + 7);
+    // uint8_t major_version = *reinterpret_cast<uint8_t *>(buffer + 6);
+    // uint8_t minor_version = *reinterpret_cast<uint8_t *>(buffer + 7);
     uint16_t header_len = *reinterpret_cast<uint16_t *>(buffer + 8);
     std::string header(reinterpret_cast<char *>(buffer + 9), header_len);
 
@@ -109,8 +109,10 @@ void cnpy::parse_npy_header(unsigned char *buffer, size_t &word_size, std::vecto
     // byte order code | stands for not applicable.
     // not sure when this applies except for byte array
     loc1 = header.find("descr") + 9;
+#ifndef NDEBUG
     bool littleEndian = (header[loc1] == '<' || header[loc1] == '|' ? true : false);
     assert(littleEndian);
+#endif
 
     // char type = header[loc1+1];
     // assert(type == map_type(T));
@@ -160,8 +162,10 @@ void cnpy::parse_npy_header(FILE *fp, size_t &word_size, std::vector<size_t> &sh
     if (loc1 == std::string::npos)
         throw std::runtime_error("parse_npy_header: failed to find header keyword: 'descr'");
     loc1 += 9;
+#ifndef NDEBUG
     bool littleEndian = (header[loc1] == '<' || header[loc1] == '|' ? true : false);
     assert(littleEndian);
+#endif
 
     // char type = header[loc1+1];
     // assert(type == map_type(T));
@@ -178,19 +182,23 @@ void cnpy::parse_zip_footer(FILE *fp, uint16_t &nrecs, size_t &global_header_siz
     if (res != 22)
         throw std::runtime_error("parse_zip_footer: failed fread");
 
+#ifndef NDEBUG
     uint16_t disk_no, disk_start, nrecs_on_disk, comment_len;
     disk_no = *(uint16_t *)&footer[4];
     disk_start = *(uint16_t *)&footer[6];
     nrecs_on_disk = *(uint16_t *)&footer[8];
     nrecs = *(uint16_t *)&footer[10];
+#endif
     global_header_size = *(uint32_t *)&footer[12];
     global_header_offset = *(uint32_t *)&footer[16];
+#ifndef NDEBUG
     comment_len = *(uint16_t *)&footer[20];
 
     assert(disk_no == 0);
     assert(disk_start == 0);
     assert(nrecs_on_disk == nrecs);
     assert(comment_len == 0);
+#endif
 }
 
 cnpy::NpyArray load_the_npy_file(FILE *fp) {
@@ -214,7 +222,6 @@ cnpy::NpyArray load_the_npz_array(FILE *fp, uint32_t compr_bytes, uint32_t uncom
     if (nread != compr_bytes)
         throw std::runtime_error("load_the_npy_file: failed fread");
 
-    int err;
     z_stream d_stream;
 
     d_stream.zalloc = Z_NULL;
@@ -222,15 +229,15 @@ cnpy::NpyArray load_the_npz_array(FILE *fp, uint32_t compr_bytes, uint32_t uncom
     d_stream.opaque = Z_NULL;
     d_stream.avail_in = 0;
     d_stream.next_in = Z_NULL;
-    err = inflateInit2(&d_stream, -MAX_WBITS);
+    inflateInit2(&d_stream, -MAX_WBITS);
 
     d_stream.avail_in = compr_bytes;
     d_stream.next_in = &buffer_compr[0];
     d_stream.avail_out = uncompr_bytes;
     d_stream.next_out = &buffer_uncompr[0];
 
-    err = inflate(&d_stream, Z_FINISH);
-    err = inflateEnd(&d_stream);
+    inflate(&d_stream, Z_FINISH);
+    inflateEnd(&d_stream);
 
     std::vector<size_t> shape;
     size_t word_size;
