@@ -53,10 +53,10 @@ struct {
 /// This can be extended easily, so long as you update the corresponding input_map_t and potentially the System::write()
 /// function if you can't use a reference in the output_map for some reason.
 typedef struct output_map_t {
-    double &time = properties.time; ///< System::properties
-    double &dt = properties.dt;     ///< System::properties
-    FiberContainer &fibers = fc_;   ///< System::fc_
-    BodyContainer &bodies = bc_;    ///< System::bc_
+    double &time = properties.time;                             ///< System::properties
+    double &dt = properties.dt;                                 ///< System::properties
+    FiberContainer &fibers = fc_;                               ///< System::fc_
+    BodyContainer &bodies = bc_;                                ///< System::bc_
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
 #ifdef SKELLY_DEBUG
     Periphery &shell = *shell_;
@@ -1020,7 +1020,8 @@ void prep_state_for_solver() {
         int i_col = 0;
 
         for (const auto &fib : fc_.fibers) {
-            external_force_fibers.block(0, i_col, 3, fib.n_nodes_) += shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
+            external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
+                shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
             i_col += fib.n_nodes_;
         }
     }
@@ -1082,24 +1083,9 @@ bool step() {
 
     auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
 
-    // Unpack fiber solution
-    size_t offset = 0;
-    for (auto &fib : fc_.fibers) {
-        for (int i = 0; i < 3; ++i)
-            fib.x_.row(i) = curr_solution_.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
-        offset += 4 * fib.n_nodes_;
-    }
-
+    fc_.step(fiber_sol);
     bc_.step(body_sol, dt);
-
-    // Re-pin fibers to bodies
-    for (auto &fib : fc_.fibers) {
-        if (fib.binding_site_.first >= 0) {
-            Eigen::Vector3d delta =
-                bc_.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);
-            fib.x_.colwise() += delta;
-        }
-    }
+    fc_.repin_to_bodies(bc_);
 
     return converged;
 }

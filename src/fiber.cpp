@@ -1,4 +1,5 @@
 #include <skelly_sim.hpp>
+#include <body.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -552,6 +553,8 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices(int n_nodes_finite_di
 // FIXME: Make this an input parameter
 const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matrices(4);
 
+/// @brief Get total number of fibers across all ranks
+/// @return total number of fibers across all ranks
 int FiberContainer::get_global_count() const {
     const int local_fib_count = get_local_count();
     int global_fib_count;
@@ -560,6 +563,8 @@ int FiberContainer::get_global_count() const {
     return global_fib_count;
 }
 
+/// @brief Get total number of fiber nodes across all ranks
+/// @return total number of fiber nodes across all ranks
 int FiberContainer::get_global_total_fib_nodes() const {
     const int local_fib_nodes = get_local_node_count();
     int global_fib_nodes;
@@ -568,6 +573,8 @@ int FiberContainer::get_global_total_fib_nodes() const {
     return global_fib_nodes;
 }
 
+/// @brief Update derivatives on all fibers
+/// See: Fiber::update_derivatives
 void FiberContainer::update_derivatives() {
     for (auto &fib : fibers)
         fib.update_derivatives();
@@ -767,6 +774,32 @@ void FiberContainer::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, Mat
         // FIXME: preconditioner update probably shouldn't be here. think of how to organize it with other cache
         fib.update_preconditioner();
         offset += fib.n_nodes_;
+    }
+}
+
+/// @brief Step fiber to new position according to current fiber solution
+/// Updates: [fibers].x_
+/// @param[in] fiber_sol [4 x n_nodes_tot] fiber solution vector
+void FiberContainer::step(VectorRef &fiber_sol) {
+    size_t offset = 0;
+    for (auto &fib : fibers) {
+        for (int i = 0; i < 3; ++i)
+            fib.x_.row(i) = fiber_sol.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
+        offset += 4 * fib.n_nodes_;
+    }
+}
+
+/// @brief Since the fiber and the body might not move _exactly_ the same, move the fiber to
+/// lie exactly at the binding site again
+/// Updates: [fibers].x_
+/// @param[in] bodies BodyContainer object that contains fiber binding sites
+void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
+    for (auto &fib : fibers) {
+        if (fib.binding_site_.first >= 0) {
+            Eigen::Vector3d delta =
+                bodies.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);
+            fib.x_.colwise() += delta;
+        }
     }
 }
 

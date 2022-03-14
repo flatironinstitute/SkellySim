@@ -11,6 +11,7 @@
 #include <params.hpp>
 
 class Periphery;
+class BodyContainer;
 
 /// @brief Class to represent a single flexible filament
 ///
@@ -176,6 +177,8 @@ class FiberContainer {
     void update_cache_variables(double dt, double eta);
     void update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
     void apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
+    void step(VectorRef &fiber_sol);
+    void repin_to_bodies(BodyContainer &bodies);
 
     /// @brief get total number of nodes across fibers in the container
     /// Usually you need this to form arrays used as input later
@@ -196,7 +199,6 @@ class FiberContainer {
     /// @brief Get number of local fibers
     int get_local_count() const { return fibers.size(); };
 
-    /// @brief Get number of local fibers
     int get_global_count() const;
 
     Eigen::MatrixXd generate_constant_force() const;
