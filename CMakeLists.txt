@@ -83,49 +83,67 @@ find_package(Tpetra REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 
-set(pvfmm_DIR ${CMAKE_CURRENT_BINARY_DIR}/extern/pvfmm)
-add_subdirectory(extern/pvfmm EXCLUDE_FROM_ALL)
-
-set_readonly(PVFMM_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/extern/pvfmm/lib64/")
-set_readonly(PVFMM_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pvfmm-include/")
-find_package(pvfmm)
-add_subdirectory(extern/stkfmm EXCLUDE_FROM_ALL)
-
-file(GLOB pvfmm_includes "${PROJECT_SOURCE_DIR}/extern/pvfmm/include/*")
-
-add_custom_target(pvfmm_include)
-add_custom_command(TARGET pvfmm_include
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-  ${CMAKE_CURRENT_BINARY_DIR}/extern/pvfmm/pvfmm_config.h pvfmm-include/pvfmm/pvfmm_config.h
-  )
-
-foreach(fullsource ${pvfmm_includes})
-  get_filename_component(source ${fullsource} NAME)
-  add_custom_command(TARGET pvfmm_include
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${fullsource} pvfmm-include/pvfmm/${source}
-    )
-endforeach()
-
-file(GLOB sctl_includes "${PROJECT_SOURCE_DIR}/extern/pvfmm/SCTL/include/sctl/*")
-add_custom_command(TARGET pvfmm_include
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-  ${PROJECT_SOURCE_DIR}/extern/pvfmm/SCTL/include/sctl.hpp pvfmm-include/pvfmm/sctl.hpp
-  )
-foreach(fullsource ${sctl_includes})
-  get_filename_component(source ${fullsource} NAME)
-  add_custom_command(TARGET pvfmm_include
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${fullsource} pvfmm-include/pvfmm/sctl/${source}
-    )
-endforeach()
-
-# add_dependencies(pvfmm_include pvfmmStatic)
-add_dependencies(STKFMM_STATIC pvfmm_include pvfmmStatic)
-
 add_library(skelly OBJECT src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
   src/system.cpp src/body.cpp src/solver_hydro.cpp src/rng.cpp src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp)
-add_dependencies(skelly STKFMM_STATIC)
+
+if(SKELLY_BUILD_FMM)
+  set(pvfmm_DIR ${CMAKE_CURRENT_BINARY_DIR}/extern/pvfmm)
+  add_subdirectory(extern/pvfmm EXCLUDE_FROM_ALL)
+
+  set_readonly(PVFMM_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/extern/pvfmm/lib64/")
+  set_readonly(PVFMM_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/pvfmm-include/")
+  find_package(pvfmm)
+  add_subdirectory(extern/stkfmm EXCLUDE_FROM_ALL)
+
+  file(GLOB pvfmm_includes "${PROJECT_SOURCE_DIR}/extern/pvfmm/include/*")
+
+  add_custom_target(pvfmm_include)
+  add_custom_command(TARGET pvfmm_include
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_CURRENT_BINARY_DIR}/extern/pvfmm/pvfmm_config.h pvfmm-include/pvfmm/pvfmm_config.h
+    )
+
+  foreach(fullsource ${pvfmm_includes})
+    get_filename_component(source ${fullsource} NAME)
+    add_custom_command(TARGET pvfmm_include
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      ${fullsource} pvfmm-include/pvfmm/${source}
+      )
+  endforeach()
+
+  file(GLOB sctl_includes "${PROJECT_SOURCE_DIR}/extern/pvfmm/SCTL/include/sctl/*")
+  add_custom_command(TARGET pvfmm_include
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${PROJECT_SOURCE_DIR}/extern/pvfmm/SCTL/include/sctl.hpp pvfmm-include/pvfmm/sctl.hpp
+    )
+  foreach(fullsource ${sctl_includes})
+    get_filename_component(source ${fullsource} NAME)
+    add_custom_command(TARGET pvfmm_include
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      ${fullsource} pvfmm-include/pvfmm/sctl/${source}
+      )
+  endforeach()
+
+  add_dependencies(STKFMM_STATIC pvfmm_include pvfmmStatic)
+  add_dependencies(skelly STKFMM_STATIC)
+  # FIXME: Lazy hack to load mkl fftw if loaded
+  set(SKELLY_INCLUDES_FMM ${PVFMM_INCLUDE_DIR}/pvfmm
+    ${PROJECT_SOURCE_DIR}/extern/stkfmm/Lib/include)
+  if (MKL_FFTW_INCLUDE_DIR)
+    set(SKELLY_INCLUDES_FMM ${SKELLY_INCLUDES_FMM} ${MKL_FFTW_INCLUDE_DIR})
+  endif()
+  target_link_libraries(skelly PUBLIC STKFMM_STATIC.a pvfmm.a ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
+  target_link_directories(skelly PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/extern/stkfmm/Lib ${CMAKE_CURRENT_BINARY_DIR}/extern/pvfmm)
+else()
+  find_package(pvfmm REQUIRED)
+  find_package(STKFMM REQUIRED)
+  set(SKELLY_INCLUDES_FMM ${PVFMM_INCLUDE_DIR}/pvfmm
+    ${PVFMM_DEP_INCLUDE_DIR}
+    ${STKFMM_INCLUDE_DIRS}
+  ) 
+  target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
+endif()
+
 
 set(SKELLY_INCLUDES ${PROJECT_SOURCE_DIR}/include)
 set(SKELLY_INCLUDES_SYSTEM
@@ -134,17 +152,14 @@ set(SKELLY_INCLUDES_SYSTEM
   ${PROJECT_SOURCE_DIR}/extern/toml11
   ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
   ${MPI_CXX_INCLUDE_DIRS}
-  ${PVFMM_INCLUDE_DIR}/pvfmm
-  ${PROJECT_SOURCE_DIR}/extern/stkfmm/Lib/include
   ${EIGEN3_INCLUDE_DIR}
+  ${SKELLY_INCLUDES_FMM}
   ${Kokkos_INCLUDE_DIRS}
   ${Tpetra_INCLUDE_DIRS}
   ${Teuchos_INCLUDE_DIRS}
   ${Belos_INCLUDE_DIRS}
   )
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES} SYSTEM ${SKELLY_INCLUDES_SYSTEM})
-target_link_directories(skelly PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/extern/stkfmm/Lib ${CMAKE_CURRENT_BINARY_DIR}/extern/pvfmm)
-target_link_libraries(skelly PUBLIC STKFMM_STATIC.a pvfmm.a ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
 
 add_subdirectory(extern/spdlog EXCLUDE_FROM_ALL)
 add_subdirectory(extern/trng4 EXCLUDE_FROM_ALL)
