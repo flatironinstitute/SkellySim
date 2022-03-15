@@ -27,7 +27,7 @@ Eigen::MatrixXd PointSourceContainer::flow(const MatrixRef &r_trg, double eta, d
         if (point.force_.any())
             forcers.push_back(std::make_pair(point.position_, point.force_));
         if (point.torque_.any())
-            torquers.push_back(std::make_pair(point.position_, point.force_));
+            torquers.push_back(std::make_pair(point.position_, point.torque_));
     }
 
     if (forcers.size()) {

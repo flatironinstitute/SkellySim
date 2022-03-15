@@ -1,4 +1,5 @@
 #include <skelly_sim.hpp>
+#include <body.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -74,7 +75,7 @@ void FiberContainer::update_boundary_conditions(Periphery &shell, bool periphery
 ///
 /// Updates: Fiber::stokeslet_
 /// @param[in] eta fluid viscosity
-void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_direct(x_, x_, eta = eta); }
+void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_direct(x_, x_, eta); }
 
 /// @brief Update all of the derivative internal cache variables
 ///
@@ -291,8 +292,8 @@ void Fiber::update_force_operator() {
 
         force_operator_.block(i * np, 3 * np, np, np).diagonal() = xss_.row(i);
 
-        force_operator_.block(i * np, 3 * np, np, np) +=
-            (D_1.array().colwise() * xs_.row(i).transpose().array()).matrix().transpose();
+        Eigen::MatrixXd t2 = (D_1.array().rowwise() * xs_.row(i).array()).matrix().transpose();
+        force_operator_.block(i * np, 3 * np, np, np) += t2;
     }
 }
 
@@ -441,8 +442,9 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         B(10, 4 * np - 1) = 1.0;
 
         Vector3d BC_plus_vec_0 = {0.0, 0.0, 0.0};
+        // FIXME: hack to fix BCs for motor forces at end
         if (f_on_fiber.size())
-            BC_plus_vec_0 = f_on_fiber.col(f_on_fiber.cols() - 1);
+            BC_plus_vec_0 = f_on_fiber.col(f_on_fiber.cols() - 1) - force_scale_ * xs_.col(n_nodes_ - 1);
 
         B_RHS.segment(7, 3) = BC_plus_vec_0;
         B_RHS(10) = BC_plus_vec_0.dot(xs_.col(xs_.cols() - 1));
@@ -551,6 +553,8 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices(int n_nodes_finite_di
 // FIXME: Make this an input parameter
 const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matrices(4);
 
+/// @brief Get total number of fibers across all ranks
+/// @return total number of fibers across all ranks
 int FiberContainer::get_global_count() const {
     const int local_fib_count = get_local_count();
     int global_fib_count;
@@ -559,6 +563,8 @@ int FiberContainer::get_global_count() const {
     return global_fib_count;
 }
 
+/// @brief Get total number of fiber nodes across all ranks
+/// @return total number of fiber nodes across all ranks
 int FiberContainer::get_global_total_fib_nodes() const {
     const int local_fib_nodes = get_local_node_count();
     int global_fib_nodes;
@@ -567,6 +573,8 @@ int FiberContainer::get_global_total_fib_nodes() const {
     return global_fib_nodes;
 }
 
+/// @brief Update derivatives on all fibers
+/// See: Fiber::update_derivatives
 void FiberContainer::update_derivatives() {
     for (auto &fib : fibers)
         fib.update_derivatives();
@@ -729,7 +737,7 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
     size_t offset = 0;
     for (const auto &fib : fibers) {
         const int np = fib.n_nodes_;
-        auto force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
+        Eigen::VectorXd force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
         fw.block(0, offset, 1, np) = force_fibers.segment(0 * np, np).transpose();
         fw.block(1, offset, 1, np) = force_fibers.segment(1 * np, np).transpose();
         fw.block(2, offset, 1, np) = force_fibers.segment(2 * np, np).transpose();
@@ -766,6 +774,32 @@ void FiberContainer::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, Mat
         // FIXME: preconditioner update probably shouldn't be here. think of how to organize it with other cache
         fib.update_preconditioner();
         offset += fib.n_nodes_;
+    }
+}
+
+/// @brief Step fiber to new position according to current fiber solution
+/// Updates: [fibers].x_
+/// @param[in] fiber_sol [4 x n_nodes_tot] fiber solution vector
+void FiberContainer::step(VectorRef &fiber_sol) {
+    size_t offset = 0;
+    for (auto &fib : fibers) {
+        for (int i = 0; i < 3; ++i)
+            fib.x_.row(i) = fiber_sol.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
+        offset += 4 * fib.n_nodes_;
+    }
+}
+
+/// @brief Since the fiber and the body might not move _exactly_ the same, move the fiber to
+/// lie exactly at the binding site again
+/// Updates: [fibers].x_
+/// @param[in] bodies BodyContainer object that contains fiber binding sites
+void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
+    for (auto &fib : fibers) {
+        if (fib.binding_site_.first >= 0) {
+            Eigen::Vector3d delta =
+                bodies.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);
+            fib.x_.colwise() += delta;
+        }
     }
 }
 

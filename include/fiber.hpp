@@ -11,6 +11,7 @@
 #include <params.hpp>
 
 class Periphery;
+class BodyContainer;
 
 /// @brief Class to represent a single flexible filament
 ///
@@ -137,9 +138,17 @@ class Fiber {
     void update_stokeslet(double);
     bool attached_to_body() { return binding_site_.first >= 0; };
     bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
+#ifndef SKELLY_DEBUG
     MSGPACK_DEFINE_MAP(n_nodes_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_,
                        epsilon_, binding_site_, x_);
+#else
+    MSGPACK_DEFINE_MAP(n_nodes_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_,
+                       epsilon_, binding_site_, x_, A_, RHS_, force_operator_, bc_minus_, bc_plus_, xs_, xss_, xsss_,
+                       xssss_, stokeslet_);
+#endif
 };
+
+MSGPACK_ADD_ENUM(Fiber::BC);
 
 /// Class to hold the fiber objects.
 ///
@@ -168,6 +177,8 @@ class FiberContainer {
     void update_cache_variables(double dt, double eta);
     void update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
     void apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
+    void step(VectorRef &fiber_sol);
+    void repin_to_bodies(BodyContainer &bodies);
 
     /// @brief get total number of nodes across fibers in the container
     /// Usually you need this to form arrays used as input later
@@ -188,7 +199,6 @@ class FiberContainer {
     /// @brief Get number of local fibers
     int get_local_count() const { return fibers.size(); };
 
-    /// @brief Get number of local fibers
     int get_global_count() const;
 
     Eigen::MatrixXd generate_constant_force() const;

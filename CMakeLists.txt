@@ -51,10 +51,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-sign-compare -Wno-unused-variable")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-sign-compare")
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-value -Wno-misleading-indentation")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # using intel, disable offloading
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qno-offload")
@@ -123,7 +123,7 @@ endforeach()
 # add_dependencies(pvfmm_include pvfmmStatic)
 add_dependencies(STKFMM_STATIC pvfmm_include pvfmmStatic)
 
-add_library(skelly STATIC src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
+add_library(skelly OBJECT src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
   src/system.cpp src/body.cpp src/solver_hydro.cpp src/rng.cpp src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp)
 add_dependencies(skelly STKFMM_STATIC)
 
@@ -153,6 +153,12 @@ add_executable(skelly_sim src/skelly_sim.cpp)
 
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
+
+
+add_executable(skelly_debug src/skelly_debug.cpp)
+target_link_libraries(skelly_debug PUBLIC skelly z MPI::MPI_CXX trng4_static
+  ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
+
 
 include(CTest)
 add_subdirectory(tests)

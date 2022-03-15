@@ -14,10 +14,12 @@ Params::Params(toml::value &pt) {
     seed = toml::find_or(pt, "seed", 1);
     dt_min = toml::find_or(pt, "dt_min", 1E-4);
     dt_write = toml::find_or(pt, "dt_write", 0.25);
+    implicit_motor_activation_delay = toml::find_or(pt, "implicit_motor_activation_delay", 0.0);
     seed = toml::find_or(pt, "seed", 1);
     periphery_binding_flag = toml::find_or(pt, "periphery_binding_flag", false);
     velocity_field_flag = toml::find_or(pt, "velocity_field_flag", false);
-    periphery_interaction_flag = toml::find_or(pt, "periphery_interaction_flag", true);
+    periphery_interaction_flag = toml::find_or(pt, "periphery_interaction_flag", false);
+    adaptive_timestep_flag = toml::find_or(pt, "adaptive_timestep_flag", true);
 
     if (pt.contains("dynamic_instability")) {
         const auto &di = pt.at("dynamic_instability");
@@ -60,7 +62,7 @@ Params::Params(toml::value &pt) {
     if (pt.contains("fiber_periphery_interaction")) {
         const auto fp = pt.at("fiber_periphery_interaction");
         fiber_periphery_interaction.f_0 = toml::find_or(fp, "f_0", fiber_periphery_interaction.f_0);
-        fiber_periphery_interaction.lambda = toml::find_or(fp, "lambda", fiber_periphery_interaction.lambda);
+        fiber_periphery_interaction.l_0 = toml::find_or(fp, "l_0", fiber_periphery_interaction.l_0);
     }
 
     if (pt.contains("velocity_field")) {

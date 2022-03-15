@@ -20,7 +20,21 @@ int main(int argc, char *argv[]) {
     }
 
     System::init(config_file, resume_flag);
-    System::run();
+    System::prep_state_for_solver();
+    System::write();
+
+    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
+    int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
+    Eigen::VectorXd x(sol_size);
+    x.setOnes();
+    Eigen::VectorXd b = System::apply_matvec(x);
+
+    Eigen::VectorXd bpy(sol_size);
+    bpy.segment(0, shell_sol_size) = b.segment(fib_sol_size, shell_sol_size);
+    bpy.segment(shell_sol_size, body_sol_size) = b.segment(fib_sol_size + shell_sol_size, body_sol_size);
+    bpy.segment(shell_sol_size + body_sol_size, fib_sol_size) = b.segment(0, fib_sol_size);
+
+    std::cout << bpy.transpose() << std::endl;
 
     MPI_Finalize();
     return EXIT_SUCCESS;

@@ -370,14 +370,16 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
 
-    // TODO: Make mult_order and max_pts passable fmm parameters
     {
+        auto &sp = params.stkfmm;
         utils::LoggerRedirect redirect(std::cout);
-        stresslet_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
-            8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm));
+        stresslet_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(
+            new kernels::FMM<stkfmm::Stk3DFMM>(sp.body_stresslet_multipole_order, sp.body_stresslet_max_points,
+                                               stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm));
         redirect.flush(spdlog::level::debug, "STKFMM");
-        oseen_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(new kernels::FMM<stkfmm::Stk3DFMM>(
-            8, 2000, stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
+        oseen_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(
+            new kernels::FMM<stkfmm::Stk3DFMM>(sp.body_oseen_multipole_order, sp.body_oseen_max_points,
+                                               stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
 

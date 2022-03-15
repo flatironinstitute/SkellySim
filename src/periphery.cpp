@@ -1,5 +1,6 @@
 #include <body.hpp>
 #include <cnpy.hpp>
+#include <fiber.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <utils.hpp>
@@ -79,9 +80,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
 ///
 /// @param[in] v_on_shell [3 x n_nodes_local] matrix of velocity at shell nodes on local to this MPI rank
 /// @return true if collision, false otherwise
-void Periphery::update_RHS(MatrixRef &v_on_shell) {
-    RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size());
-}
+void Periphery::update_RHS(MatrixRef &v_on_shell) { RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size()); }
 
 /// @brief Check for collision between SphericalPeriphery and SphericalBody
 /// If any point on body > (this->radius_ - threshold), then a collision is detected
@@ -120,28 +119,28 @@ bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double th
     return false;
 }
 
-/// @brief Calculate forces between SphericalPeriphery and a point cloud
-/// Implicitly point_cloud = list of fiber coordinates
+/// @brief Calculate steric forces between SphericalPeriphery and a fiber
 ///
-/// @param[in] point_cloud [3 x n_points] matrix of points to interact with periphery
+/// @param[in] fiber to interact with periphery
 /// @param[in] fp_params structure which parameterizes this interaction
 /// @return [3 x n_points] matrix of forces on points due to the Periphery
-Eigen::MatrixXd SphericalPeriphery::point_cloud_interaction(const MatrixRef &point_cloud,
-                                                            const fiber_periphery_interaction_t &fp_params) const {
+Eigen::MatrixXd SphericalPeriphery::fiber_interaction(const Fiber &fiber,
+                                                      const fiber_periphery_interaction_t &fp_params) const {
     if (!n_nodes_global_)
-        return Eigen::MatrixXd::Zero(point_cloud.rows(), point_cloud.cols());
+        return Eigen::MatrixXd::Zero(fiber.x_.rows(), fiber.x_.cols());
 
-    const MatrixRef &pc = point_cloud;
+    const MatrixRef &pc = fiber.x_;
     Eigen::MatrixXd f_points = Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
 
-    for (int i = 0; i < pc.cols(); ++i) {
+    const int start_index = fiber.minus_clamped_ ? 1 : 0;
+    for (int i = start_index; i < pc.cols(); ++i) {
         double r_mag = pc.col(i).norm();
 
         if (r_mag < radius_) {
             Eigen::VectorXd u_hat = pc.col(i) / r_mag;
             Eigen::Vector3d dr = pc.col(i) - u_hat * radius_;
             double d = dr.norm();
-            f_points.col(i) = fp_params.f_0 * dr / d * exp(-(radius_ - r_mag) / fp_params.lambda);
+            f_points.col(i) = fp_params.f_0 * dr / d * exp(-(radius_ - r_mag) / fp_params.l_0);
         } else
             spdlog::debug("Fiber collision detected in force routine.");
     }
@@ -197,21 +196,22 @@ bool EllipsoidalPeriphery::check_collision(const MatrixRef &point_cloud, double 
     return false;
 }
 
-/// @brief Calculate forces between EllipsoidalPeriphery and a point cloud
-/// Implicitly point_cloud = list of fiber coordinates
+/// @brief Calculate steric forces between SphericalPeriphery and a fiber
 ///
+/// @param[in] fiber to interact with periphery
 /// @param[in] point_cloud [3 x n_points] matrix of points to interact with periphery
 /// @param[in] fp_params structure which parameterizes this interaction
 /// @return [3 x n_points] matrix of forces on points due to the Periphery
-Eigen::MatrixXd EllipsoidalPeriphery::point_cloud_interaction(const MatrixRef &point_cloud,
-                                                              const fiber_periphery_interaction_t &fp_params) const {
+Eigen::MatrixXd EllipsoidalPeriphery::fiber_interaction(const Fiber &fiber,
+                                                        const fiber_periphery_interaction_t &fp_params) const {
+    const MatrixRef &pc = fiber.x_;
     if (!n_nodes_global_)
-        return Eigen::MatrixXd::Zero(point_cloud.rows(), point_cloud.cols());
+        return Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
 
-    const MatrixRef &pc = point_cloud;
     Eigen::MatrixXd f_points = Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
 
-    for (int i = 0; i < pc.cols(); ++i) {
+    const int start_index = fiber.minus_clamped_ ? 1 : 0;
+    for (int i = start_index; i < pc.cols(); ++i) {
         Eigen::Vector3d r_scaled = pc.col(i).array() / Eigen::Array3d{a_, b_, c_};
         double r_scaled_mag = r_scaled.norm();
         double r_mag = pc.col(i).norm();
@@ -226,7 +226,7 @@ Eigen::MatrixXd EllipsoidalPeriphery::point_cloud_interaction(const MatrixRef &p
         if (r_mag < r_cortex_mag) {
             Eigen::Vector3d dr = pc.col(i) - r_cortex;
             double d = dr.norm();
-            f_points.col(i) = fp_params.f_0 * dr / d * exp(-(r_cortex_mag - r_mag) / fp_params.lambda);
+            f_points.col(i) = fp_params.f_0 * dr / d * exp(-(r_cortex_mag - r_mag) / fp_params.l_0);
         } else {
             spdlog::debug("Fiber collision detected in force routine.");
         }
@@ -277,20 +277,20 @@ bool GenericPeriphery::check_collision(const MatrixRef &point_cloud, double thre
     return false;
 }
 
-/// @brief STUB Calculate forces between GenericPeriphery and SphericalBody
+/// @brief STUB Calculate forces between GenericPeriphery and Fiber
 ///
-/// @param[in] point_cloud [3 x n_points] matrix of points to interact with periphery
+/// @param[in] fiber to interact with periphery
 /// @param[in] fp_params structure which parameterizes this interaction
 /// @return [3 x n_points] matrix of forces (ZEROS) on points due to the Periphery
-Eigen::MatrixXd GenericPeriphery::point_cloud_interaction(const MatrixRef &point_cloud,
-                                                          const fiber_periphery_interaction_t &fp_params) const {
+Eigen::MatrixXd GenericPeriphery::fiber_interaction(const Fiber &fiber,
+                                                    const fiber_periphery_interaction_t &fp_params) const {
     static bool first_call = true;
     if (!world_rank_ && first_call) {
-        spdlog::warn("point_cloud_interaction not implemented for GenericPeriphery->PointCloud");
+        spdlog::warn("fiber_interaction not implemented for GenericPeriphery->Fiber");
         first_call = false;
     }
 
-    return Eigen::MatrixXd::Zero(point_cloud.rows(), point_cloud.cols());
+    return Eigen::MatrixXd::Zero(fiber.x_.rows(), fiber.x_.cols());
 }
 
 /// @brief Construct Periphery base class object

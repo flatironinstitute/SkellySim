@@ -58,7 +58,12 @@ typedef struct output_map_t {
     FiberContainer &fibers = fc_;                               ///< System::fc_
     BodyContainer &bodies = bc_;                                ///< System::bc_
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);    ///< Helper routine to specify serialization
+#ifdef SKELLY_DEBUG
+    Periphery &shell = *shell_;
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
+#else
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies); ///< Helper routine to specify serialization
+#endif
 } output_map_t;
 output_map_t output_map; ///< Output data for msgpack dump
 
@@ -81,7 +86,12 @@ void write() {
     BodyContainer bc_empty;
     BodyContainer &bc_global = (rank_ == 0) ? bc_ : bc_empty;
 
+#ifdef SKELLY_DEBUG
+    const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, *shell_, {RNG::dump_state()}};
+#else
     const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, {RNG::dump_state()}};
+#endif
+
     std::stringstream mergebuf;
     msgpack::pack(mergebuf, to_merge);
 
@@ -954,12 +964,18 @@ void VelocityField::compute() {
     x_grid = make_grid();
 
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
-    if (params_.periphery_interaction_flag)
-        f_on_fibers += shell_->point_cloud_interaction(fc_.get_local_node_positions(), fp);
+    if (params_.periphery_interaction_flag) {
+        int i_fib = 0;
+        for (const auto &fib : fc_.fibers) {
+            f_on_fibers.col(i_fib) += shell_->fiber_interaction(fib, fp);
+            i_fib++;
+        }
+    }
 
     v_grid = fc_.flow(x_grid, f_on_fibers, eta, false);
     v_grid += bc_.flow(x_grid, sol_bodies, eta);
     v_grid += shell_->flow(x_grid, sol_shell, eta);
+    v_grid += psc_.flow(x_grid, eta, properties.time);
 
     // FIXME: move this to body logic with overloading
     // Replace points inside a body to have velocity v_body + w_body x r
@@ -972,18 +988,11 @@ void VelocityField::compute() {
     }
 }
 
-/// @brief Generate next trial system state for the current System::properties::dt
+/// @brief Calculate all initial velocities/forces/RHS/BCs
 ///
 /// @note Modifies anything that evolves in time.
-/// @return If the Matrix solver converged to the requested tolerance with no issue.
-bool step() {
+void prep_state_for_solver() {
     using Eigen::MatrixXd;
-    Params &params = params_;
-    Periphery &shell = *shell_;
-    FiberContainer &fc = fc_;
-    BodyContainer &bc = bc_;
-    const double eta = params.eta;
-    const double dt = properties.dt;
 
     // Since DI can change size of fiber containers, must call first.
     System::dynamic_instability();
@@ -993,26 +1002,37 @@ bool step() {
     MatrixXd r_all(3, fib_node_count + shell_node_count + body_node_count);
     {
         auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
-        r_fibers = fc.get_local_node_positions();
-        r_shell = shell.get_local_node_positions();
-        r_bodies = bc.get_local_node_positions(bc.bodies);
+        r_fibers = fc_.get_local_node_positions();
+        r_shell = shell_->get_local_node_positions();
+        r_bodies = bc_.get_local_node_positions(bc_.bodies);
     }
 
-    fc.update_cache_variables(dt, eta);
+    fc_.update_cache_variables(properties.dt, params_.eta);
 
     // Implicit motor forces
-    MatrixXd f_on_fibers = fc.generate_constant_force();
+    MatrixXd motor_force_fibers = params_.implicit_motor_activation_delay > properties.time
+                                      ? MatrixXd::Zero(3, fib_node_count)
+                                      : fc_.generate_constant_force();
 
+    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     // Fiber-periphery forces (if periphery exists)
-    if (params_.periphery_interaction_flag)
-        f_on_fibers += shell.point_cloud_interaction(fc.get_local_node_positions(), params.fiber_periphery_interaction);
-    MatrixXd v_all = fc.flow(r_all, f_on_fibers, eta);
+    if (params_.periphery_interaction_flag) {
+        int i_col = 0;
 
-    bc.update_cache_variables(eta);
+        for (const auto &fib : fc_.fibers) {
+            external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
+                shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
+            i_col += fib.n_nodes_;
+        }
+    }
+    // Don't include motor forces for initial calculation (explicitly handled elsewhere)
+    MatrixXd v_all = fc_.flow(r_all, external_force_fibers, params_.eta);
+
+    bc_.update_cache_variables(params_.eta);
 
     // Check for an add external body forces
     bool external_force_body = false;
-    for (auto &body : bc.spherical_bodies) {
+    for (auto &body : bc_.spherical_bodies) {
         body->force_torque_.setZero();
         // Hack so that when you sum global forces, it should sum back to the external force
         body->force_torque_.segment(0, 3) = body->external_force_ / size_;
@@ -1023,25 +1043,38 @@ bool step() {
         const int total_node_count = fib_node_count + shell_node_count + body_node_count;
         MatrixXd r_all(3, total_node_count);
         auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
-        r_fibers = fc.get_local_node_positions();
-        r_shell = shell.get_local_node_positions();
-        r_bodies = bc.get_local_node_positions(bc.bodies);
+        r_fibers = fc_.get_local_node_positions();
+        r_shell = shell_->get_local_node_positions();
+        r_bodies = bc_.get_local_node_positions(bc_.bodies);
 
-        v_all += bc.flow(r_all, Eigen::VectorXd::Zero(bc.get_local_solution_size()), eta);
+        v_all += bc_.flow(r_all, Eigen::VectorXd::Zero(bc_.get_local_solution_size()), params_.eta);
     }
 
-    v_all += psc_.flow(r_all, eta, properties.time);
+    v_all += psc_.flow(r_all, params_.eta, properties.time);
 
-    bc.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
+    bc_.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
 
-    fc.update_RHS(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
-    fc.update_boundary_conditions(shell, params.periphery_binding_flag);
-    fc.apply_bc_rectangular(dt, v_all.block(0, 0, 3, fib_node_count), f_on_fibers);
+    MatrixXd total_force_fibers = motor_force_fibers + external_force_fibers;
+    fc_.update_RHS(properties.dt, v_all.block(0, 0, 3, fib_node_count), total_force_fibers);
+    fc_.update_boundary_conditions(*shell_, params_.periphery_binding_flag);
+    fc_.apply_bc_rectangular(properties.dt, v_all.block(0, 0, 3, fib_node_count), total_force_fibers);
 
-    shell.update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
+    shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
+}
+
+/// @brief Generate next trial system state for the current System::properties::dt
+///
+/// @note Modifies anything that evolves in time.
+/// @return If the Matrix solver converged to the requested tolerance with no issue.
+bool step() {
+    const double dt = properties.dt;
+
+    prep_state_for_solver();
+
     Solver<P_inv_hydro, A_fiber_hydro> solver_; /// < Wrapper class for solving system
 
     solver_.set_RHS();
+
     bool converged = solver_.solve();
     curr_solution_ = solver_.get_solution();
 
@@ -1050,23 +1083,9 @@ bool step() {
 
     auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
 
-    size_t offset = 0;
-    for (auto &fib : fc.fibers) {
-        for (int i = 0; i < 3; ++i)
-            fib.x_.row(i) = curr_solution_.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
-        offset += 4 * fib.n_nodes_;
-    }
-
+    fc_.step(fiber_sol);
     bc_.step(body_sol, dt);
-
-    // Re-pin fibers to bodies
-    for (auto &fib : fc.fibers) {
-        if (fib.binding_site_.first >= 0) {
-            Eigen::Vector3d delta =
-                bc.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);
-            fib.x_.colwise() += delta;
-        }
-    }
+    fc_.repin_to_bodies(bc_);
 
     return converged;
 }
@@ -1104,32 +1123,35 @@ void run() {
         }
         MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
-        // Now all the acceptance/adaptive timestepping logic
         double dt_new = properties.dt;
         bool accept = false;
-        if (converged && fiber_error <= params.fiber_error_tol) {
-            accept = true;
-            const double tol_window = 0.9 * params.fiber_error_tol;
-            if (fiber_error <= tol_window)
-                dt_new = std::min(params.dt_max, properties.dt * params.beta_up);
-        } else {
-            dt_new = properties.dt * params.beta_down;
-            accept = false;
-        }
+        if (params.adaptive_timestep_flag) {
+            // Now all the acceptance/adaptive timestepping logic
+            if (converged && fiber_error <= params.fiber_error_tol) {
+                accept = true;
+                const double tol_window = 0.9 * params.fiber_error_tol;
+                if (fiber_error <= tol_window)
+                    dt_new = std::min(params.dt_max, properties.dt * params.beta_up);
+            } else {
+                dt_new = properties.dt * params.beta_down;
+                accept = false;
+            }
 
-        if (converged && System::check_collision()) {
-            spdlog::info("Collision detected, rejecting solution and taking a smaller timestep");
-            dt_new = properties.dt * 0.5;
-            accept = false;
-        }
+            if (converged && System::check_collision()) {
+                spdlog::info("Collision detected, rejecting solution and taking a smaller timestep");
+                dt_new = properties.dt * 0.5;
+                accept = false;
+            }
 
-        if (dt_new < params.dt_min) {
-            spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
-            spdlog::critical("Timestep smaller than minimum allowed");
-            throw std::runtime_error("Timestep smaller than dt_min");
-        }
+            if (dt_new < params.dt_min) {
+                spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
+                spdlog::critical("Timestep smaller than minimum allowed");
+                throw std::runtime_error("Timestep smaller than dt_min");
+            }
 
-        if (accept) {
+            properties.dt = dt_new;
+        }
+        if (!params.adaptive_timestep_flag || accept) {
             spdlog::info("Accepting timestep and advancing time");
             double t_old = properties.time;
             properties.time += properties.dt;
@@ -1150,7 +1172,7 @@ void run() {
             spdlog::info("Rejecting timestep");
             System::restore();
         }
-        properties.dt = dt_new;
+
         spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
     }
 

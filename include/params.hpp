@@ -16,9 +16,11 @@ class Params {
     double dt_min;
     double dt_max;
     double dt_write;
+    double implicit_motor_activation_delay;
     bool periphery_binding_flag;
     bool velocity_field_flag;
     bool periphery_interaction_flag;
+    bool adaptive_timestep_flag;
 
     struct {
         int n_nodes = 0;
@@ -35,7 +37,7 @@ class Params {
 
     fiber_periphery_interaction_t fiber_periphery_interaction{
         .f_0 = 20.0,
-        .lambda = 0.5,
+        .l_0 = 0.05,
     };
 
     struct {
