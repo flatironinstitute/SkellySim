@@ -251,7 +251,7 @@ class TrajectoryReader {
 
 /// @brief Set system state to last state found in trajectory files
 ///
-/// @param[in] if_file input file name of trajectory file for this rank
+/// @param[in] input_file input file name of trajectory file for this rank
 void resume_from_trajectory(std::string input_file) {
     TrajectoryReader trajectory(input_file);
     while (trajectory.read_next_frame()) {
