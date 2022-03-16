@@ -28,7 +28,7 @@ void SphericalBody::step(double dt, VectorRef &body_solution) {
         ss << x_new.transpose();
         spdlog::debug("Moving body {}: [{}]", (void *)this, ss.str());
 
-        move(x_new, orientation_new);
+        place(x_new, orientation_new);
     }
 }
 
@@ -139,7 +139,7 @@ void SphericalBody::update_RHS(MatrixRef &v_on_body) {
 /// SphericalBody::node_normals_, SphericalBody::nucleation_sites_
 /// @param[in] new_pos new lab frame position to move the body centroid
 /// @param[in] new_orientation new orientation of the body
-void SphericalBody::move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation) {
+void SphericalBody::place(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation) {
     position_ = new_pos;
     orientation_ = new_orientation;
 
@@ -233,7 +233,7 @@ SphericalBody::SphericalBody(const toml::value &body_table, const Params &params
     if (body_table.contains("external_force"))
         external_force_ = convert_array<>(body_table.at("external_force").as_array());
 
-    move(position_, orientation_);
+    place(position_, orientation_);
 
     update_cache_variables(params.eta);
 }

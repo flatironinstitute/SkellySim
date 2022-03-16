@@ -2,8 +2,8 @@
 
 #include <system.hpp>
 
-#include <spdlog/spdlog.h>
 #include <filesystem>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 
 #include <Teuchos_CommandLineProcessor.hpp>
@@ -16,10 +16,12 @@ int main(int argc, char *argv[]) {
     std::string config_file = "skelly_config.toml";
     bool resume_flag = false;
     bool overwrite_flag = false;
+    bool post_process_flag = false;
     Teuchos::CommandLineProcessor cmdp(false, true);
     cmdp.setOption("config-file", &config_file, "TOML input file.");
     cmdp.setOption("resume", "no-resume", &resume_flag, "Supply to resume simulation.");
     cmdp.setOption("overwrite", "no-overwrite", &overwrite_flag, "Supply to overwrite existing simulation.");
+    cmdp.setOption("post-process", "no-post-process", &post_process_flag, "Supply to post-process existing sim.");
     if (cmdp.parse(argc, argv) != Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL) {
         MPI_Finalize();
         return EXIT_FAILURE;
@@ -29,11 +31,24 @@ int main(int argc, char *argv[]) {
         if (resume_flag && overwrite_flag)
             throw std::runtime_error("Can't resume and overwrite simultaneously.");
         namespace fs = std::filesystem;
-        if (!overwrite_flag && (fs::exists(fs::path{"skelly_sim.out"}) || fs::exists(fs::path{"skelly_sim.vf"}))
-            throw std::runtime_error("Existing trajectory detected. Supply --overwrite flag to overwrite.");
+        if (!post_process_flag) {
+            if (!overwrite_flag && (fs::exists(fs::path{"skelly_sim.out"}) || fs::exists(fs::path{"skelly_sim.vf"})))
+                throw std::runtime_error("Existing trajectory detected. Supply --overwrite flag to overwrite.");
+        }
+        else {
+            if (!fs::exists(fs::path{"skelly_sim.out"}))
+                throw std::runtime_error("No trajectory detected for post-process.");
+            if (resume_flag)
+                throw std::runtime_error("--post-process and --resume are mutually exclusive.");
+            if (overwrite_flag)
+                throw std::runtime_error("--post-process and --overwrite are mutually exclusive.");
+        }
 
-        System::init(config_file, resume_flag);
-        System::run();
+        System::init(config_file, resume_flag, post_process_flag);
+        if (post_process_flag)
+            System::run_post_process();
+        else
+            System::run();
     } catch (const std::runtime_error &e) {
         // Warning: Critical only catches things on rank 0, so this may or may not print, if
         // some random rank throws an error. This is the same reason we use MPI_Abort: all

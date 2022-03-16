@@ -10,7 +10,7 @@ class Periphery;
 
 /// Namespace for System, which drives the simulation and handles communication (timestepping, data wrangling, etc)
 namespace System {
-void init(const std::string &input_file, bool resume_flag = false);
+void init(const std::string &input_file, bool resume_flag = false, bool post_process_flag = false);
 Params *get_params();
 BodyContainer *get_body_container();
 FiberContainer *get_fiber_container();
@@ -25,6 +25,7 @@ void dynamic_instability();
 void prep_state_for_solver();
 bool step();
 void run();
+void run_post_process();
 void write();
 bool check_collision();
 void backup();

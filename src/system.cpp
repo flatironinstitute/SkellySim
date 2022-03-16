@@ -1180,6 +1180,21 @@ void run() {
     System::write();
 }
 
+/// @brief Run the post processing step
+void run_post_process() {
+    return;
+    Params &params = params_;
+
+    while (properties.time < params.t_final) {
+        if (params_.velocity_field_flag) {
+            double dt_write_field = params_.velocity_field.dt_write_field;
+            VelocityField vf_curr;
+            vf_curr.compute();
+            vf_curr.write();
+        }
+    }
+}
+
 /// @brief Check for any collisions between objects
 ///
 /// @return true if any collision detected, false otherwise
@@ -1230,7 +1245,7 @@ toml::value *get_param_table() { return &param_table_; }
 /// @brief Initialize entire system. Needs to be called once at the beginning of the program execution
 /// @param[in] input_file String of toml config file specifying system parameters and initial conditions
 /// @param[in] resume_flag true if simulation is resuming from prior execution state, false otherwise.
-void init(const std::string &input_file, bool resume_flag) {
+void init(const std::string &input_file, bool resume_flag, bool post_process_flag) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
     spdlog::logger sink = rank_ == 0
@@ -1276,16 +1291,15 @@ void init(const std::string &input_file, bool resume_flag) {
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
 
     std::string filename = "skelly_sim.out";
-    auto open_mode = std::ofstream::out | std::ofstream::binary;
+    auto trajectory_open_mode = std::ofstream::binary | (post_process_flag ? std::ofstream::in : std::ofstream::out);
     if (resume_flag) {
         resume_from_trajectory(filename);
-        open_mode = open_mode | std::ofstream::app;
+        trajectory_open_mode = trajectory_open_mode | std::ofstream::app;
     }
     if (rank_ == 0)
-        ofs_ = std::ofstream(filename, open_mode);
+        ofs_ = std::ofstream(filename, trajectory_open_mode);
 
-    if (params_.velocity_field_flag && rank_ == 0) {
-        ofs_vf_ = std::ofstream("skelly_sim.vf", open_mode);
-    }
+    if (post_process_flag && rank_ == 0)
+        ofs_vf_ = std::ofstream("skelly_sim.vf", std::ofstream::binary | std::ofstream::out);
 }
 } // namespace System

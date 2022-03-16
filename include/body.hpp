@@ -224,7 +224,6 @@ class SphericalBody : public Body {
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
 
-    /// Return reference to body COM position
     void update_RHS(MatrixRef &v_on_body) override;
     void update_cache_variables(double eta) override;
     void update_preconditioner(double eta) override;
@@ -237,7 +236,7 @@ class SphericalBody : public Body {
     Eigen::VectorXd apply_preconditioner(VectorRef &x) const override;
 
     Eigen::Vector3d get_position() const override { return position_; }
-    void move(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
+    void place(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);
     void update_K_matrix();
     void update_singularity_subtraction_vecs(double eta);
 
