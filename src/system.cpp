@@ -167,72 +167,96 @@ class VelocityField {
     std::vector<int> displs_;
 };
 
+class TrajectoryReader {
+  public:
+    TrajectoryReader(const std::string &input_file) : offset_(0) {
+        fd_ = open(input_file.c_str(), O_RDONLY);
+        if (fd_ == -1)
+            throw std::runtime_error("Unable to open trajectory file " + input_file + " for resume.");
+
+        struct stat sb;
+        if (fstat(fd_, &sb) == -1)
+            throw std::runtime_error("Error statting " + input_file + " for resume.");
+
+        buflen_ = sb.st_size;
+
+        addr_ = static_cast<char *>(mmap(NULL, buflen_, PROT_READ, MAP_PRIVATE, fd_, 0u));
+        if (addr_ == MAP_FAILED)
+            throw std::runtime_error("Error mapping " + input_file + " for resume.");
+    }
+
+    std::size_t read_next_frame() {
+        if (offset_ >= buflen_)
+            return 0;
+
+        std::size_t old_offset = offset_;
+        msgpack::unpack(oh_, addr_, buflen_, offset_);
+        return offset_ - old_offset;
+    }
+
+    void unpack_current_frame(bool silence_output = false) {
+        msgpack::object obj = oh_.get();
+
+        input_map_t const &min_state = obj.as<input_map_t>();
+
+        const int n_fib_tot = min_state.fibers.fibers.size();
+        const int fib_count_big = n_fib_tot / size_ + 1;
+        const int fib_count_small = n_fib_tot / size_;
+        const int n_fib_big = n_fib_tot % size_;
+
+        std::vector<int> counts(size_);
+        std::vector<int> displs(size_ + 1);
+        for (int i = 0; i < size_; ++i) {
+            counts[i] = ((i < n_fib_big) ? fib_count_big : fib_count_small);
+            displs[i + 1] = displs[i] + counts[i];
+        }
+
+        properties.time = min_state.time;
+        properties.dt = min_state.dt;
+        fc_.fibers.clear();
+        int i_fib = 0;
+        for (const auto &min_fib : min_state.fibers.fibers) {
+            if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1])
+                fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
+            i_fib++;
+        }
+
+        // make sure sublist pointers are initialized, and then fill them in
+        bc_.populate_sublists();
+        for (int i = 0; i < bc_.spherical_bodies.size(); ++i)
+            bc_.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
+        for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
+            bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
+        output_map.rng_state = min_state.rng_state;
+        if (size_ > min_state.rng_state.size() && !silence_output) {
+            spdlog::error(
+                "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
+            MPI_Finalize();
+            exit(1);
+        } else if (size_ < min_state.rng_state.size()) {
+            spdlog::warn(
+                "Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
+                "the RNG. This isn't really a problem, but runs will not be exactly reproducable.");
+        }
+        RNG::init(output_map.rng_state[rank_]);
+    }
+
+  private:
+    int fd_;                    ///< File descriptor
+    std::size_t buflen_;        ///< size of our file
+    char *addr_;                ///< mmap address
+    std::size_t offset_;        ///< current byte location in trajectory
+    msgpack::object_handle oh_; ///< handle to last read frame
+};
+
 /// @brief Set system state to last state found in trajectory files
 ///
 /// @param[in] if_file input file name of trajectory file for this rank
-void resume_from_trajectory(std::string if_file) {
-    int fd = open(if_file.c_str(), O_RDONLY);
-    if (fd == -1)
-        throw std::runtime_error("Unable to open trajectory file " + if_file + " for resume.");
-
-    struct stat sb;
-    if (fstat(fd, &sb) == -1)
-        throw std::runtime_error("Error statting " + if_file + " for resume.");
-
-    std::size_t buflen = sb.st_size;
-
-    const char *addr = static_cast<const char *>(mmap(NULL, buflen, PROT_READ, MAP_PRIVATE, fd, 0u));
-    if (addr == MAP_FAILED)
-        throw std::runtime_error("Error mapping " + if_file + " for resume.");
-
-    std::size_t offset = 0;
-    msgpack::object_handle oh;
-    // FIXME: There is probably a way to not have to read the entire trajectory
-    while (offset != buflen)
-        msgpack::unpack(oh, addr, buflen, offset);
-
-    msgpack::object obj = oh.get();
-    input_map_t const &min_state = obj.as<input_map_t>();
-
-    const int n_fib_tot = min_state.fibers.fibers.size();
-    const int fib_count_big = n_fib_tot / size_ + 1;
-    const int fib_count_small = n_fib_tot / size_;
-    const int n_fib_big = n_fib_tot % size_;
-
-    std::vector<int> counts(size_);
-    std::vector<int> displs(size_ + 1);
-    for (int i = 0; i < size_; ++i) {
-        counts[i] = ((i < n_fib_big) ? fib_count_big : fib_count_small);
-        displs[i + 1] = displs[i] + counts[i];
+void resume_from_trajectory(std::string input_file) {
+    TrajectoryReader trajectory(input_file);
+    while (trajectory.read_next_frame()) {
     }
-
-    properties.time = min_state.time;
-    properties.dt = min_state.dt;
-    fc_.fibers.clear();
-    int i_fib = 0;
-    for (const auto &min_fib : min_state.fibers.fibers) {
-        if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1])
-            fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
-        i_fib++;
-    }
-
-    // make sure sublist pointers are initialized, and then fill them in
-    bc_.populate_sublists();
-    for (int i = 0; i < bc_.spherical_bodies.size(); ++i)
-        bc_.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
-    for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
-        bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
-    output_map.rng_state = min_state.rng_state;
-    if (size_ > min_state.rng_state.size()) {
-        spdlog::error(
-            "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
-        MPI_Finalize();
-        exit(1);
-    } else if (size_ < min_state.rng_state.size()) {
-        spdlog::warn("Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
-                     "the RNG. This isn't really a problem, but runs will not be exactly reproducable.");
-    }
-    RNG::init(output_map.rng_state[rank_]);
+    trajectory.unpack_current_frame();
 }
 
 // TODO: Refactor all preprocess stuff. It's awful
@@ -1182,16 +1206,18 @@ void run() {
 
 /// @brief Run the post processing step
 void run_post_process() {
-    return;
     Params &params = params_;
+    TrajectoryReader trajectory("skelly_sim.out");
 
-    while (properties.time < params.t_final) {
-        if (params_.velocity_field_flag) {
-            double dt_write_field = params_.velocity_field.dt_write_field;
-            VelocityField vf_curr;
-            vf_curr.compute();
-            vf_curr.write();
-        }
+    while (trajectory.read_next_frame()) {
+        trajectory.unpack_current_frame(true);
+        std::cout << properties.time << std::endl;
+        // if (params_.velocity_field_flag) {
+        //     double dt_write_field = params_.velocity_field.dt_write_field;
+        //     VelocityField vf_curr;
+        //     vf_curr.compute();
+        //     vf_curr.write();
+        // }
     }
 }
 
