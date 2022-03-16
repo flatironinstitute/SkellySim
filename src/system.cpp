@@ -1110,6 +1110,7 @@ bool step() {
     fc_.step(fiber_sol);
     bc_.step(body_sol, dt);
     fc_.repin_to_bodies(bc_);
+    shell_->step(shell_sol);
 
     return converged;
 }
