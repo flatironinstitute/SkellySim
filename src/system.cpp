@@ -228,12 +228,12 @@ class TrajectoryReader {
         for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
             bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
         output_map.rng_state = min_state.rng_state;
-        if (size_ > min_state.rng_state.size() && !silence_output) {
+        if (size_ > min_state.rng_state.size()) {
             spdlog::error(
                 "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
             MPI_Finalize();
             exit(1);
-        } else if (size_ < min_state.rng_state.size()) {
+        } else if (size_ < min_state.rng_state.size() && !silence_output) {
             spdlog::warn(
                 "Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
                 "the RNG. This isn't really a problem, but runs will not be exactly reproducable.");
