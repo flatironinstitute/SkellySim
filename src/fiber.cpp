@@ -453,7 +453,7 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     default: {
         spdlog::critical("Unimplemented BC encountered in first plus end of apply_bc_rectangular [{}, {}]",
                          BC_name[bc_plus_.first], BC_name[bc_plus_.second]);
-        throw std::runtime_error("Unimplemented BC error\n");
+        throw std::runtime_error("Unimplemented BC error");
     }
     }
 
@@ -471,7 +471,7 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     default: {
         spdlog::critical("Unimplemented BC encountered in second plus end of apply_bc_rectangular [{}, {}]",
                          BC_name[bc_plus_.first], BC_name[bc_plus_.second]);
-        throw std::runtime_error("Unimplemented BC error\n");
+        throw std::runtime_error("Unimplemented BC error");
     }
     }
 }
