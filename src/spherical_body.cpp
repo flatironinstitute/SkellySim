@@ -14,6 +14,7 @@ void SphericalBody::step(double dt, VectorRef &body_solution) {
 
     Eigen::Vector3d body_velocity = body_solution.segment(sol_offset, 3);
     Eigen::Vector3d body_angular_velocity = body_solution.segment(sol_offset + 3, 3);
+    solution_vec_ = body_solution;
 
     Eigen::Vector3d x_new = position_ + body_velocity * dt;
     Eigen::Vector3d phi = body_angular_velocity * dt;

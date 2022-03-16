@@ -22,6 +22,7 @@ class Body {
     Eigen::MatrixXd node_normals_;       ///< [ 3 x n_nodes ] node normals in lab frame
     Eigen::MatrixXd node_normals_ref_;   ///< [ 3 x n_nodes ] node normals in reference 'body' frame
     Eigen::VectorXd node_weights_;       ///< [ n_nodes ] far field quadrature weights for nodes
+    Eigen::VectorXd solution_vec_;       ///< [ 3 * n_nodes + <body_specific> ] strength of interaction on nodes
 
     /// [ 3 x n_nucleation_sites ] nucleation site positions in reference 'body' frame
     Eigen::MatrixXd nucleation_sites_ref_;
@@ -246,7 +247,7 @@ class SphericalBody : public Body {
     bool check_collision(const DeformableBody &body, double threshold) const override;
 
     /// @brief Serialize body automatically with msgpack macros
-    MSGPACK_DEFINE_MAP(position_, orientation_);
+    MSGPACK_DEFINE_MAP(position_, orientation_, solution_vec_);
 };
 
 /// @brief Spherical Body...
@@ -278,7 +279,7 @@ class DeformableBody : public Body {
     bool check_collision(const SphericalBody &body, double threshold) const override;
     bool check_collision(const DeformableBody &body, double threshold) const override;
 
-    MSGPACK_DEFINE_MAP(node_positions_, node_normals_);
+    MSGPACK_DEFINE_MAP(node_positions_, node_normals_, solution_vec_);
 };
 
 #endif

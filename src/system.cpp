@@ -116,7 +116,6 @@ void write() {
         std::size_t offset = 0;
 
         output_map_t to_write{properties.time, properties.dt, fc_global, bc_global};
-
         for (int i = 0; i < size_; ++i) {
             msgpack::unpack(oh, (char *)msg.data(), msg.size(), offset);
             msgpack::object obj = oh.get();
