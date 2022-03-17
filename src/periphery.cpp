@@ -334,6 +334,8 @@ Periphery::Periphery(const std::string &precompute_file, const toml::value &peri
     const int n_nodes_big = n_nodes % world_size_;
     const int nrows_local = node_size_local;
 
+    solution_vec_ = Eigen::VectorXd::Zero(nrows_local);
+
     // TODO: prevent overflow for large matrices in periphery import
     node_counts_.resize(world_size_);
     node_displs_ = Eigen::VectorXi::Zero(world_size_ + 1);

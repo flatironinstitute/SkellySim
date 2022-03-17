@@ -36,6 +36,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 
     x_ = Eigen::Map<Eigen::ArrayXd>(x_array.data(), x_array.size());
     x_.resize(3, n_nodes_);
+    tension_ = Eigen::VectorXd::Zero(n_nodes_);
 
     init(eta);
 

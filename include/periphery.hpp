@@ -27,8 +27,11 @@ class Periphery {
     /// @brief Get the number of nodes local to the MPI rank
     int get_local_node_count() const { return M_inv_.rows() / 3; };
 
-    /// @brief Get the size of the shell's contribution to the matrix problem solution
+    /// @brief Get the rank local size of shell's contribution to the matrix problem solution
     int get_local_solution_size() const { return M_inv_.rows(); };
+
+    /// @brief Get the global size of the shell's contribution to the matrix problem solution
+    int get_global_solution_size() const { return M_inv_.cols(); };
 
     Eigen::MatrixXd get_local_node_positions() const { return node_pos_; };
 
@@ -99,11 +102,11 @@ class Periphery {
 
     int n_nodes_global_ = 0; ///< Number of nodes across ALL MPI ranks
 #ifdef SKELLY_DEBUG
-    MSGPACK_DEFINE_MAP(RHS_);
-#else
     MSGPACK_DEFINE_MAP(solution_vec_, RHS_);
+#else
+    MSGPACK_DEFINE_MAP(solution_vec_);
 #endif
-    
+
   protected:
     int world_size_;
     int world_rank_ = -1;
