@@ -36,6 +36,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 
     x_ = Eigen::Map<Eigen::ArrayXd>(x_array.data(), x_array.size());
     x_.resize(3, n_nodes_);
+    tension_ = Eigen::VectorXd::Zero(n_nodes_);
 
     init(eta);
 
@@ -783,9 +784,12 @@ void FiberContainer::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, Mat
 void FiberContainer::step(VectorRef &fiber_sol) {
     size_t offset = 0;
     for (auto &fib : fibers) {
-        for (int i = 0; i < 3; ++i)
-            fib.x_.row(i) = fiber_sol.segment(offset + i * fib.n_nodes_, fib.n_nodes_);
-        offset += 4 * fib.n_nodes_;
+        for (int i = 0; i < 3; ++i) {
+            fib.x_.row(i) = fiber_sol.segment(offset, fib.n_nodes_);
+            offset += fib.n_nodes_;
+        }
+        fib.tension_ = fiber_sol.segment(offset, fib.n_nodes_);
+        offset += fib.n_nodes_;
     }
 }
 

@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 
@@ -57,13 +58,9 @@ typedef struct output_map_t {
     double &dt = properties.dt;                                 ///< System::properties
     FiberContainer &fibers = fc_;                               ///< System::fc_
     BodyContainer &bodies = bc_;                                ///< System::bc_
+    Periphery &shell = *shell_;                                 ///< System::shell_
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
-#ifdef SKELLY_DEBUG
-    Periphery &shell = *shell_;
     MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
-#else
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies); ///< Helper routine to specify serialization
-#endif
 } output_map_t;
 output_map_t output_map; ///< Output data for msgpack dump
 
@@ -76,21 +73,54 @@ typedef struct input_map_t {
     double dt;                                                  ///< System::properties
     FiberContainer fibers;                                      ///< System::fc_
     BodyContainer bodies;                                       ///< System::bc_
+    Periphery shell;                                            ///< System::bc_
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies);    ///< Helper routine to specify serialization
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
 } input_map_t;
+
+/// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
+std::tuple<int, int, int> get_local_node_counts() {
+    return std::make_tuple(fc_.get_local_node_count(), shell_->get_local_node_count(), bc_.get_local_node_count());
+}
+
+/// @brief Get GMRES solution size local to MPI rank for each object type [fibers, shell, bodies]
+std::tuple<int, int, int> get_local_solution_sizes() {
+    return std::make_tuple(fc_.get_local_solution_size(), shell_->get_local_solution_size(),
+                           bc_.get_local_solution_size());
+}
+
+/// @brief Map 1D array data to a three-tuple of Vector Maps [fibers, shell, bodies]
+std::tuple<VectorMap, VectorMap, VectorMap> get_solution_maps(double *x) {
+    using Eigen::Map;
+    using Eigen::VectorXd;
+    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
+    return std::make_tuple(VectorMap(x, fib_sol_size), VectorMap(x + fib_sol_size, shell_sol_size),
+                           VectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
+}
+
+/// @brief Map 1D array data to a three-tuple of const Vector Maps [fibers, shell, bodies]
+std::tuple<CVectorMap, CVectorMap, CVectorMap> get_solution_maps(const double *x) {
+    using Eigen::Map;
+    using Eigen::VectorXd;
+    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
+    return std::make_tuple(CVectorMap(x, fib_sol_size), CVectorMap(x + fib_sol_size, shell_sol_size),
+                           CVectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
+}
+
+/// @brief Get size of local solution vector
+std::size_t get_local_solution_size() {
+    auto [fiber_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
+    return fiber_sol_size + shell_sol_size + body_sol_size;
+}
 
 /// @brief Flush current simulation state to trajectory file(s)
 void write() {
     FiberContainer fc_global;
     BodyContainer bc_empty;
     BodyContainer &bc_global = (rank_ == 0) ? bc_ : bc_empty;
+    Periphery shell_global;
 
-#ifdef SKELLY_DEBUG
     const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, *shell_, {RNG::dump_state()}};
-#else
-    const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, {RNG::dump_state()}};
-#endif
 
     std::stringstream mergebuf;
     msgpack::pack(mergebuf, to_merge);
@@ -110,18 +140,25 @@ void write() {
     MPI_Gatherv(msg_local.data(), msgsize_local, MPI_CHAR, msg.data(), msgsize.data(), displs.data(), MPI_CHAR, 0,
                 MPI_COMM_WORLD);
 
+    shell_global.solution_vec_.resize(shell_->get_global_solution_size());
+
     if (rank_ == 0) {
         msgpack::object_handle oh;
         std::size_t offset = 0;
 
-        output_map_t to_write{properties.time, properties.dt, fc_global, bc_global};
-
+        output_map_t to_write{properties.time, properties.dt, fc_global, bc_global, shell_global};
+        std::size_t shell_offset = 0;
         for (int i = 0; i < size_; ++i) {
             msgpack::unpack(oh, (char *)msg.data(), msg.size(), offset);
             msgpack::object obj = oh.get();
             input_map_t const &min_state = obj.as<input_map_t>();
             for (const auto &min_fib : min_state.fibers.fibers)
                 fc_global.fibers.emplace_back(Fiber(min_fib, params_.eta));
+
+            // FIXME: WRANGLE IN THAT SHELL.SOLUTION now
+            shell_global.solution_vec_.segment(shell_offset, min_state.shell.solution_vec_.size());
+            shell_offset += min_state.shell.solution_vec_.size();
+
             to_write.rng_state.push_back(min_state.rng_state[0]);
         }
         msgpack::pack(ofs_, to_write);
@@ -166,72 +203,125 @@ class VelocityField {
     std::vector<int> displs_;
 };
 
+class TrajectoryReader {
+  public:
+    TrajectoryReader(const std::string &input_file) : offset_(0) {
+        fd_ = open(input_file.c_str(), O_RDONLY);
+        if (fd_ == -1)
+            throw std::runtime_error("Unable to open trajectory file " + input_file + " for resume.");
+
+        struct stat sb;
+        if (fstat(fd_, &sb) == -1)
+            throw std::runtime_error("Error statting " + input_file + " for resume.");
+
+        buflen_ = sb.st_size;
+
+        addr_ = static_cast<char *>(mmap(NULL, buflen_, PROT_READ, MAP_PRIVATE, fd_, 0u));
+        if (addr_ == MAP_FAILED)
+            throw std::runtime_error("Error mapping " + input_file + " for resume.");
+    }
+
+    std::size_t read_next_frame() {
+        if (offset_ >= buflen_)
+            return 0;
+
+        std::size_t old_offset = offset_;
+        msgpack::unpack(oh_, addr_, buflen_, offset_);
+        return offset_ - old_offset;
+    }
+
+    void unpack_current_frame(bool silence_output = false) {
+        msgpack::object obj = oh_.get();
+
+        input_map_t const &min_state = obj.as<input_map_t>();
+
+        const int n_fib_tot = min_state.fibers.fibers.size();
+        const int fib_count_big = n_fib_tot / size_ + 1;
+        const int fib_count_small = n_fib_tot / size_;
+        const int n_fib_big = n_fib_tot % size_;
+        auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
+
+        std::vector<int> counts(size_);
+        std::vector<int> displs(size_ + 1);
+        for (int i = 0; i < size_; ++i) {
+            counts[i] = ((i < n_fib_big) ? fib_count_big : fib_count_small);
+            displs[i + 1] = displs[i] + counts[i];
+        }
+
+        properties.time = min_state.time;
+        properties.dt = min_state.dt;
+        fc_.fibers.clear();
+        int i_fib = 0;
+        for (const auto &min_fib : min_state.fibers.fibers) {
+            if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1])
+                fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
+            i_fib++;
+        }
+
+        // make sure sublist pointers are initialized, and then fill them in
+        bc_.populate_sublists();
+        for (int i = 0; i < bc_.spherical_bodies.size(); ++i)
+            bc_.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
+        for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
+            bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
+        output_map.rng_state = min_state.rng_state;
+        if (size_ > min_state.rng_state.size()) {
+            spdlog::error(
+                "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
+            MPI_Finalize();
+            exit(1);
+        } else if (size_ < min_state.rng_state.size() && !silence_output) {
+            spdlog::warn(
+                "Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
+                "the RNG. This isn't really a problem, but runs will not be exactly reproducable.");
+        }
+        RNG::init(output_map.rng_state[rank_]);
+
+        int rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        shell_->solution_vec_ =
+            min_state.shell.solution_vec_.segment(shell_->node_displs_[rank], shell_->node_counts_[rank]);
+
+        shell_sol = shell_->solution_vec_;
+
+        if (rank == 0) {
+            std::size_t body_offset = 0;
+            for (auto &body : bc_.bodies) {
+                body_sol.segment(body_offset, body->solution_vec_.size()) = body->solution_vec_;
+                body_offset += body->solution_vec_.size();
+            }
+        }
+
+        std::size_t fiber_offset = 0;
+        for (auto &fib : fc_.fibers) {
+            for (int i = 0; i < 3; ++i) {
+                fiber_sol.segment(fiber_offset, fib.n_nodes_) = fib.x_.row(i);
+                fiber_offset += fib.n_nodes_;
+            }
+            fiber_sol.segment(fiber_offset, fib.n_nodes_) = fib.tension_;
+            fiber_offset += fib.n_nodes_;
+        }
+
+        fc_.update_cache_variables(properties.dt, params_.eta);
+        bc_.update_cache_variables(params_.eta);
+    }
+
+  private:
+    int fd_;                    ///< File descriptor
+    std::size_t buflen_;        ///< size of our file
+    char *addr_;                ///< mmap address
+    std::size_t offset_;        ///< current byte location in trajectory
+    msgpack::object_handle oh_; ///< handle to last read frame
+};
+
 /// @brief Set system state to last state found in trajectory files
 ///
-/// @param[in] if_file input file name of trajectory file for this rank
-void resume_from_trajectory(std::string if_file) {
-    int fd = open(if_file.c_str(), O_RDONLY);
-    if (fd == -1)
-        throw std::runtime_error("Unable to open trajectory file " + if_file + " for resume.");
-
-    struct stat sb;
-    if (fstat(fd, &sb) == -1)
-        throw std::runtime_error("Error statting " + if_file + " for resume.");
-
-    std::size_t buflen = sb.st_size;
-
-    const char *addr = static_cast<const char *>(mmap(NULL, buflen, PROT_READ, MAP_PRIVATE, fd, 0u));
-    if (addr == MAP_FAILED)
-        throw std::runtime_error("Error mapping " + if_file + " for resume.");
-
-    std::size_t offset = 0;
-    msgpack::object_handle oh;
-    // FIXME: There is probably a way to not have to read the entire trajectory
-    while (offset != buflen)
-        msgpack::unpack(oh, addr, buflen, offset);
-
-    msgpack::object obj = oh.get();
-    input_map_t const &min_state = obj.as<input_map_t>();
-
-    const int n_fib_tot = min_state.fibers.fibers.size();
-    const int fib_count_big = n_fib_tot / size_ + 1;
-    const int fib_count_small = n_fib_tot / size_;
-    const int n_fib_big = n_fib_tot % size_;
-
-    std::vector<int> counts(size_);
-    std::vector<int> displs(size_ + 1);
-    for (int i = 0; i < size_; ++i) {
-        counts[i] = ((i < n_fib_big) ? fib_count_big : fib_count_small);
-        displs[i + 1] = displs[i] + counts[i];
+/// @param[in] input_file input file name of trajectory file for this rank
+void resume_from_trajectory(std::string input_file) {
+    TrajectoryReader trajectory(input_file);
+    while (trajectory.read_next_frame()) {
     }
-
-    properties.time = min_state.time;
-    properties.dt = min_state.dt;
-    fc_.fibers.clear();
-    int i_fib = 0;
-    for (const auto &min_fib : min_state.fibers.fibers) {
-        if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1])
-            fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
-        i_fib++;
-    }
-
-    // make sure sublist pointers are initialized, and then fill them in
-    bc_.populate_sublists();
-    for (int i = 0; i < bc_.spherical_bodies.size(); ++i)
-        bc_.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
-    for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
-        bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
-    output_map.rng_state = min_state.rng_state;
-    if (size_ > min_state.rng_state.size()) {
-        spdlog::error(
-            "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
-        MPI_Finalize();
-        exit(1);
-    } else if (size_ < min_state.rng_state.size()) {
-        spdlog::warn("Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
-                     "the RNG. This isn't really a problem, but runs will not be exactly reproducable.");
-    }
-    RNG::init(output_map.rng_state[rank_]);
+    trajectory.unpack_current_frame();
 }
 
 // TODO: Refactor all preprocess stuff. It's awful
@@ -570,35 +660,6 @@ Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, Vecto
     return velocities_on_fiber;
 }
 
-/// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
-std::tuple<int, int, int> get_local_node_counts() {
-    return std::make_tuple(fc_.get_local_node_count(), shell_->get_local_node_count(), bc_.get_local_node_count());
-}
-
-/// @brief Get GMRES solution size local to MPI rank for each object type [fibers, shell, bodies]
-std::tuple<int, int, int> get_local_solution_sizes() {
-    return std::make_tuple(fc_.get_local_solution_size(), shell_->get_local_solution_size(),
-                           bc_.get_local_solution_size());
-}
-
-/// @brief Map 1D array data to a three-tuple of Vector Maps [fibers, shell, bodies]
-std::tuple<VectorMap, VectorMap, VectorMap> get_solution_maps(double *x) {
-    using Eigen::Map;
-    using Eigen::VectorXd;
-    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
-    return std::make_tuple(VectorMap(x, fib_sol_size), VectorMap(x + fib_sol_size, shell_sol_size),
-                           VectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
-}
-
-/// @brief Map 1D array data to a three-tuple of const Vector Maps [fibers, shell, bodies]
-std::tuple<CVectorMap, CVectorMap, CVectorMap> get_solution_maps(const double *x) {
-    using Eigen::Map;
-    using Eigen::VectorXd;
-    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
-    return std::make_tuple(CVectorMap(x, fib_sol_size), CVectorMap(x + fib_sol_size, shell_sol_size),
-                           CVectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
-}
-
 /// @brief Map Eigen Matrix node data to a three-tuple of Matrix Block references (use like view)
 ///
 /// @param[in] x [3 x n_nodes_local] Matrix where you want the views
@@ -898,7 +959,9 @@ Eigen::MatrixXd VelocityField::make_grid() {
                         for (int k = 0; k < n_points; ++k) {
                             Vector3l coord_i = Vector3l{i, j, k} + bottom_left;
                             long int key = key_map[0] * coord_i[0] + key_map[1] * coord_i[1] + key_map[2] * coord_i[2];
-                            grid_map[key] = res * coord_i.cast<double>();
+                            Eigen::Vector3d test_point = res * coord_i.cast<double>();
+                            if (!shell_->check_collision(test_point, 0.0))
+                                grid_map[key] = test_point;
                         }
                     }
                 }
@@ -1086,6 +1149,7 @@ bool step() {
     fc_.step(fiber_sol);
     bc_.step(body_sol, dt);
     fc_.repin_to_bodies(bc_);
+    shell_->step(shell_sol);
 
     return converged;
 }
@@ -1153,21 +1217,10 @@ void run() {
         }
         if (!params.adaptive_timestep_flag || accept) {
             spdlog::info("Accepting timestep and advancing time");
-            double t_old = properties.time;
             properties.time += properties.dt;
             double &dt_write = params_.dt_write;
             if ((int)(properties.time / dt_write) > (int)((properties.time - properties.dt) / dt_write))
                 System::write();
-            if (params_.velocity_field_flag) {
-                double dt_write_field = params_.velocity_field.dt_write_field;
-                bool write_flag = t_old == 0.0 || (int)(properties.time / dt_write_field) >
-                                                      (int)((properties.time - properties.dt) / dt_write_field);
-                if (write_flag) {
-                    VelocityField vf_curr;
-                    vf_curr.compute();
-                    vf_curr.write();
-                }
-            }
         } else {
             spdlog::info("Rejecting timestep");
             System::restore();
@@ -1177,6 +1230,25 @@ void run() {
     }
 
     System::write();
+}
+
+/// @brief Run the post processing step
+void run_post_process() {
+    TrajectoryReader trajectory("skelly_sim.out");
+
+    double dt_write_field = params_.velocity_field.dt_write_field;
+    double t_last = -dt_write_field;
+    while (trajectory.read_next_frame()) {
+        trajectory.unpack_current_frame(true);
+        if ((properties.time - t_last) / dt_write_field >= 1.0) {
+
+            VelocityField vf_curr;
+            vf_curr.compute();
+            vf_curr.write();
+            spdlog::info("{}", properties.time);
+            t_last = properties.time;
+        }
+    }
 }
 
 /// @brief Check for any collisions between objects
@@ -1229,7 +1301,7 @@ toml::value *get_param_table() { return &param_table_; }
 /// @brief Initialize entire system. Needs to be called once at the beginning of the program execution
 /// @param[in] input_file String of toml config file specifying system parameters and initial conditions
 /// @param[in] resume_flag true if simulation is resuming from prior execution state, false otherwise.
-void init(const std::string &input_file, bool resume_flag) {
+void init(const std::string &input_file, bool resume_flag, bool post_process_flag) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
     spdlog::logger sink = rank_ == 0
@@ -1275,16 +1347,17 @@ void init(const std::string &input_file, bool resume_flag) {
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
 
     std::string filename = "skelly_sim.out";
-    auto open_mode = std::ofstream::out | std::ofstream::binary;
+    auto trajectory_open_mode = std::ofstream::binary | (post_process_flag ? std::ofstream::in : std::ofstream::out);
     if (resume_flag) {
         resume_from_trajectory(filename);
-        open_mode = open_mode | std::ofstream::app;
+        trajectory_open_mode = trajectory_open_mode | std::ofstream::app;
     }
     if (rank_ == 0)
-        ofs_ = std::ofstream(filename, open_mode);
+        ofs_ = std::ofstream(filename, trajectory_open_mode);
 
-    if (params_.velocity_field_flag && rank_ == 0) {
-        ofs_vf_ = std::ofstream("skelly_sim.vf", open_mode);
-    }
+    if (post_process_flag && rank_ == 0)
+        ofs_vf_ = std::ofstream("skelly_sim.vf", std::ofstream::binary | std::ofstream::out);
+
+    curr_solution_.resize(get_local_solution_size());
 }
 } // namespace System

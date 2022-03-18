@@ -163,7 +163,8 @@ MatrixXd BodyContainer::get_global_center_positions(const T &body_vec) const {
     return centers;
 }
 template MatrixXd BodyContainer::get_global_center_positions(const std::vector<std::shared_ptr<SphericalBody>> &) const;
-template MatrixXd BodyContainer::get_global_center_positions(const std::vector<std::shared_ptr<DeformableBody>> &) const;
+template MatrixXd
+BodyContainer::get_global_center_positions(const std::vector<std::shared_ptr<DeformableBody>> &) const;
 
 /// @brief Get center positions on rank 0, otherwise empty
 /// @param[in] std::vector of shared_ptr<DerivedBody>

@@ -55,6 +55,7 @@ class Fiber {
     /// Boundary condition pair for plus end of fiber
     std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
 
+    Eigen::VectorXd tension_; ///< [ n_nodes ] vector representing local tension on fiber nodes
     Eigen::MatrixXd x_;     ///< [ 3 x n_nodes_ ] matrix representing coordinates of fiber nodes
     Eigen::MatrixXd xs_;    ///< [ 3 x n_nodes_ ] matrix representing first derivative of fiber nodes
     Eigen::MatrixXd xss_;   ///< [ 3 x n_nodes_ ] matrix representing second derivative of fiber nodes
@@ -140,10 +141,10 @@ class Fiber {
     bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
 #ifndef SKELLY_DEBUG
     MSGPACK_DEFINE_MAP(n_nodes_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_,
-                       epsilon_, binding_site_, x_);
+                       epsilon_, binding_site_, tension_, x_);
 #else
     MSGPACK_DEFINE_MAP(n_nodes_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_,
-                       epsilon_, binding_site_, x_, A_, RHS_, force_operator_, bc_minus_, bc_plus_, xs_, xss_, xsss_,
+                       epsilon_, binding_site_, tension_, x_, A_, RHS_, force_operator_, bc_minus_, bc_plus_, xs_, xss_, xsss_,
                        xssss_, stokeslet_);
 #endif
 };
