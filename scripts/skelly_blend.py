@@ -9,14 +9,6 @@ import time
 import os
 import pickle
 
-if '--' not in sys.argv:
-    print(
-        "skelly_blend error! Must supply trailing `-- myconfig.toml` to command line"
-    )
-    sys.exit()
-
-argv = sys.argv[sys.argv.index("--") + 1:]
-
 site_package_dir = site.getusersitepackages()
 if not site_package_dir in sys.path:
     sys.path.append(site_package_dir)
@@ -48,7 +40,7 @@ def nurbs_cylinder(x, obj=None):
 
         for p, new_co in zip(spline.points, x):
             p.co = new_co.tolist() + [1.0]
-        obj = bpy.data.objects.new('cylinder', crv)
+        obj = bpy.data.objects.new('fiber', crv)
         obj.data.bevel_depth = 0.025
         obj.data.use_fill_caps = True
         obj.data.bevel_resolution = 3
@@ -57,7 +49,7 @@ def nurbs_cylinder(x, obj=None):
         for p, new_co in zip(obj.data.splines[0].points, x):
             p.co = new_co.tolist() + [1.0]
 
-    obj.hide_render = bool(x[0, 1] > 0.0)
+    # obj.hide_render = bool(x[0, 1] > 0.0)
     return obj
 
 
@@ -98,7 +90,7 @@ def new_shader(label, typename, r, g, b):
     elif typename == "background":
         shader = nodes.new(type='ShaderNodeBackground')
         nodes["Background"].inputs['Color'].default_value = (r, g, b, 1)
-        nodes["Background"].inputs['Strength'].default_value = 10.0
+        nodes["Background"].inputs['Strength'].default_value = 1.0
 
     links.new(shader.outputs[0], output.inputs[0])
 
@@ -110,17 +102,11 @@ class SkellySim:
     fpos = []
     times = []
     frame_data = None
+    config_data = {}
 
     def __init__(self, toml_file):
         with open(toml_file, 'r') as f:
-            td = toml.load(f)
-        if 'periphery' in td:
-            periphery = td['periphery']
-            if periphery['shape'] == 'sphere':
-                place_half_shell(td['periphery']['radius'])
-            else:
-                print("Periphery of type '{}' not yet supported".format(
-                    periphery['shape']))
+            self.config_data = toml.load(f)
 
         traj_file = os.path.join(os.path.dirname(toml_file), 'skelly_sim.out')
 
@@ -142,12 +128,38 @@ class SkellySim:
             print("No trajectory index file. Building.")
             self.build_index(mtime, index_file)
 
+        self.init_scene()
+
+
+    def init_scene(self):
+        bpy.context.scene.frame_start = 0
+        bpy.context.scene.frame_end = len(self) - 1
+        bpy.app.handlers.frame_change_pre.append(
+            lambda scene: self.draw(scene.frame_current))
+
+        bpy.types.RenderSettings.use_lock_interface = True
+        bpy.context.scene.frame_set(0)
+
+
     def __len__(self):
         return len(self.times)
 
     def load_frame(self, frameno):
         self.fh.seek(self.fpos[frameno])
         self.frame_data = msgpack.Unpacker(self.fh, raw=False).unpack()
+
+    def place_periphery(self, half=True):
+        if 'periphery' not in self.config_data:
+            print("No periphery found in configuration data.")
+            return
+
+        periphery = self.config_data['periphery']
+        if periphery['shape'] == 'sphere':
+            place_shell(self.config_data['periphery']['radius'], half)
+        else:
+            print("Periphery of type '{}' not yet supported".format(
+                periphery['shape']))
+
 
     def draw(self, frameno):
         self.load_frame(frameno)
@@ -195,7 +207,7 @@ class SkellySim:
             pickle.dump(index, f)
 
 def clear_scene():
-    if "Cube" in bpy.data.meshes:
+    if "Cube" in bpy.data.objects:
         cube = bpy.data.objects["Cube"]
         bpy.data.objects.remove(cube, do_unlink=True)
     if "Light" in bpy.data.objects:
@@ -203,7 +215,7 @@ def clear_scene():
         bpy.data.objects.remove(light, do_unlink=True)
 
 
-def place_half_shell(radius):
+def place_shell(radius, half=True):
     mesh = bpy.data.meshes.new('Sphere')
     sphere = bpy.data.objects.new("Sphere", mesh)
     sphere.data.materials.append(bpy.data.materials['ShellMaterial'])
@@ -221,59 +233,19 @@ def place_half_shell(radius):
                               v_segments=32,
                               diameter=radius)
 
-    for vert in bm.verts:
-        if vert.co[1] > 0:
-            bm.verts.remove(vert)
+    if half:
+        for vert in bm.verts:
+            if vert.co[1] > 0.1:
+                bm.verts.remove(vert)
     bm.to_mesh(mesh)
     bpy.ops.object.shade_smooth()
     bm.free()
 
 
-def place_backdrop():
-    bpy.ops.mesh.primitive_plane_add(size=100.0,
-                                     location=(0.0, -5.5, 0.0),
-                                     rotation=(0.5 * np.pi, 0.0, 0.0))
-    plane = bpy.data.objects['Plane']
-    plane.data.materials.append(bpy.data.materials['PlaneMaterial'])
-
-
-def place_camera():
-    if "Camera" not in bpy.data.cameras:
-        camera_data = bpy.data.cameras.new(name='Camera')
-        camera_object = bpy.data.objects.new('Camera', camera_data)
-        bpy.context.scene.collection.objects.link(camera_object)
-
-    camera = bpy.data.objects['Camera']
-    mat_loc = mathutils.Matrix.Translation((7.1, 21.2, -10.9))
-    eul = mathutils.Euler(
-        (math.radians(-115), math.radians(1), math.radians(-18.4)), 'XYZ')
-    camera.matrix_world = mat_loc @ eul.to_matrix().to_4x4()
-
-
-def set_light():
-    light_data = bpy.data.lights.new(name="Light", type='SUN')
-    light_data.energy = 2.0
-    light_data.specular_factor = 1.0
-    light = bpy.data.objects.new(name="Light", object_data=light_data)
-    bpy.context.collection.objects.link(light)
-
-    mat_loc = mathutils.Matrix.Translation((0.0, 30, 0.0))
-    eul = mathutils.Euler(
-        (math.radians(90.0), math.radians(0), math.radians(180.0)), 'XYZ')
-    light.matrix_world = mat_loc @ eul.to_matrix().to_4x4()
-
-
-def set_ambient_light():
-    bpy.context.scene.world.node_tree.nodes["Background"].inputs[
-        'Color'].default_value = (1.0, 1.0, 1.0, 1)
-    bpy.context.scene.world.node_tree.nodes['Background'].inputs[
-        'Strength'].default_value = 0.7
-
-
 def init_materials():
     new_shader("FiberMaterial", "glossy", 0.087, 0.381, 1.0)
     new_shader("ShellMaterial", "principled", 0.233, 0.233, 0.233)
-    new_shader("PlaneMaterial", "background", 1.0, 1.0, 1.0)
+    new_shader("PlaneMaterial", "background", 0.0, 0.0, 0.0)
 
 
 def init_collections():
@@ -281,30 +253,20 @@ def init_collections():
     bpy.context.scene.collection.children.link(fiber_col)
 
 
-def init_scene(sim: SkellySim):
-    bpy.context.scene.frame_start = 0
-    bpy.context.scene.frame_end = len(sim) - 1
-    bpy.app.handlers.frame_change_pre.append(
-        lambda scene: sim.draw(scene.frame_current))
-
-    bpy.types.RenderSettings.use_lock_interface = True
-    bpy.context.scene.frame_set(0)
-
-
-def main():
+def init(config_file='skelly_config.toml'):
     init_collections()
     init_materials()
 
-    sim = SkellySim(argv[0])
-
-    clear_scene()
-    place_backdrop()
-    place_camera()
-    set_light()
-    set_ambient_light()
-
-    init_scene(sim)
+    return SkellySim(config_file)
 
 
 if __name__ == "__main__":
-    main()
+    if '--' not in sys.argv:
+        print(
+            "skelly_blend error! Must supply trailing `-- myconfig.toml` to command line"
+        )
+        sys.exit()
+
+    argv = sys.argv[sys.argv.index("--") + 1:]
+
+    init(argv[0])
