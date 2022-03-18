@@ -959,7 +959,9 @@ Eigen::MatrixXd VelocityField::make_grid() {
                         for (int k = 0; k < n_points; ++k) {
                             Vector3l coord_i = Vector3l{i, j, k} + bottom_left;
                             long int key = key_map[0] * coord_i[0] + key_map[1] * coord_i[1] + key_map[2] * coord_i[2];
-                            grid_map[key] = res * coord_i.cast<double>();
+                            Eigen::Vector3d test_point = res * coord_i.cast<double>();
+                            if (!shell_->check_collision(test_point, 0.0))
+                                grid_map[key] = test_point;
                         }
                     }
                 }
