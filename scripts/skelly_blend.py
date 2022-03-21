@@ -97,7 +97,7 @@ def new_shader(label, typename, r, g, b):
     return mat
 
 
-class SkellySim:
+class SkellyBlend:
     fh = None
     fpos = []
     times = []
@@ -128,8 +128,10 @@ class SkellySim:
             print("No trajectory index file. Building.")
             self.build_index(mtime, index_file)
 
-        self.init_scene()
+        init_collections()
+        init_materials()
 
+        self.init_scene()
 
     def init_scene(self):
         bpy.context.scene.frame_start = 0
@@ -139,7 +141,6 @@ class SkellySim:
 
         bpy.types.RenderSettings.use_lock_interface = True
         bpy.context.scene.frame_set(0)
-
 
     def __len__(self):
         return len(self.times)
@@ -160,7 +161,6 @@ class SkellySim:
             print("Periphery of type '{}' not yet supported".format(
                 periphery['shape']))
 
-
     def draw(self, frameno):
         self.load_frame(frameno)
 
@@ -178,7 +178,6 @@ class SkellySim:
             else:
                 nurbs_cylinder(pos,
                                bpy.data.collections['Fibers'].objects[ifib])
-
 
     def build_index(self, mtime, index_file):
         unpacker = msgpack.Unpacker(self.fh, raw=False)
@@ -205,6 +204,7 @@ class SkellySim:
         }
         with open(index_file, 'wb') as f:
             pickle.dump(index, f)
+
 
 def clear_scene():
     if "Cube" in bpy.data.objects:
@@ -243,21 +243,18 @@ def place_shell(radius, half=True):
 
 
 def init_materials():
-    new_shader("FiberMaterial", "glossy", 0.087, 0.381, 1.0)
-    new_shader("ShellMaterial", "principled", 0.233, 0.233, 0.233)
-    new_shader("PlaneMaterial", "background", 0.0, 0.0, 0.0)
+    if not 'FiberMaterial' in bpy.data.materials:
+        new_shader("FiberMaterial", "glossy", 0.087, 0.381, 1.0)
+    if not 'ShellMaterial' in bpy.data.materials:
+        new_shader("ShellMaterial", "principled", 0.233, 0.233, 0.233)
+    if not 'PlaneMaterial' in bpy.data.materials:
+        new_shader("PlaneMaterial", "background", 0.0, 0.0, 0.0)
 
 
 def init_collections():
-    fiber_col = bpy.data.collections.new('Fibers')
-    bpy.context.scene.collection.children.link(fiber_col)
-
-
-def init(config_file='skelly_config.toml'):
-    init_collections()
-    init_materials()
-
-    return SkellySim(config_file)
+    if not 'Fibers' in bpy.data.collections:
+        fiber_col = bpy.data.collections.new('Fibers')
+        bpy.context.scene.collection.children.link(fiber_col)
 
 
 if __name__ == "__main__":
