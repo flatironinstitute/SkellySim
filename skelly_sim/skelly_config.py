@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from dataclasses import dataclass, asdict, field, is_dataclass
 from argparse import Namespace
 import copy
@@ -78,7 +78,7 @@ def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
     """
     Create a fiber with a small cosine perturbation in a random direction orthogonal to the fiber.
     Fiber orientation is assumed to be along the vector x0, which is the position of the minus end of the filament (so don't place at the origin).
-    
+
     Arguments
     ---------
     amplitude : float
@@ -203,9 +203,9 @@ class DynamicInstability():
         When a fiber hits a boundary, scale its velocity (v_growth) by this factor
     f_catastrophe_collision_scale : float
         When a fiber hits a boundary, scale its catastrophe frequency (f_catastrophe) by this
-    nucleation_rate : float = 0.0
+    nucleation_rate : float
         Fiber nucleation rate in units of MT nucleations / second
-    min_length: float = 0.5
+    min_length: float
         New fiber initial length in microns
     bending_rigidity : float
         New fiber bending rigidity
@@ -231,7 +231,7 @@ class VelocityField():
     Attributes
     ----------
     moving_volume : bool
-        For large systems, track velocity field around bodies. If two bodies are adjacent, their grids will be merged into one
+        Track velocity field around bodies. If two bodies are adjacent, their grids will be merged into one. Useful when no periphery.
     moving_volume_radius : float
         not really a radius. half box size for volume around body to track
     dt_write_field : float
@@ -239,10 +239,10 @@ class VelocityField():
     resolution : float
         Distance between grid points. n_points ~ (2 * radius / resolution)^3. Don't make too small unless you have lots of memory/storage :)
     """
-    moving_volume: bool = True  # For large systems, track velocity field around bodies
-    moving_volume_radius: float = 30.0  # not really a radius. half box size for volume around body to track
-    dt_write_field: float = 0.5  # how often to write velocity field
-    resolution: float = 1.0  # distance between grid points. n_points ~ (2 * radius / resolution)^3. don't make too small!
+    moving_volume: bool = True
+    moving_volume_radius: float = 30.0
+    dt_write_field: float = 0.5
+    resolution: float = 1.0
 
 
 @dataclass
@@ -281,9 +281,9 @@ class Params():
         Dynamic instability parameters
     velocity_field : VelocityField
         Velocity field parameters
-    periphery_interaction_flag : bool = True
+    periphery_interaction_flag : bool
         Experimental repulsion between periphery and Fibers
-    adaptive_timestep_flag : bool = True
+    adaptive_timestep_flag : bool
         If set, use adaptive timestepping, which attempts to control simulation error by reducing the timestep when the solution has convergence issues
     """
     eta: float = 1.0
@@ -332,32 +332,33 @@ class SphericalPeriphery(Periphery):
     ----------
     n_nodes : int
         Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
-    shape : str = 'sphere'
+    shape : str
         Shape of the periphery. Don't modify it!
-    radius : float = 6.0
+    radius : float
         Radius of our sphere in microns
     """
 
     shape: str = 'sphere'
     radius: float = 6.0
 
-    def find_binding_site(self, fibers: List[Fiber], ds_min):
+    def find_binding_site(self, fibers: List[Fiber], ds_min) -> Tuple[np.array, np.array]:
         """
         Find an open binding site given a list of Fibers that could interfere with binding
         Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
         interacting with the periphery directly. The binding site is guaranteed to be further than the Euclidean distance ds_min from any
         other Fiber minus end
-        
+
         Arguments
         ---------
-        fibers : List[Fiber]
+        fibers : list[Fiber]
             Fibers that could potentially block a binding site
         ds_min : float
             Minimum allowable separation between a binding site and any fiber minus end
 
         Returns
         -------
-        (x0, u0) -> tuple numpy arrays of the site position, and the unit vector pointing from the origin to this point (x0 / np.linalg.norm(x0))
+        tuple(np.array, np.array)
+            position vector and its normalized version
         """
         while (True):
             u0 = get_random_point_on_sphere()
@@ -387,7 +388,7 @@ class EllipsoidalPeriphery(Periphery):
          length of axis 'a'
     b : float
          length of axis 'b'
-    b : float
+    c : float
          length of axis 'c'
     """
 
@@ -405,22 +406,24 @@ class RevolutionPeriphery(Periphery):
     your output toml file with the correct number of nodes. This complicated machinery is so that later on 'skelly_sim' can directly look for
     collisions using the input height function
 
-    # Example usage:
-    # Target number of nodes -- actual number likely larger
-    config.periphery.envelope.n_nodes_target = 6000
+    .. highlight:: python
+    .. code-block:: python
 
-    # lower/upper bound are required options. ideally your function should go to zero at the upper/lower bounds
-    config.periphery.envelope.lower_bound = -3.75
-    config.periphery.envelope.upper_bound = 3.75
+        # Example usage:
+        # Target number of nodes -- actual number likely larger
+        config.periphery.envelope.n_nodes_target = 6000
 
-    # required option. this is the function you're revolving around the 'x' axis. 'x' needs to be
-    # the independent variable. Currently the function has to be a one-liner
-    config.periphery.envelope.height = "0.5 * T * ((1 + 2*x/length)**p1) * ((1 - 2*x/length)**p2) * length"
-    # All the parameters that go into our height function
-    config.periphery.envelope.T = 0.72
-    config.periphery.envelope.p1 = 0.4
-    config.periphery.envelope.p2 = 0.2
-    config.periphery.envelope.length = 7.5
+        # lower/upper bound are required options. ideally your function should go to zero at the upper/lower bounds
+        config.periphery.envelope.lower_bound = -3.75
+        config.periphery.envelope.upper_bound = 3.75
+
+        # required option. this is the function you're revolving around the 'x' axis. 'x' needs to be
+        # the independent variable. Currently the function has to be a one-liner
+        config.periphery.envelope.height = "0.5 * T * ((1 + 2*x/length)**p1) * ((1 - 2*x/length)**p2) * length"
+        config.periphery.envelope.T = 0.72
+        config.periphery.envelope.p1 = 0.4
+        config.periphery.envelope.p2 = 0.2
+        config.periphery.envelope.length = 7.5
 
 
     Attributes
@@ -505,13 +508,13 @@ class Config():
     Attributes
     ----------
     params : Params
-        System parameters (skelly_config.Params)
+        System parameters
     bodies : List[Body]
-        List of bodies (skelly_config.Body)
+        List of bodies
     fibers : List[Fiber]
-        List of fibers (skelly_config.Fiber)
+        List of fibers
     point_sources : List[Point]
-        List of point sources (skelly_config.Point)
+        List of point sources
     """
     params: Params = field(default_factory=Params)
     bodies: List[Body] = field(default_factory=list)
@@ -545,13 +548,13 @@ class ConfigSpherical(Config):
     Attributes
     ----------
     params : Params
-        System parameters (skelly_config.Params)
+        System parameters
     bodies : List[Body]
-        List of bodies (skelly_config.Body)
+        List of bodies
     fibers : List[Fiber]
-        List of fibers (skelly_config.Fiber)
+        List of fibers
     point_sources : List[Point]
-        List of point sources (skelly_config.Point)
+        List of point sources
     periphery : SphericalPeriphery
         SphericalPeriphery
     """
@@ -566,13 +569,13 @@ class ConfigEllipsoidal(Config):
     Attributes
     ----------
     params : Params
-        System parameters (skelly_config.Params)
+        System parameters
     bodies : List[Body]
-        List of bodies (skelly_config.Body)
+        List of bodies
     fibers : List[Fiber]
-        List of fibers (skelly_config.Fiber)
+        List of fibers
     point_sources : List[Point]
-        List of point sources (skelly_config.Point)
+        List of point sources
     periphery : EllipsoidalPeriphery
         EllipsoidalPeriphery
     """
@@ -587,13 +590,13 @@ class ConfigRevolution(Config):
     Attributes
     ----------
     params : Params
-        System parameters (skelly_config.Params)
+        System parameters
     bodies : List[Body]
-        List of bodies (skelly_config.Body)
+        List of bodies
     fibers : List[Fiber]
-        List of fibers (skelly_config.Fiber)
+        List of fibers
     point_sources : List[Point]
-        List of point sources (skelly_config.Point)
+        List of point sources
     periphery : RevolutionPeriphery
         RevolutionPeriphery
     """
