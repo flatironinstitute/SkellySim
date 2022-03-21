@@ -1,11 +1,8 @@
 import sys
 import site
-import math
 import bpy
 import numpy as np
 import bmesh
-import mathutils
-import time
 import os
 import pickle
 
@@ -28,6 +25,48 @@ except ImportError:
     subprocess.call([PYTHON, "-m", "pip", "install", "toml"])
 
     import msgpack, toml
+
+
+def place_shell(radius, half=True):
+    mesh = bpy.data.meshes.new('Sphere')
+    sphere = bpy.data.objects.new("Sphere", mesh)
+    sphere.data.materials.append(bpy.data.materials['ShellMaterial'])
+    bpy.context.collection.objects.link(sphere)
+
+    bpy.context.view_layer.objects.active = sphere
+    sphere.select_set(True)
+    modifier = sphere.modifiers.new(name="Solidify", type="SOLIDIFY")
+    modifier.thickness = 0.1
+    modifier.offset = 1.0
+
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm,
+                              u_segments=64,
+                              v_segments=32,
+                              diameter=radius)
+
+    if half:
+        for vert in bm.verts:
+            if vert.co[1] > 0.1:
+                bm.verts.remove(vert)
+    bm.to_mesh(mesh)
+    bpy.ops.object.shade_smooth()
+    bm.free()
+
+
+def init_materials():
+    if not 'FiberMaterial' in bpy.data.materials:
+        new_shader("FiberMaterial", "glossy", 0.087, 0.381, 1.0)
+    if not 'ShellMaterial' in bpy.data.materials:
+        new_shader("ShellMaterial", "principled", 0.233, 0.233, 0.233)
+    if not 'PlaneMaterial' in bpy.data.materials:
+        new_shader("PlaneMaterial", "background", 0.0, 0.0, 0.0)
+
+
+def init_collections():
+    if not 'Fibers' in bpy.data.collections:
+        fiber_col = bpy.data.collections.new('Fibers')
+        bpy.context.scene.collection.children.link(fiber_col)
 
 
 def nurbs_cylinder(x, obj=None):
@@ -204,57 +243,6 @@ class SkellyBlend:
         }
         with open(index_file, 'wb') as f:
             pickle.dump(index, f)
-
-
-def clear_scene():
-    if "Cube" in bpy.data.objects:
-        cube = bpy.data.objects["Cube"]
-        bpy.data.objects.remove(cube, do_unlink=True)
-    if "Light" in bpy.data.objects:
-        light = bpy.data.objects["Light"]
-        bpy.data.objects.remove(light, do_unlink=True)
-
-
-def place_shell(radius, half=True):
-    mesh = bpy.data.meshes.new('Sphere')
-    sphere = bpy.data.objects.new("Sphere", mesh)
-    sphere.data.materials.append(bpy.data.materials['ShellMaterial'])
-    bpy.context.collection.objects.link(sphere)
-
-    bpy.context.view_layer.objects.active = sphere
-    sphere.select_set(True)
-    modifier = sphere.modifiers.new(name="Solidify", type="SOLIDIFY")
-    modifier.thickness = 0.1
-    modifier.offset = 1.0
-
-    bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm,
-                              u_segments=64,
-                              v_segments=32,
-                              diameter=radius)
-
-    if half:
-        for vert in bm.verts:
-            if vert.co[1] > 0.1:
-                bm.verts.remove(vert)
-    bm.to_mesh(mesh)
-    bpy.ops.object.shade_smooth()
-    bm.free()
-
-
-def init_materials():
-    if not 'FiberMaterial' in bpy.data.materials:
-        new_shader("FiberMaterial", "glossy", 0.087, 0.381, 1.0)
-    if not 'ShellMaterial' in bpy.data.materials:
-        new_shader("ShellMaterial", "principled", 0.233, 0.233, 0.233)
-    if not 'PlaneMaterial' in bpy.data.materials:
-        new_shader("PlaneMaterial", "background", 0.0, 0.0, 0.0)
-
-
-def init_collections():
-    if not 'Fibers' in bpy.data.collections:
-        fiber_col = bpy.data.collections.new('Fibers')
-        bpy.context.scene.collection.children.link(fiber_col)
 
 
 if __name__ == "__main__":
