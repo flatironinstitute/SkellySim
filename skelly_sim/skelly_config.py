@@ -21,6 +21,100 @@ def get_random_point_on_sphere():
     return np.array([np.cos(phi) * factor, np.sin(phi) * factor, u])
 
 
+def sin_length(amplitude: float, xf: float):
+    """
+    Compute the arc length of the function amplitude * sin(x) on [0, xf]
+
+    Arguments
+    ---------
+    amplitude : float
+        amplitude of sine wave
+    xf : float
+        upper bound of arc length integral
+    """
+    A2 = (2 * np.pi * amplitude / xf)**2
+    return xf / np.pi * (ellipe(-A2) + np.sqrt(1 + A2) * ellipe(A2 / (1 + A2)))
+
+
+def cos_length_full(amplitude: float, xi: float, xf: float, x_max: float):
+    """
+    The arclength of amplitude * cos(x) on the interval [xi, xf]
+    Designed to be used with an fsolve on (sin_length() - length) to get x_max
+    Arclengths are bizarrely complicated!
+
+    Arguments
+    ---------
+    amplitude : float
+        amplitude of sine wave
+    xi : float
+        lower bound of integral
+    xf : float
+        upper bound of integral
+    x_max : float
+        maximum xf for our given length (basically where one period is reached)
+    """
+    scale_factor = 2.0 * np.pi / x_max
+    A2 = (scale_factor * amplitude)**2
+    return (ellipeinc(scale_factor * xf, -A2) -
+            ellipeinc(scale_factor * xi, -A2)) / scale_factor
+
+
+def get_random_orthogonal_vector(x: np.array):
+    """Take an input 3d vector 'x' and return a random unit vector orthogonal to the input vector"""
+
+    if x[1] != 0 or x[2] != 0:
+        offaxis = np.array([1, 0, 0])
+    else:
+        offaxis = np.array([0, 1, 0])
+    b = np.cross(x, offaxis)
+    b /= np.linalg.norm(b)
+    c = np.cross(x, b)
+
+    theta = 2 * np.pi * np.random.uniform()
+    return b * np.cos(theta) + c * np.sin(theta)
+
+
+def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
+    """
+    Create a fiber with a small cosine perturbation in a random direction orthogonal to the fiber.
+    Fiber orientation is assumed to be along the vector x0, which is the position of the minus end of the filament (so don't place at the origin).
+    
+    Arguments
+    ---------
+    amplitude : float
+        Amplitude of the perturbation. Make it a small fraction of the total length
+    length : float
+        Length of the fiber
+    x0 : np.array(3)
+        3D position of the base of the Fiber. Don't place at the origin since the orientation is determined from this.
+    n_nodes : int
+        number of nodes to represent the fiber
+
+    Returns: [n_nodes, 3] matrix of positions of each node in a perturbed fiber
+    """
+    x_max_fun = lambda xf: sin_length(amplitude, xf) - length
+    x_max = fsolve(x_max_fun, length)
+
+    normal = -x0 / np.linalg.norm(x0)
+
+    ortho = get_random_orthogonal_vector(normal)
+
+    arc_length_per_segment = length / (n_nodes - 1)
+    lin_pos = np.zeros(n_nodes)
+    for i in range(1, n_nodes):
+        fun = lambda xf: cos_length_full(amplitude, lin_pos[i - 1], xf, x_max
+                                         ) - arc_length_per_segment
+        lin_pos[i] = fsolve(fun, lin_pos[i - 1] + arc_length_per_segment)
+
+    fiber_positions = np.outer(lin_pos, normal)
+
+    cos_perturbation = amplitude * (np.cos(lin_pos) - 1)
+    fiber_positions += np.outer(cos_perturbation, ortho)
+    fiber_positions += x0
+
+    return fiber_positions
+
+
 def unpack(obj):
     """
     Helper routine to process a Config recursively into the format needed by skelly_sim
@@ -222,6 +316,9 @@ class Periphery():
     n_nodes: int = 6000
 
     def find_binding_site(self, fibers: List[Fiber]):
+        """
+        stub for finding a binding site on a periphery surface given a list of fibers
+        """
         return None
 
 
@@ -244,6 +341,23 @@ class SphericalPeriphery(Periphery):
     radius: float = 6.0
 
     def find_binding_site(self, fibers: List[Fiber], ds_min):
+        """
+        Find an open binding site given a list of Fibers that could interfere with binding
+        Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
+        interacting with the periphery directly. The binding site is guaranteed to be further than the Euclidean distance ds_min from any
+        other Fiber minus end
+        
+        Arguments
+        ---------
+        fibers : List[Fiber]
+            Fibers that could potentially block a binding site
+        ds_min : float
+            Minimum allowable separation between a binding site and any fiber minus end
+
+        Returns
+        -------
+        (x0, u0) -> tuple numpy arrays of the site position, and the unit vector pointing from the origin to this point (x0 / np.linalg.norm(x0))
+        """
         while (True):
             u0 = get_random_point_on_sphere()
             x0 = 0.99999999 * u0 * self.radius
@@ -483,52 +597,3 @@ class ConfigRevolution(Config):
         RevolutionPeriphery
     """
     periphery: RevolutionPeriphery = RevolutionPeriphery()
-
-
-def sin_length(amplitude: float, xf: float):
-    A2 = (2 * np.pi * amplitude / xf)**2
-    return xf / np.pi * (ellipe(-A2) + np.sqrt(1 + A2) * ellipe(A2 / (1 + A2)))
-
-
-def cos_length_full(amplitude: float, xi: float, xf: float, x_max: float):
-    scale_factor = 2.0 * np.pi / x_max
-    A2 = (scale_factor * amplitude)**2
-    return (ellipeinc(scale_factor * xf, -A2) -
-            ellipeinc(scale_factor * xi, -A2)) / scale_factor
-
-
-def get_random_orthogonal_vector(x: np.array):
-    if x[1] != 0 or x[2] != 0:
-        offaxis = np.array([1, 0, 0])
-    else:
-        offaxis = np.array([0, 1, 0])
-    b = np.cross(x, offaxis)
-    b /= np.linalg.norm(b)
-    c = np.cross(x, b)
-
-    theta = 2 * np.pi * np.random.uniform()
-    return b * np.cos(theta) + c * np.sin(theta)
-
-
-def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
-    x_max_fun = lambda xf: sin_length(amplitude, xf) - length
-    x_max = fsolve(x_max_fun, length)
-
-    normal = -x0 / np.linalg.norm(x0)
-
-    ortho = get_random_orthogonal_vector(normal)
-
-    arc_length_per_segment = length / (n_nodes - 1)
-    lin_pos = np.zeros(n_nodes)
-    for i in range(1, n_nodes):
-        fun = lambda xf: cos_length_full(amplitude, lin_pos[i - 1], xf, x_max
-                                         ) - arc_length_per_segment
-        lin_pos[i] = fsolve(fun, lin_pos[i - 1] + arc_length_per_segment)
-
-    fiber_positions = np.outer(lin_pos, normal)
-
-    cos_perturbation = amplitude * (np.cos(lin_pos) - 1)
-    fiber_positions += np.outer(cos_perturbation, ortho)
-    fiber_positions += x0
-
-    return fiber_positions
