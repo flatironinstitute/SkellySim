@@ -23,7 +23,7 @@ def get_random_point_on_sphere():
 
 def sin_length(amplitude: float, xf: float):
     """
-    Compute the arc length of the function amplitude * sin(x) on [0, xf]
+    Compute the arc length of the function amplitude * sin(2*pi*x/xf) on [0, xf]
 
     Arguments
     ---------
@@ -38,7 +38,7 @@ def sin_length(amplitude: float, xf: float):
 
 def cos_length_full(amplitude: float, xi: float, xf: float, x_max: float):
     """
-    The arclength of amplitude * cos(x) on the interval [xi, xf]
+    The arclength of amplitude * cos(2*pi*x/x_max) on the interval [xi, xf]
     Designed to be used with an fsolve on (sin_length() - length) to get x_max
     Arclengths are bizarrely complicated!
 
