@@ -9,6 +9,11 @@ import toml
 
 
 def get_random_point_on_sphere():
+    """
+    Give a uniform random point on the surface of a unit sphere
+
+    Returns: numpy 3d-vector of unit length on surface of a unit sphere
+    """
     phi = np.random.uniform() * 2.0 * np.pi
     u = 2 * np.random.uniform() - 1.0
     factor = np.sqrt(1.0 - u * u)
@@ -17,6 +22,10 @@ def get_random_point_on_sphere():
 
 
 def unpack(obj):
+    """
+    Helper routine to process a Config recursively into the format needed by skelly_sim
+    Used in toml dumping
+    """
     if isinstance(obj, dict):
         return {key: unpack(value) for key, value in obj.items()}
     elif isinstance(obj, list):
@@ -37,40 +46,105 @@ def unpack(obj):
 
 
 def default_vector():
+    """
+    The name says it all. A default vector for the field factories.
+    """
     return [0.0, 0.0, 0.0]
 
 
 def default_quaternion():
+    """
+    The name says it all. A default quaternion for the field factories.
+    """
     return [0.0, 0.0, 0.0, 1.0]
 
 
 @dataclass
 class Fiber():
-    n_nodes: int = 32  # number of nodes
-    parent_body: int = 0  # body it's attached to. if you add more bodies, you'll have to specify 0,1,2,3,...
-    force_scale: float = -0.04  # tangential motor force on each node
-    bending_rigidity: float = 0.1  # bending rigidity
-    length: float = 10.0  # starting length
-    # Flattened (x0,y0,z0,x1,y1,z1,...) absolute positions in real space of all the nodes, don't set unless you know what you're doing
-    x: List[float] = field(default_factory=list)
+    """
+    dataclass representing a single fiber
+
+    Attributes
+    ----------
+    n_nodes : int
+        Number of nodes to represent fiber. Highly deformed or very long fibers will require more nodes to be accurately represented
+    parent_body : int
+        Index of 'body' fiber is bound to. A value of '-1' indicates a free fiber
+    force_scale : float
+        Tangential force per unit length to act along filament. A positive value pushes toward the 'plus' end,
+        while a negative value pushes toward the 'minus' end
+    bending_rigidity : float
+        Bending rigidity of this filament
+    length : float
+        Constraint length of this filament
+    minus_clamped : bool
+        Fix minus end of filament with "clamped" boundary condition, preserving orientation and position (Velocity = 0, AngularVelocity = 0)
+    x : List[float]
+        List of node positions in [x0,y0,z0,x1,y1,z1...] order. Extreme care must be taken when setting this since the length constraint
+        can generate massive tensions with poor input
+    """
+    n_nodes: int = 32
+    parent_body: int = -1
+    force_scale: float = 0.0
+    bending_rigidity: float = 2.5E-3
+    length: float = 1.0
     minus_clamped: bool = False
+    x: List[float] = field(default_factory=list)
 
 
 @dataclass
 class DynamicInstability():
-    n_nodes: int = 16  # number of nodes representing fiber
-    v_growth: float = 0.0  # growth velocity microns/second
-    f_catastrophe: float = 0.0  # catastrophe frequency 1/second
-    v_grow_collision_scale: float = 0.5  # when hit boundary, scale velocity by this
-    f_catastrophe_collision_scale: float = 2.0  # when hit boundary, scale catastrophe freq by this
-    nucleation_rate: float = 0.0  # fixed nucleation rate (MT nucleations / second)
-    min_length: float = 0.5  # starting length in microns
-    bending_rigidity: float = 20.0  # bending rigidity
-    min_separation: float = 0.1  # minimum distance between MTs in microns when nucleating
+    """
+    dataclass for dynamic instability parameters
+
+    Attributes
+    ----------
+    n_nodes : int
+        Number of nodes for newly nucleated fibers (see nucleation_rate)
+    v_growth : float
+        Growth velocity in microns/second. Growth happens at the "plus" ends
+    f_catastrophe : float
+        Catastrophe frequency (probability per unit time of switching from growth to deletion) in 1/second
+    v_grow_collision_scale : float
+        When a fiber hits a boundary, scale its velocity (v_growth) by this factor
+    f_catastrophe_collision_scale : float
+        When a fiber hits a boundary, scale its catastrophe frequency (f_catastrophe) by this
+    nucleation_rate : float = 0.0
+        Fiber nucleation rate in units of MT nucleations / second
+    min_length: float = 0.5
+        New fiber initial length in microns
+    bending_rigidity : float
+        New fiber bending rigidity
+    min_separation : float
+        Minimum distance between Fiber minus ends in microns when nucleating (closer than this will be rejected)
+    """
+    n_nodes: int = 16
+    v_growth: float = 0.0
+    f_catastrophe: float = 0.0
+    v_grow_collision_scale: float = 0.5
+    f_catastrophe_collision_scale: float = 2.0
+    nucleation_rate: float = 0.0
+    min_length: float = 0.5
+    bending_rigidity: float = 2.5E-3
+    min_separation: float = 0.1
 
 
 @dataclass
 class VelocityField():
+    """
+    dataclass representing velocity field measurement parameters
+
+    Attributes
+    ----------
+    moving_volume : bool
+        For large systems, track velocity field around bodies. If two bodies are adjacent, their grids will be merged into one
+    moving_volume_radius : float
+        not really a radius. half box size for volume around body to track
+    dt_write_field : float
+        Time between velocity field measurements
+    resolution : float
+        Distance between grid points. n_points ~ (2 * radius / resolution)^3. Don't make too small unless you have lots of memory/storage :)
+    """
     moving_volume: bool = True  # For large systems, track velocity field around bodies
     moving_volume_radius: float = 30.0  # not really a radius. half box size for volume around body to track
     dt_write_field: float = 0.5  # how often to write velocity field
@@ -79,18 +153,56 @@ class VelocityField():
 
 @dataclass
 class Params():
-    eta: float = 1.0  # Viscosity
-    dt_initial: float = 0.025  # Initial length of timestep in seconds
-    dt_min: float = 1E-5  # minimum timestep before simulation fails
-    dt_max: float = 0.025  # maximum timestep size
-    dt_write: float = 0.1  # roughly how often to write
-    t_final: float = 1000.0  # time when finished
-    gmres_tol: float = 1E-8  # gmres tolerance, might be tuned later
-    fiber_error_tol: float = 1E-1  # don't touch, fiber error tolerance
+    """
+    dataclass representing system/meta parameters for the entire simulation
+
+    Attributes
+    ----------
+    eta : float
+        Viscosity of fluid
+    dt_initial : float
+        Initial length of timestep in seconds
+    dt_min : float
+        Minimum timestep before simulation fails when using adaptive timestepping (adaptive_timestep_flag)
+    dt_max : float
+        Maximum timestep size allowable when using adaptive timestepping (adaptive_timestep_flag)
+    dt_write : float
+        Amount of simulation time between writes. Due to adaptive timestepping (and floating point issues) the
+        time between writes is only approximately dt_write
+    t_final : float
+        Simulation time to quit the simulation
+    gmres_tol : float
+        GMRES tolerance, might be tuned later, but recommend at least 1E-8
+    fiber_error_tol : float
+        Fiber error tolerance. Not recommended to tamper with.
+        Fiber error is the maximum deviation between 1.0 and a the derivative along the fiber.
+        When using adaptive timestepping, if the error exceeds this value, the timestep is rejected.
+    shell_precompute_file : str
+        File to store the shell precompute data
+    periphery_binding_flag : bool
+        If set, fiber plus ends near the periphery (closer than 0.75, hardcoded) will use hinged boundary conditions
+    seed : int
+        Random number seed
+    dynamic_instability : DynamicInstability
+        Dynamic instability parameters
+    velocity_field : VelocityField
+        Velocity field parameters
+    periphery_interaction_flag : bool = True
+        Experimental repulsion between periphery and Fibers
+    adaptive_timestep_flag : bool = True
+        If set, use adaptive timestepping, which attempts to control simulation error by reducing the timestep when the solution has convergence issues
+    """
+    eta: float = 1.0
+    dt_initial: float = 0.025
+    dt_min: float = 1E-5
+    dt_max: float = 0.025
+    dt_write: float = 0.1
+    t_final: float = 1000.0
+    gmres_tol: float = 1E-8
+    fiber_error_tol: float = 1E-1
     shell_precompute_file: str = "shell_precompute.npz"
-    periphery_binding_flag: bool = False  # should MT hinge at periphery surface
-    seed: int = 130319  # random number seed
-    velocity_field_flag: bool = True  # measure the velocity field
+    periphery_binding_flag: bool = False
+    seed: int = 130319
     dynamic_instability: DynamicInstability = DynamicInstability()
     velocity_field: VelocityField = VelocityField()
     periphery_interaction_flag: bool = True
@@ -99,7 +211,15 @@ class Params():
 
 @dataclass
 class Periphery():
-    n_nodes: int = 6000  # number of nodes to represent sphere. larger peripheries = more nodes. don't exceed ~10000 :)
+    """
+    dataclass representing a periphery. Don't use directly, but use one of the subclasses
+
+    Attributes
+    ----------
+    n_nodes : int
+        Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
+    """
+    n_nodes: int = 6000
 
     def find_binding_site(self, fibers: List[Fiber]):
         return None
@@ -107,8 +227,21 @@ class Periphery():
 
 @dataclass
 class SphericalPeriphery(Periphery):
-    shape: str = 'sphere'  # fixed, don't change
-    radius: float = 6.0  # radius
+    """
+    dataclass representing a spherical periphery
+
+    Attributes
+    ----------
+    n_nodes : int
+        Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
+    shape : str = 'sphere'
+        Shape of the periphery. Don't modify it!
+    radius : float = 6.0
+        Radius of our sphere in microns
+    """
+
+    shape: str = 'sphere'
+    radius: float = 6.0
 
     def find_binding_site(self, fibers: List[Fiber], ds_min):
         while (True):
@@ -126,38 +259,123 @@ class SphericalPeriphery(Periphery):
 
 @dataclass
 class EllipsoidalPeriphery(Periphery):
-    shape: str = 'ellipsoid'  # fixed, don't change
-    a: float = 7.8  # axis 1
-    b: float = 4.16  # axis 2
-    c: float = 4.16  # axis 3
+    """
+    dataclass representing an ellipsoidal periphery. (x/a)^2 + (y/b)^2 (z/c)^2 = 1
+
+    Attributes
+    ----------
+    n_nodes : int
+        Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
+    shape : str
+        Shape of the periphery. Don't modify it!
+    a : float
+         length of axis 'a'
+    b : float
+         length of axis 'b'
+    b : float
+         length of axis 'c'
+    """
+
+    shape: str = 'ellipsoid'
+    a: float = 7.8
+    b: float = 4.16
+    c: float = 4.16
 
 
 @dataclass
 class RevolutionPeriphery(Periphery):
-    shape: str = 'surface_of_revolution'  # fixed, don't change
+    """
+    dataclass representing a surface of revolution. The user provides an envelope function 'h(x)' (see skelly_sim.shape_gallery.Envelope)
+    which is rotated around the 'x' axis to generate a periphery. Note that the 'skelly_precompute' utility will actually update
+    your output toml file with the correct number of nodes. This complicated machinery is so that later on 'skelly_sim' can directly look for
+    collisions using the input height function
+
+    # Example usage:
+    # Target number of nodes -- actual number likely larger
+    config.periphery.envelope.n_nodes_target = 6000
+
+    # lower/upper bound are required options. ideally your function should go to zero at the upper/lower bounds
+    config.periphery.envelope.lower_bound = -3.75
+    config.periphery.envelope.upper_bound = 3.75
+
+    # required option. this is the function you're revolving around the 'x' axis. 'x' needs to be
+    # the independent variable. Currently the function has to be a one-liner
+    config.periphery.envelope.height = "0.5 * T * ((1 + 2*x/length)**p1) * ((1 - 2*x/length)**p2) * length"
+    # All the parameters that go into our height function
+    config.periphery.envelope.T = 0.72
+    config.periphery.envelope.p1 = 0.4
+    config.periphery.envelope.p2 = 0.2
+    config.periphery.envelope.length = 7.5
+
+
+    Attributes
+    ----------
+    n_nodes : int
+        Number of nodes to represent Periphery object. This will be set by the envelope, so don't bother changing from default
+    shape : str
+        Shape of the periphery. Don't modify it!
+    envelope : skelly_sim.shape_gallery.Envelope
+        See example above
+    """
+
+    shape: str = 'surface_of_revolution'
     n_nodes: int = 0
     envelope: Namespace = field(default_factory=Namespace)
 
 
 @dataclass
 class Body():
-    nucleation_type: str = 'auto'  # how nucleation sites are made (can be manually set)
-    n_nucleation_sites: int = 500  # number of available MT sites. don't add more fibers than this to body
-    position: List[float] = field(
-        default_factory=default_vector)  # lab frame coordinate
-    orientation: List[float] = field(
-        default_factory=default_quaternion
-    )  # orientation quaternion. don't bother changing
-    shape: str = 'sphere'  # sphere is currently only supported option
-    radius: float = 1.0  # radius :). this is the attachment radius, the hydrodynamic radius is a bit smaller
-    num_nodes: int = 600  # number of nodes to represent surface. MAKE NEW PRECOMPUTE DATA WHEN CHANGING
-    precompute_file: str = 'body_precompute.npz'  # where precompute data is stored (quadrature data, mostly)
-    external_force: List[float] = field(
-        default_factory=default_vector)  # force applied to body
+    """
+    dataclass for a single body and its parameters
+
+    Attributes
+    ----------
+    nucleation_type : str
+        How nucleation sites are made (just leave as 'auto', which will place the nucleation site at the fiber minus end automatically)
+    n_nucleation_sites : int
+        Number of available Fiber sites on the body. Don't add more fibers than this to body
+    position : List[float]
+        Lab frame coordinate of the body center
+    orientation : List[float]
+        Orientation quaternion of the body. Not worth changing
+    shape : str
+        Shape of the body. Sphere is currently only supported option
+    radius : float
+        Radius of the body. This is the attachment radius for nucleation sites, the hydrodynamic radius is a bit smaller
+    num_nodes : int
+        Number of nodes to represent surface. WARNING: MAKE NEW PRECOMPUTE DATA WHEN CHANGING or you will regret it.
+    precompute_file : str
+        Where precompute data is stored (quadrature data, mostly)
+    external_force : List[float]
+        Lab frame external force applied to body - useful for testing things like stokes flow
+    """
+    nucleation_type: str = 'auto'
+    n_nucleation_sites: int = 500
+    position: List[float] = field(default_factory=default_vector)
+    orientation: List[float] = field(default_factory=default_quaternion)
+    shape: str = 'sphere'
+    radius: float = 1.0
+    num_nodes: int = 600
+    precompute_file: str = 'body_precompute.npz'
+    external_force: List[float] = field(default_factory=default_vector)
 
 
 @dataclass
 class Point():
+    """
+    dataclass for a point force/torque source
+
+    Attributes
+    ----------
+    position : List[float]
+        Position of the point source (x,y,z)
+    force : List[float]
+        Constant force to emit from point source
+    torque : List[float]
+        Constant torque to emit from point source
+    time_to_live : float
+        Simulation time after which the point source deactivates and does nothing
+    """
     position: List[float] = field(default_factory=default_vector)
     force: List[float] = field(default_factory=default_vector)
     torque: List[float] = field(default_factory=default_vector)
@@ -166,6 +384,20 @@ class Point():
 
 @dataclass
 class Config():
+    """
+    Parent dataclass for a SkellySim config. Use this config if you don't have a bounding volume
+
+    Attributes
+    ----------
+    params : Params
+        System parameters (skelly_config.Params)
+    bodies : List[Body]
+        List of bodies (skelly_config.Body)
+    fibers : List[Fiber]
+        List of fibers (skelly_config.Fiber)
+    point_sources : List[Point]
+        List of point sources (skelly_config.Point)
+    """
     params: Params = Params()
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
@@ -192,16 +424,64 @@ class Config():
 
 @dataclass
 class ConfigSpherical(Config):
+    """
+    dataclass for a SkellySim config with a spherical periphery
+
+    Attributes
+    ----------
+    params : Params
+        System parameters (skelly_config.Params)
+    bodies : List[Body]
+        List of bodies (skelly_config.Body)
+    fibers : List[Fiber]
+        List of fibers (skelly_config.Fiber)
+    point_sources : List[Point]
+        List of point sources (skelly_config.Point)
+    periphery : SphericalPeriphery
+        SphericalPeriphery
+    """
     periphery: SphericalPeriphery = SphericalPeriphery()
 
 
 @dataclass
 class ConfigEllipsoidal(Config):
+    """
+    dataclass for a SkellySim config with an ellipsoidal periphery
+
+    Attributes
+    ----------
+    params : Params
+        System parameters (skelly_config.Params)
+    bodies : List[Body]
+        List of bodies (skelly_config.Body)
+    fibers : List[Fiber]
+        List of fibers (skelly_config.Fiber)
+    point_sources : List[Point]
+        List of point sources (skelly_config.Point)
+    periphery : EllipsoidalPeriphery
+        EllipsoidalPeriphery
+    """
     periphery: EllipsoidalPeriphery = EllipsoidalPeriphery()
 
 
 @dataclass
 class ConfigRevolution(Config):
+    """
+    dataclass for a SkellySim config with a 'surface of revolution' periphery
+
+    Attributes
+    ----------
+    params : Params
+        System parameters (skelly_config.Params)
+    bodies : List[Body]
+        List of bodies (skelly_config.Body)
+    fibers : List[Fiber]
+        List of fibers (skelly_config.Fiber)
+    point_sources : List[Point]
+        List of point sources (skelly_config.Point)
+    periphery : RevolutionPeriphery
+        RevolutionPeriphery
+    """
     periphery: RevolutionPeriphery = RevolutionPeriphery()
 
 
@@ -231,7 +511,6 @@ def get_random_orthogonal_vector(x: np.array):
 
 
 def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
-
     x_max_fun = lambda xf: sin_length(amplitude, xf) - length
     x_max = fsolve(x_max_fun, length)
 
