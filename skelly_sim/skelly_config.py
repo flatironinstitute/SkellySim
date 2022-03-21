@@ -297,8 +297,9 @@ class Params():
     shell_precompute_file: str = "shell_precompute.npz"
     periphery_binding_flag: bool = False
     seed: int = 130319
-    dynamic_instability: DynamicInstability = DynamicInstability()
-    velocity_field: VelocityField = VelocityField()
+    dynamic_instability: DynamicInstability = field(
+        default_factory=DynamicInstability)
+    velocity_field: VelocityField = field(default_factory=VelocityField)
     periphery_interaction_flag: bool = True
     adaptive_timestep_flag: bool = True
 
@@ -512,7 +513,7 @@ class Config():
     point_sources : List[Point]
         List of point sources (skelly_config.Point)
     """
-    params: Params = Params()
+    params: Params = field(default_factory=Params)
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
