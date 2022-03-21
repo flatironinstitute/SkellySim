@@ -558,7 +558,7 @@ class ConfigSpherical(Config):
     periphery : SphericalPeriphery
         SphericalPeriphery
     """
-    periphery: SphericalPeriphery = SphericalPeriphery()
+    periphery: SphericalPeriphery = field(default_factory=SphericalPeriphery)
 
 
 @dataclass
@@ -579,7 +579,7 @@ class ConfigEllipsoidal(Config):
     periphery : EllipsoidalPeriphery
         EllipsoidalPeriphery
     """
-    periphery: EllipsoidalPeriphery = EllipsoidalPeriphery()
+    periphery: EllipsoidalPeriphery = field(default_factory=EllipsoidalPeriphery)
 
 
 @dataclass
@@ -600,4 +600,4 @@ class ConfigRevolution(Config):
     periphery : RevolutionPeriphery
         RevolutionPeriphery
     """
-    periphery: RevolutionPeriphery = RevolutionPeriphery()
+    periphery: RevolutionPeriphery = field(default_factory=RevolutionPeriphery)
