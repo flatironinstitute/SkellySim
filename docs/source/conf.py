@@ -64,3 +64,6 @@ def process_sig(app, what, name, obj, options, signature, return_annotation):
 
 def setup(app):
     app.connect("autodoc-process-signature", process_sig)
+
+
+autodoc_mock_imports = ["function_generator"]
