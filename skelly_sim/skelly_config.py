@@ -268,7 +268,7 @@ class Fiber():
         """
         fiber_positions = x0 + \
             self.length * np.linspace(0, normal, self.n_nodes)
-        fib.x = fiber_positions.ravel().tolist()
+        self.x = fiber_positions.ravel().tolist()
 
 
 @dataclass
@@ -297,7 +297,7 @@ class DynamicInstability():
     min_separation : float, default: :obj:`0.1`
         Minimum distance between Fiber minus ends in microns when nucleating (closer than this will be rejected)
     """
-    n_nodes: int = 16
+    n_nodes: int = 0
     v_growth: float = 0.0
     f_catastrophe: float = 0.0
     v_grow_collision_scale: float = 0.5
@@ -382,7 +382,7 @@ class Params():
     dynamic_instability: DynamicInstability = field(
         default_factory=DynamicInstability)
     velocity_field: VelocityField = field(default_factory=VelocityField)
-    periphery_interaction_flag: bool = True
+    periphery_interaction_flag: bool = False
     adaptive_timestep_flag: bool = True
 
 
@@ -684,7 +684,7 @@ class Body():
         Shape of the body. Sphere is currently only supported option
     radius : float, default: :obj:`1.0`
         Radius of the body. This is the attachment radius for nucleation sites, the hydrodynamic radius is a bit smaller
-    num_nodes : int, default: :obj:`600`
+    n_nodes : int, default: :obj:`600`
         Number of nodes to represent surface. WARNING: MAKE NEW PRECOMPUTE DATA WHEN CHANGING or you will regret it.
     precompute_file : str, default: :obj:`'body_precompute.npz'`
         Where precompute data is stored (quadrature data, mostly). Can be different on
@@ -699,7 +699,7 @@ class Body():
     orientation: List[float] = field(default_factory=_default_quaternion)
     shape: str = 'sphere'
     radius: float = 1.0
-    num_nodes: int = 600
+    n_nodes: int = 600
     precompute_file: str = 'body_precompute.npz'
     external_force: List[float] = field(default_factory=_default_vector)
 

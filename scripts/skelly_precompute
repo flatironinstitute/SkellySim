@@ -156,7 +156,7 @@ def precompute_periphery(config):
 
 def precompute_body_sphere(body):
     precompute_file = body['precompute_file']
-    num_nodes = body['num_nodes']
+    n_nodes = body['n_nodes']
 
     radius = body['radius']
     if radius < body_quadrature_radius_threshold:
@@ -166,7 +166,7 @@ def precompute_body_sphere(body):
 
     boundary = ShapeGallery(
         'sphere',
-        num_nodes,
+        n_nodes,
         radius=radius,
     )
 
