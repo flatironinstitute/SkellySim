@@ -12,16 +12,15 @@ from skelly_sim import shape_gallery
 def build_cdf(f: Callable[[float], float], lb: float,
               ub: float) -> Tuple[np.array, np.array]:
     """
-    Builds a discretized cumulative distribution function on the function f(x) on [lb, ub]
+    Builds a discretized cumulative distribution function of the arclength along the curve defined by f(x) on [lb, ub].
+    Useful for distributing random positions uniformly along a curve (i.e. for placing fibers on an arbitrary surface).
+    Used with sister function invert_cdf
 
     Returns
     -------
     tuple(np.array, np.array)
         uniformly separated x_i and its associated cdf(x_i)
     """
-    # to generate microtubules on the surface, I build up a 'cdf' of ds(x)*h(x) (the infinitesimal
-    #  area of the shell at 'x'). Then solving 'cdf(x) = u' for x will give me a properly
-    #  distributed 'x'.
 
     # Evaluate function finely so that we can get a good estimate for the arc length
     xs = np.hstack([np.linspace(lb, ub, 1000000), [ub]])
@@ -31,12 +30,11 @@ def build_cdf(f: Callable[[float], float], lb: float,
     # shell area (off by some constant factor. using mean of height since diff() shortens
     # vectors)
     dist = np.sqrt(xd**2 + rd**2) * (rs[0:-1] + rs[1:])
-    # total arc length as function of x
+    # cumulative arc length as function of x
     u = np.hstack([[0.0], np.cumsum(dist)]) / np.sum(dist)
     return xs, u
 
 
-# invert a cdf to get a point uniformly distributed along the surface
 def invert_cdf(y: float, xs: np.array, u: np.array) -> float:
     """
     Solves the cdf equation 'cdf(x) = y' for x using bisection. Meant to be used with the output from build_cdf
