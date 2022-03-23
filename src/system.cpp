@@ -1079,7 +1079,7 @@ void prep_state_for_solver() {
 
     MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     // Fiber-periphery forces (if periphery exists)
-    if (params_.periphery_interaction_flag) {
+    if (params_.periphery_interaction_flag && shell_->is_active()) {
         int i_col = 0;
 
         for (const auto &fib : fc_.fibers) {

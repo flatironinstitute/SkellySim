@@ -67,6 +67,8 @@ class Periphery {
 
     void step(VectorRef &solution) { solution_vec_ = solution; }
 
+    bool is_active() const { return n_nodes_global_; }
+
     virtual bool check_collision(const DeformableBody &body, double threshold) const {
         if (!n_nodes_global_)
             return false;
