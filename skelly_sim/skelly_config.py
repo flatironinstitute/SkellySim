@@ -6,7 +6,20 @@ import numpy as np
 from scipy.special import ellipeinc, ellipe
 from scipy.optimize import fsolve, bisect
 import toml
-from skelly_sim import shape_gallery
+from skelly_sim import shape_gallery, param_tools
+
+
+def _ellipsoid(t: float, u: float, a: float, b: float, c: float):
+    """
+    Return point on ellipsoid(t=angle1, u=angle2) parameterized by the axes [a, b, c].
+
+    Returns
+    -------
+    np.array(3)
+        Point on the surface of the ellipsoid given input parameters
+    """
+    return np.array(
+        [a * np.sin(u) * np.cos(t), b * np.sin(u) * np.sin(t), c * np.cos(u)])
 
 
 def _build_cdf(f: Callable[[float], float], lb: float,
@@ -542,6 +555,74 @@ class EllipsoidalPeriphery(Periphery):
     b: float = 4.16
     c: float = 4.16
 
+    def move_fibers_to_surface(self,
+                               fibers: List[Fiber],
+                               ds_min: float,
+                               verbose: bool = True) -> None:
+        """
+        Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
+
+        Arguments
+        ---------
+        fibers : List[Fiber]
+            List of fibers that will be moved. Only the Fiber.x property will be modified
+        ds_min : float
+            Minimum separation allowable between the fiber minus ends. Collisions are not searched for the rest of the fibers,
+            though they are unlikely
+        verbose : bool
+            default: :obj:`True`
+
+            If true, print a progress message
+        """
+        print("Generating trial uniform points on surface")
+        n_trials = 5 * len(fibers)
+
+        def ellipsoid(t, u):
+            return _ellipsoid(t, u, self.a / 1.04, self.b / 1.04,
+                              self.c / 1.04)
+
+        x_trial = param_tools.r_surface(n_trials, ellipsoid, *(0, 2 * np.pi),
+                                        *(0, np.pi))[0]
+
+        print("Inserting fibers")
+        ds_min2 = ds_min * ds_min
+        i_trial = 0
+        for i in range(len(fibers)):
+            if i_trial >= n_trials:
+                print(
+                    "Unable to insert fibers. Add more fiber trials, or decrease fiber density on the surface."
+                )
+                sys.exit()
+
+            fib: Fiber = fibers[i]
+
+            i_trial_start = i_trial
+            while (True):
+                x0 = x_trial[:, i_trial]
+
+                reject = False
+                for j in range(0, i - 1):
+                    dx = x0 - fibers[j].x[0:3]
+                    if np.dot(x0, x0) < ds_min2:
+                        i_trial_fiber += 1
+                        reject = True
+                        break
+                if reject:
+                    continue
+
+                # Use our envelope function to calculate the gradient/normal
+                normal = np.array(
+                    [x0[0] / self.a**2, x0[1] / self.b**2, x0[2] / self.c**2])
+                normal = normal / np.linalg.norm(normal)
+
+                fiber_positions = x0 + fibers[i].length * np.linspace(
+                    0, normal, fibers[i].n_nodes)
+                fib.x = fiber_positions.ravel().tolist()
+                i_trial += 1
+                print("Inserted fiber {} after {} trials".format(
+                    i, i_trial - i_trial_start))
+                break
+
 
 @dataclass
 class RevolutionPeriphery(Periphery):
@@ -606,6 +687,8 @@ class RevolutionPeriphery(Periphery):
             Minimum separation allowable between the fiber minus ends. Collisions are not searched for the rest of the fibers,
             though they are unlikely
         verbose : bool
+            default: :obj:`True`
+
             If true, print a progress message
         """
         print("Building envelope object and CDF...")
@@ -784,19 +867,32 @@ class Config():
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
 
-    def insert_fiber(self, fiber: Fiber, placement=None):
-        fib = copy.copy(fiber)
-        if placement:
-            if placement[0] == 'periphery':
-                x0, u0 = self.periphery.find_binding_site(
-                    self.fibers, placement[1])
-            else:
-                raise RuntimeError
-            fib.x = (
-                x0 -
-                np.linspace(0, u0 * fib.length, fib.n_nodes)).ravel().tolist()
-            fib.minus_clamped = True
-        self.fibers.append(fib)
+    def plot_fibers(self, backend="TKAgg"):
+        """
+        Scatter plot fiber beginning and end points. Note axes are not scaled, so results may look
+        'squished' and not exactly uniform.
+
+        Arguments
+        ---------
+        backend : str
+            default: :obj:`TKAgg`
+
+            matplotlib backend to use. This is a workaround to how matplotlib is sometimes configured by default
+        """
+        import matplotlib
+        try:
+            matplotlib.use(backend)
+        except:
+            print("Unable to use backend: '{}'. Trying to plot with default".
+                  format(backend))
+            pass
+        import matplotlib.pyplot as plt
+        x_fib = np.array([fib.x[0:3] for fib in self.fibers])
+        x_fib_2 = np.array([fib.x[-3:] for fib in self.fibers])
+        ax = plt.axes(projection='3d')
+        ax.scatter(x_fib[:, 0], x_fib[:, 1], x_fib[:, 2], color='blue')
+        ax.scatter(x_fib_2[:, 0], x_fib_2[:, 1], x_fib_2[:, 2], color='green')
+        plt.show()
 
     def save(self, filename: str):
         with open(filename, 'w') as f:

@@ -64,26 +64,8 @@ config.periphery.envelope.length = 7.5
 ds_min = 0.1
 config.periphery.move_fibers_to_surface(config.fibers, ds_min)
 
-
-# Scatter plot fiber beginning and end points. Note axes are not scaled, so results may look
-# 'squished' and not uniform
-def plot_fibers(fibers):
-    import matplotlib
-    try:
-        matplotlib.use("TKAgg")
-    except:
-        pass
-    import matplotlib.pyplot as plt
-    x_fib = np.array([fib.x[0:3] for fib in fibers])
-    x_fib_2 = np.array([fib.x[-3:] for fib in fibers])
-    ax = plt.axes(projection='3d')
-    ax.scatter(x_fib[:, 0], x_fib[:, 1], x_fib[:, 2], color='blue')
-    ax.scatter(x_fib_2[:, 0], x_fib_2[:, 1], x_fib_2[:, 2], color='green')
-    plt.show()
-
-
 # output our config
 config.save(config_file)
 
 # just uncomment this to show a quick visualization of fiber positions
-# plot_fibers(config.fibers)
+# config.plot_fibers()
