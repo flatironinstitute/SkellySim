@@ -1,11 +1,56 @@
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 from dataclasses import dataclass, asdict, field, is_dataclass
 from argparse import Namespace
 import copy
 import numpy as np
 from scipy.special import ellipeinc, ellipe
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, bisect
 import toml
+from skelly_sim import shape_gallery
+
+
+def build_cdf(f: Callable[[float], float], lb: float,
+              ub: float) -> Tuple[np.array, np.array]:
+    """
+    Builds a discretized cumulative distribution function on the function f(x) on [lb, ub]
+
+    Returns
+    -------
+    tuple(np.array, np.array)
+        uniformly separated x_i and its associated cdf(x_i)
+    """
+    # to generate microtubules on the surface, I build up a 'cdf' of ds(x)*h(x) (the infinitesimal
+    #  area of the shell at 'x'). Then solving 'cdf(x) = u' for x will give me a properly
+    #  distributed 'x'.
+
+    # Evaluate function finely so that we can get a good estimate for the arc length
+    xs = np.hstack([np.linspace(lb, ub, 1000000), [ub]])
+    rs = f(xs)
+    xd = np.diff(xs)
+    rd = np.diff(rs)
+    # shell area (off by some constant factor. using mean of height since diff() shortens
+    # vectors)
+    dist = np.sqrt(xd**2 + rd**2) * (rs[0:-1] + rs[1:])
+    # total arc length as function of x
+    u = np.hstack([[0.0], np.cumsum(dist)]) / np.sum(dist)
+    return xs, u
+
+
+# invert a cdf to get a point uniformly distributed along the surface
+def invert_cdf(y: float, xs: np.array, u: np.array) -> float:
+    """
+    Solves the cdf equation 'cdf(x) = y' for x using bisection. Meant to be used with the output from build_cdf
+
+    Returns
+    -------
+    float
+        'x' value s.t. 'cdf(x) ~= y'
+    """
+
+    def f(x):
+        return y - np.interp(x, xs, u)
+
+    return bisect(f, xs[0], xs[-1])
 
 
 def get_random_point_on_sphere():
@@ -341,7 +386,8 @@ class SphericalPeriphery(Periphery):
     shape: str = 'sphere'
     radius: float = 6.0
 
-    def find_binding_site(self, fibers: List[Fiber], ds_min) -> Tuple[np.array, np.array]:
+    def find_binding_site(self, fibers: List[Fiber],
+                          ds_min) -> Tuple[np.array, np.array]:
         """
         Find an open binding site given a list of Fibers that could interfere with binding
         Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
@@ -432,13 +478,81 @@ class RevolutionPeriphery(Periphery):
         Number of nodes to represent Periphery object. This will be set by the envelope, so don't bother changing from default
     shape : str
         Shape of the periphery. Don't modify it!
-    envelope : skelly_sim.shape_gallery.Envelope
+    envelope : Namespace
         See example above
     """
 
     shape: str = 'surface_of_revolution'
     n_nodes: int = 0
     envelope: Namespace = field(default_factory=Namespace)
+
+    def move_fibers_to_surface(self, fibers: List[Fiber],
+                               ds_min: float) -> None:
+        """
+        Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
+
+        Arguments
+        ---------
+        fibers : List[Fiber]
+            List of fibers that will be moved. Only the Fiber.x property will be modified
+        ds_min : float
+            Minimum separation allowable between the fiber minus ends. Collisions are not searched for the rest of the fibers,
+            though they are unlikely
+        """
+        envelope = shape_gallery.Envelope(self.envelope)
+
+        xs, u = build_cdf(envelope.raw_height_func, self.envelope.lower_bound,
+                          self.envelope.upper_bound)
+
+        for i in range(len(fibers)):
+            i_trial = 0
+            reject = True
+            while (reject):
+                i_trial += 1
+
+                # generate trial 'x'
+                x_trial = invert_cdf(np.random.uniform(), xs, u)
+                h_trial = envelope.raw_height_func(x_trial)
+
+                # generate trial 'y, z'
+                theta = 2 * np.pi * np.random.uniform()
+                y_trial = h_trial * np.cos(theta)
+                z_trial = h_trial * np.sin(theta)
+
+                # base of Fiber
+                x0 = np.array([x_trial, y_trial, z_trial])
+
+                # check for collisions
+                reject = False
+                for j in range(0, i - 1):
+                    if np.linalg.norm(x0 - fibers[j].x[0:3]) < ds_min:
+                        reject = True
+                        break
+                if reject:
+                    continue
+
+                # we need a normal, which requires derivatives. Our envelope can calculate them
+                # arbitrarily.  However, the envelope object is a fit, and it doesn't necessarily fit
+                # down to the supplied upper/lower bounds, if that function has a divergent
+                # derivative. Here we just assume that unfit points points are aligned along 'x'
+                if x0[0] < envelope.a:
+                    normal = np.array([1.0, 0.0, 0.0])
+                elif x0[0] > envelope.b:
+                    normal = np.array([-1.0, 0.0, 0.0])
+                else:
+                    # Use our envelope function to calculate the gradient/normal
+                    normal = np.array([
+                        envelope(x0[0]) * envelope.differentiate(x0[0]),
+                        -x0[1], -x0[2]
+                    ])
+                    normal = normal / np.linalg.norm(normal)
+
+                # Add fib.n_nodes points linearly along normal from the base
+                fiber_positions = x0 + fibers[i].length * np.linspace(
+                    0, normal, fibers[i].n_nodes)
+
+                # Assign these positions to fib.x
+                fibers[i].x = fiber_positions.ravel().tolist()
 
 
 @dataclass
@@ -453,7 +567,7 @@ class Body():
     n_nucleation_sites : int
         Number of available Fiber sites on the body. Don't add more fibers than this to body
     position : List[float]
-        Lab frame coordinate of the body center
+        Lab frame coordinate of the body center [x,y,z]
     orientation : List[float]
         Orientation quaternion of the body. Not worth changing
     shape : str
@@ -579,7 +693,8 @@ class ConfigEllipsoidal(Config):
     periphery : EllipsoidalPeriphery
         EllipsoidalPeriphery
     """
-    periphery: EllipsoidalPeriphery = field(default_factory=EllipsoidalPeriphery)
+    periphery: EllipsoidalPeriphery = field(
+        default_factory=EllipsoidalPeriphery)
 
 
 @dataclass
