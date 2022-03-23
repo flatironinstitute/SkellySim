@@ -13,7 +13,7 @@ with the provided visualization utilities in :ref:`visualization`.
 
 
 Trajectory format
-=================
+~~~~~~~~~~~~~~~~~
 
 The trajectory format is a single file that consists of consecutive 'frames' with data
 serialized in the :code:`msgpack` format. This makes doing post-processing in your language of

@@ -6,7 +6,7 @@ Visualization
 There are currently two methods for visualization, and neither is anywhere near perfect.
 
 Visualization with Paraview
-===========================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Paraview provides a nice way to overlay text, view streamlines, and generally customize your
 visualization. Unfortunately the renderer is only OK and getting it to work with a custom
@@ -14,7 +14,7 @@ python environment can be very finicky.
 
 
 Visualization with Blender
-==========================
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Blender is not really designed with scientific workflows in mind, but it is very flexible,
 plays more nicely with user python environments, has multiple renderers, all of which are

@@ -1,7 +1,7 @@
 .. _generating-configuration-files:
 
 Generating configuration files
-==============================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 While SkellySim has limited facilities for writing config files by hand, it's usually much
 better to generate the configurations from a python script. The python portion of `skelly_sim`
