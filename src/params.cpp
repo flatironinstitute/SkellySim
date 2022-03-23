@@ -71,6 +71,4 @@ Params::Params(toml::value &pt) {
         velocity_field.resolution = toml::find_or(vf, "resolution", 1.0);
         velocity_field.moving_volume_radius = toml::find_or(vf, "moving_volume_radius", 20.0);
     }
-
-    shell_precompute_file = toml::find_or(pt, "shell_precompute_file", "");
 }

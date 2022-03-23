@@ -441,7 +441,7 @@ class Periphery():
         File to store the periphery precompute data
     """
     n_nodes: int = 6000
-    periphery_precompute = 'periphery_precompute.npz'
+    precompute_file: str = 'periphery_precompute.npz'
 
     def find_binding_site(self, fibers: List[Fiber]):
         """

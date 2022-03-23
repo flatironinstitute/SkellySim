@@ -20,7 +20,7 @@ class Fiber;
 class Periphery {
   public:
     Periphery() = default;
-    Periphery(const std::string &precompute_file, const toml::value &periphery_table, const Params &params);
+    Periphery(const toml::value &periphery_table, const Params &params);
 
     Eigen::MatrixXd flow(MatrixRef &trg, MatrixRef &density, double eta) const;
 
@@ -115,8 +115,8 @@ class Periphery {
 class SphericalPeriphery : public Periphery {
   public:
     double radius_;
-    SphericalPeriphery(const std::string &precompute_file, const toml::value &periphery_table, const Params &params)
-        : Periphery(precompute_file, periphery_table, params) {
+    SphericalPeriphery(const toml::value &periphery_table, const Params &params)
+        : Periphery(periphery_table, params) {
         radius_ = toml::find_or<double>(periphery_table, "radius", 0.0);
     };
 
@@ -132,8 +132,8 @@ class EllipsoidalPeriphery : public Periphery {
     double a_;
     double b_;
     double c_;
-    EllipsoidalPeriphery(const std::string &precompute_file, const toml::value &periphery_table, const Params &params)
-        : Periphery(precompute_file, periphery_table, params) {
+    EllipsoidalPeriphery(const toml::value &periphery_table, const Params &params)
+        : Periphery(periphery_table, params) {
         a_ = toml::find_or<double>(periphery_table, "a", 0.0);
         b_ = toml::find_or<double>(periphery_table, "b", 0.0);
         c_ = toml::find_or<double>(periphery_table, "c", 0.0);
@@ -151,8 +151,8 @@ class GenericPeriphery : public Periphery {
     double a_;
     double b_;
     double c_;
-    GenericPeriphery(const std::string &precompute_file, const toml::value &periphery_table, const Params &params)
-        : Periphery(precompute_file, periphery_table, params) {
+    GenericPeriphery(const toml::value &periphery_table, const Params &params)
+        : Periphery(periphery_table, params) {
         a_ = node_pos_.row(0).array().abs().maxCoeff();
         b_ = node_pos_.row(1).array().abs().maxCoeff();
         c_ = node_pos_.row(2).array().abs().maxCoeff();

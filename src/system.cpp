@@ -1327,15 +1327,12 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
 
     if (param_table_.contains("periphery")) {
         const toml::value &periphery_table = param_table_.at("periphery");
-        if (!params_.shell_precompute_file.length())
-            throw std::runtime_error("Periphery specified, but no precompute file. Set [params] shell_precompute_file "
-                                     "in your input config and run the precompute script.");
         if (toml::find_or(periphery_table, "shape", "") == std::string("sphere"))
-            shell_ = std::make_unique<SphericalPeriphery>(params_.shell_precompute_file, periphery_table, params_);
+            shell_ = std::make_unique<SphericalPeriphery>(periphery_table, params_);
         else if (toml::find_or(periphery_table, "shape", "") == std::string("ellipsoid"))
-            shell_ = std::make_unique<EllipsoidalPeriphery>(params_.shell_precompute_file, periphery_table, params_);
+            shell_ = std::make_unique<EllipsoidalPeriphery>(periphery_table, params_);
         else // Assume generic periphery for all other shapes
-            shell_ = std::make_unique<GenericPeriphery>(params_.shell_precompute_file, periphery_table, params_);
+            shell_ = std::make_unique<GenericPeriphery>(periphery_table, params_);
     } else {
         shell_ = std::make_unique<Periphery>();
     }
