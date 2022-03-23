@@ -9,8 +9,8 @@ import toml
 from skelly_sim import shape_gallery
 
 
-def build_cdf(f: Callable[[float], float], lb: float,
-              ub: float) -> Tuple[np.array, np.array]:
+def _build_cdf(f: Callable[[float], float], lb: float,
+               ub: float) -> Tuple[np.array, np.array]:
     """
     Builds a discretized cumulative distribution function of the arclength along the curve defined by f(x) on [lb, ub].
     Useful for distributing random positions uniformly along a curve (i.e. for placing fibers on an arbitrary surface).
@@ -35,9 +35,9 @@ def build_cdf(f: Callable[[float], float], lb: float,
     return xs, u
 
 
-def invert_cdf(y: float, xs: np.array, u: np.array) -> float:
+def _invert_cdf(y: float, xs: np.array, u: np.array) -> float:
     """
-    Solves the cdf equation 'cdf(x) = y' for x using bisection. Meant to be used with the output from build_cdf
+    Solves the cdf equation 'cdf(x) = y' for x using bisection. Meant to be used with the output from _build_cdf
 
     Returns
     -------
@@ -51,7 +51,7 @@ def invert_cdf(y: float, xs: np.array, u: np.array) -> float:
     return bisect(f, xs[0], xs[-1])
 
 
-def get_random_point_on_sphere():
+def _get_random_point_on_sphere():
     """
     Give a uniform random point on the surface of a unit sphere
 
@@ -64,7 +64,7 @@ def get_random_point_on_sphere():
     return np.array([np.cos(phi) * factor, np.sin(phi) * factor, u])
 
 
-def sin_length(amplitude: float, xf: float):
+def _sin_length(amplitude: float, xf: float):
     """
     Compute the arc length of the function amplitude * sin(2*pi*x/xf) on [0, xf]
 
@@ -79,10 +79,10 @@ def sin_length(amplitude: float, xf: float):
     return xf / np.pi * (ellipe(-A2) + np.sqrt(1 + A2) * ellipe(A2 / (1 + A2)))
 
 
-def cos_length_full(amplitude: float, xi: float, xf: float, x_max: float):
+def _cos_length_full(amplitude: float, xi: float, xf: float, x_max: float):
     """
     The arclength of amplitude * cos(2*pi*x/x_max) on the interval [xi, xf]
-    Designed to be used with an fsolve on (sin_length() - length) to get x_max
+    Designed to be used with an fsolve on (_sin_length() - length) to get x_max
     Arclengths are bizarrely complicated!
 
     Arguments
@@ -102,7 +102,7 @@ def cos_length_full(amplitude: float, xi: float, xf: float, x_max: float):
             ellipeinc(scale_factor * xi, -A2)) / scale_factor
 
 
-def get_random_orthogonal_vector(x: np.array):
+def _get_random_orthogonal_vector(x: np.array):
     """Take an input 3d vector 'x' and return a random unit vector orthogonal to the input vector"""
 
     if x[1] != 0 or x[2] != 0:
@@ -117,9 +117,10 @@ def get_random_orthogonal_vector(x: np.array):
     return b * np.cos(theta) + c * np.sin(theta)
 
 
-def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
+def perturbed_fiber_positions(amplitude: float, length: float, x0: np.array,
+                              n_nodes: int):
     """
-    Create a fiber with a small cosine perturbation in a random direction orthogonal to the fiber.
+    Create a fiber x vector with a small cosine perturbation in a random direction orthogonal to the fiber.
     Fiber orientation is assumed to be along the vector x0, which is the position of the minus end of the filament (so don't place at the origin).
 
     Arguments
@@ -135,18 +136,18 @@ def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
 
     Returns: [n_nodes, 3] matrix of positions of each node in a perturbed fiber
     """
-    x_max_fun = lambda xf: sin_length(amplitude, xf) - length
+    x_max_fun = lambda xf: _sin_length(amplitude, xf) - length
     x_max = fsolve(x_max_fun, length)
 
     normal = -x0 / np.linalg.norm(x0)
 
-    ortho = get_random_orthogonal_vector(normal)
+    ortho = _get_random_orthogonal_vector(normal)
 
     arc_length_per_segment = length / (n_nodes - 1)
     lin_pos = np.zeros(n_nodes)
     for i in range(1, n_nodes):
-        fun = lambda xf: cos_length_full(amplitude, lin_pos[i - 1], xf, x_max
-                                         ) - arc_length_per_segment
+        fun = lambda xf: _cos_length_full(amplitude, lin_pos[i - 1], xf, x_max
+                                          ) - arc_length_per_segment
         lin_pos[i] = fsolve(fun, lin_pos[i - 1] + arc_length_per_segment)
 
     fiber_positions = np.outer(lin_pos, normal)
@@ -158,40 +159,50 @@ def perturb_fiber(amplitude: float, length: float, x0: np.array, n_nodes: int):
     return fiber_positions
 
 
-def unpack(obj):
+def _unpack(obj):
     """
-    Helper routine to process a Config recursively into the format needed by skelly_sim
-    Used in toml dumping
+    Helper routine to process a Config object recursively into the format needed by skelly_sim
+    Used in toml dumping.
+
+    Arguments
+    ---------
+    At entry, it should probably be a dataclass Config object
+
+    Returns
+    -------
+    Dict
+        Dictionary representation of our nested dataclass for toml export
     """
     if isinstance(obj, dict):
-        return {key: unpack(value) for key, value in obj.items()}
+        return {key: _unpack(value) for key, value in obj.items()}
     elif isinstance(obj, list):
         if not obj:
             return
-        return [unpack(value) for value in obj]
+        return [_unpack(value) for value in obj]
     elif is_dataclass(obj):
-        return {key: unpack(value) for key, value in asdict(obj).items()}
+        return {key: _unpack(value) for key, value in asdict(obj).items()}
     elif isinstance(obj, Namespace):
-        return unpack(
+        return _unpack(
             dict(
                 filter(lambda keyval: not keyval[0].startswith('__'),
                        obj.__dict__.items())))
     elif isinstance(obj, tuple):
-        return tuple(unpack(value) for value in obj)
+        return tuple(_unpack(value) for value in obj)
     else:
         return obj
 
 
-def default_vector():
+def _default_vector():
     """
-    The name says it all. A default vector for the field factories.
+    A default vector factory for dataclass 'field' objects: :obj:`[0.0, 0.0, 0.0]`
     """
     return [0.0, 0.0, 0.0]
 
 
-def default_quaternion():
+def _default_quaternion():
     """
-    The name says it all. A default quaternion for the field factories.
+    A default quaternion factory for dataclass 'field' objects: :obj:`[0.0, 0.0, 0.0, 1.0]`
+
     """
     return [0.0, 0.0, 0.0, 1.0]
 
@@ -204,21 +215,35 @@ class Fiber():
     Attributes
     ----------
     n_nodes : int
+        default: :obj:`32`
+
         Number of nodes to represent fiber. Highly deformed or very long fibers will require more nodes to be accurately represented
     parent_body : int
+        default: :obj:`-1`
+
         Index of 'body' fiber is bound to. A value of '-1' indicates a free fiber
     force_scale : float
+        default: :obj:`0.0`
+
         Tangential force per unit length to act along filament. A positive value pushes toward the 'plus' end,
         while a negative value pushes toward the 'minus' end
     bending_rigidity : float
+        default: :obj:`2.5E-3`
+
         Bending rigidity of this filament
     length : float
+        default: :obj:`1.0`
+
         Constraint length of this filament
     minus_clamped : bool
+        default: :obj:`False`
+
         Fix minus end of filament with "clamped" boundary condition, preserving orientation and position (Velocity = 0, AngularVelocity = 0)
     x : List[float]
+        default: :obj:`[]`
+
         List of node positions in [x0,y0,z0,x1,y1,z1...] order. Extreme care must be taken when setting this since the length constraint
-        can generate massive tensions with poor input
+        can generate massive tensions with poor input. See examples.
     """
     n_nodes: int = 32
     parent_body: int = -1
@@ -237,22 +262,40 @@ class DynamicInstability():
     Attributes
     ----------
     n_nodes : int
+        default: :obj:`16`
+
         Number of nodes for newly nucleated fibers (see nucleation_rate)
     v_growth : float
+        default: :obj:`0.0`
+
         Growth velocity in microns/second. Growth happens at the "plus" ends
     f_catastrophe : float
+        default: :obj:`0.0`
+
         Catastrophe frequency (probability per unit time of switching from growth to deletion) in 1/second
     v_grow_collision_scale : float
+        default: :obj:`0.5`
+
         When a fiber hits a boundary, scale its velocity (v_growth) by this factor
     f_catastrophe_collision_scale : float
+        default: :obj:`2.0`
+
         When a fiber hits a boundary, scale its catastrophe frequency (f_catastrophe) by this
     nucleation_rate : float
+        default: :obj:`0.0`
+
         Fiber nucleation rate in units of MT nucleations / second
     min_length: float
+        default: :obj:`0.5`
+
         New fiber initial length in microns
     bending_rigidity : float
+        default: :obj:`2.5E-3`
+
         New fiber bending rigidity
     min_separation : float
+        default: :obj:`0.1`
+
         Minimum distance between Fiber minus ends in microns when nucleating (closer than this will be rejected)
     """
     n_nodes: int = 16
@@ -273,71 +316,105 @@ class VelocityField():
 
     Attributes
     ----------
+    resolution : float
+        default: :obj:`1.0`
+
+        Distance between grid points. n_points ~ (2 * radius / resolution)^3. Don't make too small unless you have lots of memory/storage :)
+    dt_write_field : float
+        default: :obj:`0.5`
+
+        Time between velocity field measurements
     moving_volume : bool
+        default: :obj:`False`
+
         Track velocity field around bodies. If two bodies are adjacent, their grids will be merged into one. Useful when no periphery.
     moving_volume_radius : float
+        default: :obj:`30.0`
+
         not really a radius. half box size for volume around body to track
-    dt_write_field : float
-        Time between velocity field measurements
-    resolution : float
-        Distance between grid points. n_points ~ (2 * radius / resolution)^3. Don't make too small unless you have lots of memory/storage :)
     """
-    moving_volume: bool = True
-    moving_volume_radius: float = 30.0
-    dt_write_field: float = 0.5
     resolution: float = 1.0
+    dt_write_field: float = 0.5
+    moving_volume: bool = False
+    moving_volume_radius: float = 30.0
 
 
 @dataclass
 class Params():
-    """
-    dataclass representing system/meta parameters for the entire simulation
+    """dataclass representing system/meta parameters for the entire simulation
 
     Attributes
     ----------
     eta : float
+        default: :obj:`1.0`
+
         Viscosity of fluid
     dt_initial : float
+        default: :obj:`0.025`
+
         Initial length of timestep in seconds
     dt_min : float
+        default: :obj:`1E-5`
+
         Minimum timestep before simulation fails when using adaptive timestepping (adaptive_timestep_flag)
     dt_max : float
+        default: :obj:`0.1`
+
         Maximum timestep size allowable when using adaptive timestepping (adaptive_timestep_flag)
     dt_write : float
+        default: :obj:`0.1`
+
         Amount of simulation time between writes. Due to adaptive timestepping (and floating point issues) the
         time between writes is only approximately dt_write
     t_final : float
+        default: :obj:`100.0`
+
         Simulation time to quit the simulation
     gmres_tol : float
+        default: :obj:`1E-8`
+
         GMRES tolerance, might be tuned later, but recommend at least 1E-8
     fiber_error_tol : float
+        default: :obj:`0.1`
+
         Fiber error tolerance. Not recommended to tamper with.
         Fiber error is the maximum deviation between 1.0 and a the derivative along the fiber.
         When using adaptive timestepping, if the error exceeds this value, the timestep is rejected.
-    shell_precompute_file : str
-        File to store the shell precompute data
     periphery_binding_flag : bool
-        If set, fiber plus ends near the periphery (closer than 0.75, hardcoded) will use hinged boundary conditions
+        default: :obj:`False`
+
+        If set, fiber plus ends near the periphery (closer than 0.75, hardcoded) will use
+        hinged boundary conditions. Intended for use with dynamic instability
     seed : int
-        Random number seed
+        default: :obj:`130319`
+
+        Random number seed at simulation runtime (doesn't affect numpy seed during configuration generation)
     dynamic_instability : DynamicInstability
+        default: :obj:`DynamicInstability()`
+
         Dynamic instability parameters
     velocity_field : VelocityField
-        Velocity field parameters
+        default: :obj:`VelocityField()`
+
+        Velocity field parameters for post-processing
     periphery_interaction_flag : bool
+        default: :obj:`False`
+
         Experimental repulsion between periphery and Fibers
     adaptive_timestep_flag : bool
+        default: :obj:`True`
+
         If set, use adaptive timestepping, which attempts to control simulation error by reducing the timestep when the solution has convergence issues
+
     """
     eta: float = 1.0
     dt_initial: float = 0.025
     dt_min: float = 1E-5
     dt_max: float = 0.025
     dt_write: float = 0.1
-    t_final: float = 1000.0
+    t_final: float = 100.0
     gmres_tol: float = 1E-8
     fiber_error_tol: float = 1E-1
-    shell_precompute_file: str = "shell_precompute.npz"
     periphery_binding_flag: bool = False
     seed: int = 130319
     dynamic_instability: DynamicInstability = field(
@@ -355,9 +432,16 @@ class Periphery():
     Attributes
     ----------
     n_nodes : int
+        default: :obj:`6000`
+
         Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
+    precompute_file : str
+        default: :obj:`periphery_precompute.npz`
+
+        File to store the periphery precompute data
     """
     n_nodes: int = 6000
+    periphery_precompute = 'periphery_precompute.npz'
 
     def find_binding_site(self, fibers: List[Fiber]):
         """
@@ -374,10 +458,16 @@ class SphericalPeriphery(Periphery):
     Attributes
     ----------
     n_nodes : int
+        default: :obj:`6000`
+
         Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
     shape : str
+        default: :obj:`'sphere'`
+
         Shape of the periphery. Don't modify it!
     radius : float
+        default: :obj:`6.0`
+
         Radius of our sphere in microns
     """
 
@@ -405,7 +495,7 @@ class SphericalPeriphery(Periphery):
             position vector and its normalized version
         """
         while (True):
-            u0 = get_random_point_on_sphere()
+            u0 = _get_random_point_on_sphere()
             x0 = 0.99999999 * u0 * self.radius
 
             accept = True
@@ -426,14 +516,24 @@ class EllipsoidalPeriphery(Periphery):
     Attributes
     ----------
     n_nodes : int
+        default: :obj:`6000`
+
         Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
     shape : str
+        default: :obj:`'ellipsoid'`
+
         Shape of the periphery. Don't modify it!
     a : float
+         default: :obj:`7.8`
+
          length of axis 'a'
     b : float
+         default: :obj:`4.16`
+
          length of axis 'b'
     c : float
+         default: :obj:`4.16`
+
          length of axis 'c'
     """
 
@@ -445,8 +545,7 @@ class EllipsoidalPeriphery(Periphery):
 
 @dataclass
 class RevolutionPeriphery(Periphery):
-    """
-    dataclass representing a surface of revolution. The user provides an envelope function 'h(x)' (see skelly_sim.shape_gallery.Envelope)
+    """dataclass representing a surface of revolution. The user provides an envelope function 'h(x)' (see skelly_sim.shape_gallery.Envelope)
     which is rotated around the 'x' axis to generate a periphery. Note that the 'skelly_precompute' utility will actually update
     your output toml file with the correct number of nodes. This complicated machinery is so that later on 'skelly_sim' can directly look for
     collisions using the input height function
@@ -474,10 +573,17 @@ class RevolutionPeriphery(Periphery):
     Attributes
     ----------
     n_nodes : int
-        Number of nodes to represent Periphery object. This will be set by the envelope, so don't bother changing from default
+        default: :obj:`0`
+
+        Number of nodes to represent Periphery object. This will be set later by the envelope
+        during the precompute stage, so don't bother changing from default
     shape : str
+        default: :obj:`surface_of_revolution`
+
         Shape of the periphery. Don't modify it!
     envelope : Namespace
+        default: :obj:`argparse.Namespace()`
+
         See example above
     """
 
@@ -505,8 +611,8 @@ class RevolutionPeriphery(Periphery):
         print("Building envelope object and CDF...")
         envelope = shape_gallery.Envelope(self.envelope)
 
-        xs, u = build_cdf(envelope.raw_height_func, self.envelope.lower_bound,
-                          self.envelope.upper_bound)
+        xs, u = _build_cdf(envelope.raw_height_func, self.envelope.lower_bound,
+                           self.envelope.upper_bound)
         print("Finished building envelope object and CDF...")
 
         ds_min2 = ds_min * ds_min
@@ -517,7 +623,7 @@ class RevolutionPeriphery(Periphery):
                 i_trial += 1
 
                 # generate trial 'x'
-                x_trial = invert_cdf(np.random.uniform(), xs, u)
+                x_trial = _invert_cdf(np.random.uniform(), xs, u)
                 h_trial = envelope.raw_height_func(x_trial)
 
                 # generate trial 'y, z'
@@ -566,60 +672,87 @@ class RevolutionPeriphery(Periphery):
 
 @dataclass
 class Body():
-    """
-    dataclass for a single body and its parameters
+    """dataclass for a single body and its parameters
 
     Attributes
     ----------
     nucleation_type : str
+        default: :obj:`'auto'`
+
         How nucleation sites are made (just leave as 'auto', which will place the nucleation site at the fiber minus end automatically)
     n_nucleation_sites : int
+        default: :obj:`0`
+
         Number of available Fiber sites on the body. Don't add more fibers than this to body
     position : List[float]
+        default: :obj:`[0.0, 0.0, 0.0]`
+
         Lab frame coordinate of the body center [x,y,z]
     orientation : List[float]
+        default: :obj:`[0.0, 0.0, 0.0, 1.0]`
+
         Orientation quaternion of the body. Not worth changing
     shape : str
+        default: :obj:`'sphere'`
+
         Shape of the body. Sphere is currently only supported option
     radius : float
+        default: :obj:`1.0`
+
         Radius of the body. This is the attachment radius for nucleation sites, the hydrodynamic radius is a bit smaller
     num_nodes : int
+        default: :obj:`600`
+
         Number of nodes to represent surface. WARNING: MAKE NEW PRECOMPUTE DATA WHEN CHANGING or you will regret it.
     precompute_file : str
-        Where precompute data is stored (quadrature data, mostly)
+        default: :obj:`'body_precompute.npz'`
+
+        Where precompute data is stored (quadrature data, mostly). Can be different on
+        different bodies, though should be the same if the bodies are the same radius and have
+        the same numbers of nodes.
     external_force : List[float]
+        default: :obj:`[0.0, 0.0, 0.0]`
+
         Lab frame external force applied to body - useful for testing things like stokes flow
     """
     nucleation_type: str = 'auto'
-    n_nucleation_sites: int = 500
-    position: List[float] = field(default_factory=default_vector)
-    orientation: List[float] = field(default_factory=default_quaternion)
+    n_nucleation_sites: int = 0
+    position: List[float] = field(default_factory=_default_vector)
+    orientation: List[float] = field(default_factory=_default_quaternion)
     shape: str = 'sphere'
     radius: float = 1.0
     num_nodes: int = 600
     precompute_file: str = 'body_precompute.npz'
-    external_force: List[float] = field(default_factory=default_vector)
+    external_force: List[float] = field(default_factory=_default_vector)
 
 
 @dataclass
 class Point():
-    """
-    dataclass for a point force/torque source
+    """dataclass for a point force/torque source
 
     Attributes
     ----------
     position : List[float]
+        default: :obj:`[0.0, 0.0, 0.0]`
+
         Position of the point source (x,y,z)
     force : List[float]
+        default: :obj:`[0.0, 0.0, 0.0]`
+
         Constant force to emit from point source
     torque : List[float]
+        default: :obj:`[0.0, 0.0, 0.0]`
+
         Constant torque to emit from point source
     time_to_live : float
-        Simulation time after which the point source deactivates and does nothing
+        default: :obj:`0.0`
+
+        Simulation time after which the point source deactivates and does nothing. A value of
+        0.0 means to live forever.
     """
-    position: List[float] = field(default_factory=default_vector)
-    force: List[float] = field(default_factory=default_vector)
-    torque: List[float] = field(default_factory=default_vector)
+    position: List[float] = field(default_factory=_default_vector)
+    force: List[float] = field(default_factory=_default_vector)
+    torque: List[float] = field(default_factory=_default_vector)
     time_to_live: float = 0.0
 
 
@@ -631,12 +764,19 @@ class Config():
     Attributes
     ----------
     params : Params
+        default: :obj:`Params()`
+
         System parameters
     bodies : List[Body]
+        default: :obj:`[]`
         List of bodies
     fibers : List[Fiber]
+        default: :obj:`[]`
+
         List of fibers
     point_sources : List[Point]
+        default: :obj:`[]`
+
         List of point sources
     """
     params: Params = field(default_factory=Params)
@@ -660,7 +800,7 @@ class Config():
 
     def save(self, filename: str):
         with open(filename, 'w') as f:
-            toml.dump(unpack(self), f)
+            toml.dump(_unpack(self), f)
 
 
 @dataclass
@@ -671,14 +811,24 @@ class ConfigSpherical(Config):
     Attributes
     ----------
     params : Params
+        default: :obj:`Params()`
+
         System parameters
     bodies : List[Body]
+        default: :obj:`[]`
+
         List of bodies
     fibers : List[Fiber]
+        default: :obj:`[]`
+
         List of fibers
     point_sources : List[Point]
+        default: :obj:`[]`
+
         List of point sources
     periphery : SphericalPeriphery
+        default: :obj:`SphericalPeriphery()`
+
         SphericalPeriphery
     """
     periphery: SphericalPeriphery = field(default_factory=SphericalPeriphery)
@@ -694,13 +844,21 @@ class ConfigEllipsoidal(Config):
     params : Params
         System parameters
     bodies : List[Body]
+        default: :obj:`[]`
+
         List of bodies
     fibers : List[Fiber]
+        default: :obj:`[]`
+
         List of fibers
     point_sources : List[Point]
+        default: :obj:`[]`
+
         List of point sources
     periphery : EllipsoidalPeriphery
-        EllipsoidalPeriphery
+        default: :obj:`EllipsoidalPeriphery()`
+
+        Periphery represented by an ellipsoid
     """
     periphery: EllipsoidalPeriphery = field(
         default_factory=EllipsoidalPeriphery)
@@ -714,14 +872,24 @@ class ConfigRevolution(Config):
     Attributes
     ----------
     params : Params
+        default: :obj:`Params()`
+
         System parameters
     bodies : List[Body]
+        default: :obj:`[]`
+
         List of bodies
     fibers : List[Fiber]
+        default: :obj:`[]`
+
         List of fibers
     point_sources : List[Point]
+        default: :obj:`[]`
+
         List of point sources
     periphery : RevolutionPeriphery
-        RevolutionPeriphery
+        default: :obj:`RevolutionPeriphery()`
+
+        Periphery represented by a surface of revolution
     """
     periphery: RevolutionPeriphery = field(default_factory=RevolutionPeriphery)

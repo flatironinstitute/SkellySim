@@ -3,7 +3,7 @@
 import sys
 import toml
 import numpy as np
-from skelly_sim.skelly_config import ConfigRevolution, Body, Fiber, unpack
+from skelly_sim.skelly_config import ConfigRevolution, Body, Fiber
 from skelly_sim.shape_gallery import Envelope
 
 config_file = 'skelly_config.toml'
@@ -83,8 +83,7 @@ def plot_fibers(fibers):
 
 
 # output our config
-with open(config_file, 'w') as fh:
-    toml.dump(unpack(config), fh)
+config.save(config_file)
 
 # just uncomment this to show a quick visualization of fiber positions
 # plot_fibers(config.fibers)
