@@ -412,7 +412,8 @@ class SphericalPeriphery(Periphery):
 
             accept = True
             for fib in fibers:
-                if np.linalg.norm(x0 - fib.x[0:3]) < ds_min:
+                dx = x0 - fib.x[0:3]
+                if np.dot(dx, dx) < ds_min:
                     accept = False
                     break
             if accept:
@@ -486,8 +487,10 @@ class RevolutionPeriphery(Periphery):
     n_nodes: int = 0
     envelope: Namespace = field(default_factory=Namespace)
 
-    def move_fibers_to_surface(self, fibers: List[Fiber],
-                               ds_min: float) -> None:
+    def move_fibers_to_surface(self,
+                               fibers: List[Fiber],
+                               ds_min: float,
+                               verbose: bool = True) -> None:
         """
         Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
 
@@ -498,12 +501,17 @@ class RevolutionPeriphery(Periphery):
         ds_min : float
             Minimum separation allowable between the fiber minus ends. Collisions are not searched for the rest of the fibers,
             though they are unlikely
+        verbose : bool
+            If true, print a progress message
         """
+        print("Building envelope object and CDF...")
         envelope = shape_gallery.Envelope(self.envelope)
 
         xs, u = build_cdf(envelope.raw_height_func, self.envelope.lower_bound,
                           self.envelope.upper_bound)
+        print("Finished building envelope object and CDF...")
 
+        ds_min2 = ds_min * ds_min
         for i in range(len(fibers)):
             i_trial = 0
             reject = True
@@ -525,7 +533,8 @@ class RevolutionPeriphery(Periphery):
                 # check for collisions
                 reject = False
                 for j in range(0, i - 1):
-                    if np.linalg.norm(x0 - fibers[j].x[0:3]) < ds_min:
+                    dx = x0 - fibers[j].x[0:3]
+                    if np.dot(dx, dx) < ds_min2:
                         reject = True
                         break
                 if reject:
@@ -553,6 +562,8 @@ class RevolutionPeriphery(Periphery):
 
                 # Assign these positions to fib.x
                 fibers[i].x = fiber_positions.ravel().tolist()
+
+                print("Inserted fiber {} after {} trials".format(i, i_trial))
 
 
 @dataclass
