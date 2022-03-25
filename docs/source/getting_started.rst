@@ -12,7 +12,8 @@ straightforward.
 2. Generate precompute data
 
    :code:`$ skelly_precompute skelly_config.toml`
-3. Run the simulation. Recommended in an :code:`sbatch` script. See example submission script (FIXME ADD SCRIPT).
+3. Run the simulation. Recommended in an :code:`sbatch` script. See `example submission script
+   <https://github.com/flatironinstitute/SkellySim/tree/main/examples/skelly_sim_slurm_sbatch.sh>`_
 
    :code:`$ mpirun skelly_sim --config-file=skelly_config.toml`
 4. :ref:`Visualize<visualization>` or :ref:`post-process<post-processing>`
