@@ -464,7 +464,7 @@ class SphericalPeriphery(Periphery):
 @dataclass
 class EllipsoidalPeriphery(Periphery):
     """
-    dataclass representing an ellipsoidal periphery. (x/a)^2 + (y/b)^2 (z/c)^2 = 1
+    dataclass representing an ellipsoidal periphery. (x/a)^2 + (y/b)^2 + (z/c)^2 = 1
 
     Attributes
     ----------

@@ -46,7 +46,6 @@ config.fibers = [
           bending_rigidity=2.5E-3,
           parent_body=0,
           force_scale=0.0,
-          minus_clamped=True,
           n_nodes=64) for i in range(n_fibers)
 ]
 config.fibers[0].fill_node_positions(x0=np.array([0.0, 0.0, 0.5]),

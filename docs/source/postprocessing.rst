@@ -8,7 +8,7 @@ generate velocity fields, but could in the future be extended for other types of
 
 :code:`$ mpirun skelly_sim --config-file=skelly_config.toml --post-process` will generate a
 :code:`skelly_sim.vf` file that contains the velocity field, if your config file has the relevant
-:code:`[params.velocity_field]` heading (see: :ref:`generating-config-files`). This can be visualized
+:code:`[params.velocity_field]` heading (see: :ref:`generating-configuration-files`). This can be visualized
 with the provided visualization utilities in :ref:`visualization`.
 
 

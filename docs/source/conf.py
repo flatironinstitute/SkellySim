@@ -10,7 +10,6 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-from dataclasses import is_dataclass
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../..'))
@@ -48,7 +47,7 @@ exclude_patterns = []
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'classic'
+html_theme = 'sphinx_book_theme'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -58,6 +57,7 @@ html_static_path = ['_static']
 
 # Remove excessively long class signature from dataclass objects
 def process_sig(app, what, name, obj, options, signature, return_annotation):
+    from dataclasses import is_dataclass
     if signature and is_dataclass(obj):
         signature = "()" 
     return (signature, return_annotation)
@@ -67,3 +67,7 @@ def setup(app):
 
 
 autodoc_mock_imports = ["function_generator"]
+
+html_theme_options = {
+    "extra_navbar": '<a href="https://github.com/flatironinstitute/SkellySim">SkellySim on Github</a>',
+}
