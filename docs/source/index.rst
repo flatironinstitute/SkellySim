@@ -10,6 +10,7 @@ Welcome to SkellySim's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   installation
    getting_started
    skelly_config
    visualization
