@@ -22,14 +22,14 @@ n_fibers = 1
 
 # create a config object and set the system parameters
 config = Config()
-config.eta = 1.0
-config.dt_initial = 1E-1
-config.dt_min = 1E-4
-config.dt_max = 1E-1
-config.dt_write = 1E-1
-config.t_final = 10.0
-config.gmres_tol = 1E-10
-config.seed = 130319
+config.params.eta = 1.0
+config.params.dt_initial = 1E-1
+config.params.dt_min = 1E-4
+config.params.dt_max = 1E-1
+config.params.dt_write = 1E-1
+config.params.t_final = 10.0
+config.params.gmres_tol = 1E-10
+config.params.seed = 130319
 
 config.bodies = [
     Body(n_nucleation_sites=50,
