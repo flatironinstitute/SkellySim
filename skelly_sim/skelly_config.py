@@ -230,16 +230,19 @@ class Fiber():
     n_nodes : int, default: :obj:`32`
         Number of nodes to represent fiber. Highly deformed or very long fibers will require more nodes to be accurately represented
     parent_body : int, default: :obj:`-1`
-        Index of 'body' fiber is bound to. A value of '-1' indicates a free fiber
+        Index of :obj:`Body` the :obj:`Fiber` is bound to. A value of :obj:`-1` indicates a free fiber.
+        :obj:`Fibers` attached to :obj:`Bodies` obey the :obj:`clamped` boundary condition,
+        which preserves the relative angle of attachment to the body.
     force_scale : float, default: :obj:`0.0`
-        Tangential force per unit length to act along filament. A positive value pushes toward the 'plus' end,
-        while a negative value pushes toward the 'minus' end
+        Tangential force per unit length to act along filament. A positive value pushes toward the :obj:`plus` end,
+        while a negative value pushes toward the :obj:`minus` end
     bending_rigidity : float default: :obj:`2.5E-3`
         Bending rigidity of this filament
     length : float, default: :obj:`1.0`
         Constraint length of this filament
     minus_clamped : bool, default: :obj:`False`
-        Fix minus end of filament with "clamped" boundary condition, preserving orientation and position (Velocity = 0, AngularVelocity = 0)
+        Fix minus end of filament with "clamped" boundary condition, preserving orientation and position (:obj:`Velocity = 0, AngularVelocity = 0`).
+        If attached to a body (:obj:`parent_body >= 0`), then this parameter is implied True and ignored.
     x : List[float], default: :obj:`[]`
         List of node positions in [x0,y0,z0,x1,y1,z1...] order. Extreme care must be taken when setting this since the length constraint
         can generate massive tensions with poor input. See examples.
