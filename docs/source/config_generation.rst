@@ -4,8 +4,8 @@ Generating configuration files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 While SkellySim has limited facilities for writing config files by hand, it's usually much
-better to generate the configurations from a python script. The python portion of `skelly_sim`
-includes a utility module called `skelly_config` to help generate configuration files. It's
+better to generate the configurations from a python script. The python portion of :obj:`skelly_sim`
+includes a utility module called :obj:`skelly_config` to help generate configuration files. It's
 advisable to take a look at the `examples
 <https://github.com/flatironinstitute/SkellySim/tree/main/examples>`_ to get you started on
 complex configurations, but the basic outline is provided here, as well as a definition of all
@@ -14,14 +14,14 @@ parameters.
 Terminology
 -----------
 
-Fiber: Flexible filament. Can be bound at either end to surfaces (Bodies and Peripheries),
+:obj:`Fiber:` Flexible filament. Can be bound at either end to surfaces (:obj:`Bodies` and :obj:`Peripheries`),
 experience dynamic instability, and have constant motor forces per unit length along its axis.
 
-Body: Mobile object (currently only a sphere) that can host fixed fibers or nucleate them via
-the dynamic instability module. Think centrosomes and other objects that microtubules are
+:obj:`Body:` Mobile object (currently only a sphere) that can host fixed fibers or nucleate them via
+the dynamic instability module. Think: centrosomes and other objects that microtubules are
 typically associated with. Currently only spherical bodies are supported.
 
-Periphery: Fixed surface that Fibers and Bodies are contained within. Basically a fixed
+:obj:`Periphery:` Fixed surface that :obj:`Fibers` and :obj:`Bodies` are contained within. Basically a fixed
 cellular wall. Spheres, Ellipses, and any convex surface of revolution are supported.
 
 Example generation script
@@ -92,8 +92,10 @@ Periphery.
     # config.plot_fibers()
 
 
-Parameters and API
-------------------
+.. _skelly-config:
+
+Configuration Parameters and API
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: skelly_sim.skelly_config
    :members:

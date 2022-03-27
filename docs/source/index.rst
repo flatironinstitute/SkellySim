@@ -12,7 +12,7 @@ Welcome to SkellySim's documentation!
 
    installation
    getting_started
-   skelly_config
+   config_generation
    visualization
    postprocessing
 
