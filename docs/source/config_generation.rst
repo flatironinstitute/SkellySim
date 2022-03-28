@@ -135,8 +135,87 @@ with a single :obj:`Fiber` attached to its surface. This object pair is containe
 
 .. _skelly-config:
 
-Configuration Parameters and API
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Base configuration types
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: skelly_sim.skelly_config
+All configurations start with a base configuration class. Currently this is done by importing a
+class that represents a configuration file with a specific type of :obj:`Periphery` (or none!).
+
+Free space configuration
+------------------------
+No bounding volume. No periodic boundary conditions. Just a big open system.
+
+.. autoclass:: skelly_sim.skelly_config.Config
    :members:
+
+Spherical container configuration
+---------------------------------
+Simulations using a :obj:`SphericalPeriphery` outer boundary
+
+.. autoclass:: skelly_sim.skelly_config.ConfigSpherical
+
+Ellipsoidal container configuration
+-----------------------------------
+Simulations using an :obj:`EllipsoidalPeriphery` outer boundary
+
+.. autoclass:: skelly_sim.skelly_config.ConfigEllipsoidal
+
+Surface of revolution configuration
+-----------------------------------
+Simulations using a :obj:`SurfaceOfRevolution` outer boundary
+
+.. autoclass:: skelly_sim.skelly_config.ConfigRevolution
+
+System parameters
+~~~~~~~~~~~~~~~~~
+:obj:`Config.params`
+
+.. autoclass:: skelly_sim.skelly_config.Params
+
+Dynamic instability
+-------------------
+:obj:`Config.params.dynamic_instability`
+
+.. autoclass:: skelly_sim.skelly_config.DynamicInstability
+
+
+Velocity field
+--------------
+:obj:`Config.params.velocity_field`
+
+.. autoclass:: skelly_sim.skelly_config.VelocityField
+
+
+Fibers
+~~~~~~
+:obj:`Config.fibers` (must be a list of :obj:`Fiber` objects!)
+
+.. autoclass:: skelly_sim.skelly_config.Fiber
+
+Bodies
+~~~~~~
+:obj:`Config.bodies` (must be a list of :obj:`Fiber` objects!)
+
+.. autoclass:: skelly_sim.skelly_config.Body
+
+Peripheries
+~~~~~~~~~~~
+:obj:`Config.periphery`
+
+Spherical periphery
+-------------------
+:obj:`Config.periphery`
+
+.. autoclass:: skelly_sim.skelly_config.SphericalPeriphery
+
+Ellipsoidal periphery
+---------------------
+:obj:`Config.periphery`
+
+.. autoclass:: skelly_sim.skelly_config.EllipsoidalPeriphery
+
+Periphery of revolution
+-----------------------
+:obj:`Config.periphery`
+
+.. autoclass:: skelly_sim.skelly_config.RevolutionPeriphery

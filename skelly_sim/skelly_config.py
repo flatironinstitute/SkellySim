@@ -758,7 +758,6 @@ class Config():
         Arguments
         ---------
         backend : str, default: :obj:`TKAgg`
-
             matplotlib backend to use. This is a workaround to how matplotlib is sometimes configured by default
         """
         import matplotlib
@@ -776,7 +775,15 @@ class Config():
         ax.scatter(x_fib_2[:, 0], x_fib_2[:, 1], x_fib_2[:, 2], color='green')
         plt.show()
 
-    def save(self, filename: str):
+    def save(self, filename: str = 'skelly_config.toml'):
+        """
+        Write config object to file in TOML format
+
+        Arguments
+        ---------
+        filename : str, default: :obj:`skelly_config.toml`
+            path of configuration file to output
+        """
         with open(filename, 'w') as f:
             toml.dump(_unpack(self), f)
 
