@@ -6,8 +6,9 @@ Installation
 There are (currently) two components to :obj:`SkellySim`, the python portion, and the actual
 binary. The python portion is used generating config files and precompute data as well as
 visualization. The binary (:obj:`C++`) portion is for actually running the simulation and
-generating field data. These two components are completely separate. This allows you to analyze
-and visualize simulation data locally without having to install the simulation program.
+generating field data. These two components are completely separate, though we provide them
+together in the :obj:`singularity` images below. This allows you to analyze and visualize
+simulation data locally without having to install the full simulation program.
 
 Singularity (beginner recommended: contains everything)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -30,18 +31,19 @@ Intel Macs.
 - `Latest version (AVX2) <https://users.flatironinstitute.org/~rblackwell/skellysim_singularity/skelly_sim_avx2_latest.sif>`_
 
 Running commands in :obj:`singularity` containers is straightforward. First you need to
-actually install singularity `singularity <https://sylabs.io/singularity>`_. At :obj:`flatiron`
-and many other computing centers, this is available via the :obj:`module` system already (i.e. :obj:`module load singularity`).
+actually install `singularity <https://sylabs.io/singularity>`_. At :obj:`flatiron` and many
+other computing centers, this is available via the :obj:`module` system already
+(e.g. :obj:`module load singularity`).
 
 Then, any command you would typically run directly in the shell, you just prefix it with
 :obj:`singularity exec /path/to/image.sif`. So the workflow would look more like...
 
 .. code-block:: bash
 
-    singularity exec /path/to/skellysim/image.sif python3 gen_config.py
-    singularity exec /path/to/skellysim/image.sif skelly_precompute skelly_config.toml
-    singularity exec /path/to/skellysim/image.sif mpirun skelly_sim
-    singularity exec /path/to/skellysim/image.sif mpirun skelly_sim --post-process
+    singularity exec /path/to/skellysim_container.sif python3 gen_config.py
+    singularity exec /path/to/skellysim_container.sif skelly_precompute skelly_config.toml
+    singularity exec /path/to/skellysim_container.sif mpirun skelly_sim
+    singularity exec /path/to/skellysim_container.sif mpirun skelly_sim --post-process
 
 
 Note that this only works if the path you're writing to is in your home directory somewhere
@@ -52,7 +54,7 @@ this.
 
 .. code-block:: bash
 
-    singularity exec -B $PWD /path/to/skellysim/image.sif python3 gen_config.py
+    singularity exec -B $PWD /path/to/skellysim_container.sif python3 gen_config.py
 
 
 Python modules and scripts (advanced usage)
@@ -102,7 +104,7 @@ Requirements:
 - BLAS/LAPACK (OpenBLAS or MKL or your implementations of choice)
 - FFTW (FFTW3 or MKL-fftw)
 - cmake (>=3.10)
-- modern gcc (>=7). Should work with intel but not worth hassle in my tests
+- modern gcc (>=7). Should work with Intel compilers but almost never worth the hassle in my tests
 
 Will add a more detailed explanation here later, but please consult the `singularity build
 script <https://github.com/flatironinstitute/SkellySim/blob/main/scripts/skelly_sim.def>`_ for a
