@@ -3,6 +3,7 @@ From: ubuntu:21.04
 
 %post
     export MKLROOT=/opt/intel/oneapi/mkl/latest
+    export CXXFLAGS_="-I/usr/lib/x86_64-linux-gnu/openmpi/include -mavx2 -mfma"
 
     apt -y update
     apt -y install curl gpg software-properties-common
@@ -16,7 +17,7 @@ From: ubuntu:21.04
     apt -y update
     apt -y install intel-oneapi-mkl-devel build-essential libopenmpi-dev cmake libeigen3-dev ninja-build git python3-pip
 
-    pip3 install git+https://github.com/flatironinstitute/SkellySim.git@v0.9.3
+    pip3 install git+https://github.com/flatironinstitute/SkellySim.git@v0.9.4
 
     mkdir build
     cd build
@@ -27,7 +28,7 @@ From: ubuntu:21.04
 
     cd pvfmm-build
     cmake ../pvfmm-1.2.1 -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_FLAGS="-I/usr/lib/x86_64-linux-gnu/openmpi/include -mavx2 -mfma" -GNinja
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS_" -GNinja
     ninja
     ninja install
     cd ..
@@ -38,7 +39,7 @@ From: ubuntu:21.04
 
     cd stkfmm-build
     pvfmm_DIR=/usr/local/share/pvfmm cmake ../STKFMM-1.0.0 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DCMAKE_CXX_FLAGS="-I/usr/lib/x86_64-linux-gnu/openmpi/include -mavx2 -mfma" -GNinja
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS_" -GNinja
     ninja
     ninja install
     cd ..
@@ -48,21 +49,21 @@ From: ubuntu:21.04
     mkdir trilinos-build
 
     cd trilinos-build
-    cmake ../Trilinos-trilinos-release-13-2-0 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DTrilinos_VERBOSE_CONFIGURE:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_STANDARD:STRING=14 -DTrilinos_ENABLE_ALL_OPTIONAL_PACKAGES:BOOL=OFF -DTrilinos_ENABLE_ALL_PACKAGES:BOOL=OFF -DTrilinos_ENABLE_OpenMP=ON -DTrilinos_ENABLE_Kokkos:BOOL=ON -DTrilinos_ENABLE_Belos:BOOL=ON -DTrilinos_ENABLE_Tpetra:BOOL=ON -DTrilinos_ENABLE_Teuchos:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DTrilinos_ENABLE_Fortran:BOOL=OFF -D TPL_ENABLE_MPI=ON -DTPL_BLAS_LIBRARIES=/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_rt.so -DTPL_LAPACK_LIBRARIES=/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_rt.so -DCMAKE_CXX_FLAGS="-I/usr/lib/x86_64-linux-gnu/openmpi/include -mavx2 -mfma" -GNinja
+    cmake ../Trilinos-trilinos-release-13-2-0 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DTrilinos_VERBOSE_CONFIGURE:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_CXX_STANDARD:STRING=14 -DTrilinos_ENABLE_ALL_OPTIONAL_PACKAGES:BOOL=OFF -DTrilinos_ENABLE_ALL_PACKAGES:BOOL=OFF -DTrilinos_ENABLE_OpenMP=ON -DTrilinos_ENABLE_Kokkos:BOOL=ON -DTrilinos_ENABLE_Belos:BOOL=ON -DTrilinos_ENABLE_Tpetra:BOOL=ON -DTrilinos_ENABLE_Teuchos:BOOL=ON -DBUILD_TESTING:BOOL=OFF -DTrilinos_ENABLE_Fortran:BOOL=OFF -D TPL_ENABLE_MPI=ON -DTPL_BLAS_LIBRARIES=/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_rt.so -DTPL_LAPACK_LIBRARIES=/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_rt.so -DCMAKE_CXX_FLAGS="$CXXFLAGS_" -GNinja
     ninja
     ninja install
     cd ..
 
     git clone https://github.com/flatironinstitute/skellysim
     cd skellysim
-    git checkout v0.9.3
+    git checkout v0.9.4
     git submodule update --init
     cd ..
 
     mkdir skellysim-build
     cd skellysim-build
     STKFMM_ROOT=/usr/local cmake ../skellysim -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DCMAKE_CXX_FLAGS='-I/usr/lib/x86_64-linux-gnu/openmpi/include -mavx2 -mfma' -DBLAS_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so \
+    -DCMAKE_CXX_FLAGS="$CXXFLAGS_" -DBLAS_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so \
     -DLAPACK_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so -GNinja
     ninja
     ninja install
