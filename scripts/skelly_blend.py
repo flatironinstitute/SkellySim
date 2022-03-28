@@ -65,10 +65,13 @@ def create_body(position : np.array, radius : float):
 def init_materials():
     if not 'FiberMaterial' in bpy.data.materials:
         new_shader("FiberMaterial", "glossy", 0.087, 0.381, 1.0)
+        bpy.data.materials["FiberMaterial"].roughness = 0.798
     if not 'ShellMaterial' in bpy.data.materials:
-        new_shader("ShellMaterial", "principled", 0.233, 0.233, 0.233)
+        new_shader("ShellMaterial", "glossy", 0.846874, 0.223228, 0.361307)
+        bpy.data.materials["ShellMaterial"].roughness = 0.766
     if not 'BodyMaterial' in bpy.data.materials:
-        new_shader("BodyMaterial", "principled", 0.33, 0.33, 0.84)
+        new_shader("BodyMaterial", "glossy", 0.002, 0.672, 0.352)
+        bpy.data.materials["BodyMaterial"].roughness = 0.766
     if not 'PlaneMaterial' in bpy.data.materials:
         new_shader("PlaneMaterial", "background", 0.0, 0.0, 0.0)
 

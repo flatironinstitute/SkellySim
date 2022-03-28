@@ -27,9 +27,10 @@ config.params.dt_initial = 1E-1
 config.params.dt_min = 1E-4
 config.params.dt_max = 1E-1
 config.params.dt_write = 1E-1
-config.params.t_final = 10.0
+config.params.t_final = 20.0
 config.params.gmres_tol = 1E-10
 config.params.seed = 130319
+config.params.periphery_binding_flag = True  # Bind plus end to periphery when close to surface
 
 config.bodies = [
     Body(n_nucleation_sites=50,
@@ -42,7 +43,7 @@ config.bodies = [
 
 # generate a list of fibers. They don't have positions though, so we need to fill those in
 config.fibers = [
-    Fiber(length=3.0,
+    Fiber(length=2.5,
           bending_rigidity=2.5E-3,
           parent_body=0,
           force_scale=0.0,

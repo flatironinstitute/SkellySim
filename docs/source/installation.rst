@@ -3,7 +3,7 @@
 Installation
 ============
 
-There are (currently) two components to :obj:`SkellySim`, the python portion, and the actual
+There are (currently) two components to :obj:`SkellySim`: the python portion, and the actual
 binary. The python portion is used generating config files and precompute data as well as
 visualization. The binary (:obj:`C++`) portion is for actually running the simulation and
 generating field data. These two components are completely separate, though we provide them
