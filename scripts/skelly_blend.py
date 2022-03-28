@@ -27,17 +27,14 @@ except ImportError:
     import msgpack, toml
 
 
-def place_shell(radius, half=True):
-    mesh = bpy.data.meshes.new('Sphere')
-    sphere = bpy.data.objects.new("Sphere", mesh)
-    sphere.data.materials.append(bpy.data.materials['ShellMaterial'])
+def _create_sphere(position : np.array, radius : float, name : str, material : str, half=False):
+    mesh = bpy.data.meshes.new(name)
+    sphere = bpy.data.objects.new(name, mesh)
+    sphere.data.materials.append(bpy.data.materials[material])
     bpy.context.collection.objects.link(sphere)
 
     bpy.context.view_layer.objects.active = sphere
     sphere.select_set(True)
-    modifier = sphere.modifiers.new(name="Solidify", type="SOLIDIFY")
-    modifier.thickness = 0.1
-    modifier.offset = 1.0
 
     bm = bmesh.new()
     bmesh.ops.create_uvsphere(bm,
@@ -46,19 +43,32 @@ def place_shell(radius, half=True):
                               diameter=radius)
 
     if half:
+        modifier = sphere.modifiers.new(name="Solidify", type="SOLIDIFY")
+        modifier.thickness = 0.1
+        modifier.offset = 1.0
+
         for vert in bm.verts:
-            if vert.co[1] > 0.1:
+            if vert.co[1] > 0.0001 * radius:
                 bm.verts.remove(vert)
     bm.to_mesh(mesh)
     bpy.ops.object.shade_smooth()
     bm.free()
+    return sphere
 
+def place_shell(radius, half=True):
+    _create_sphere(np.zeros(3), radius, 'Shell', 'ShellMaterial', half)
+
+def create_body(position : np.array, radius : float):
+    sphere = _create_sphere(position, radius, 'Body', 'BodyMaterial', False)
+    bpy.data.collections['Bodies'].objects.link(sphere)
 
 def init_materials():
     if not 'FiberMaterial' in bpy.data.materials:
         new_shader("FiberMaterial", "glossy", 0.087, 0.381, 1.0)
     if not 'ShellMaterial' in bpy.data.materials:
         new_shader("ShellMaterial", "principled", 0.233, 0.233, 0.233)
+    if not 'BodyMaterial' in bpy.data.materials:
+        new_shader("BodyMaterial", "principled", 0.33, 0.33, 0.84)
     if not 'PlaneMaterial' in bpy.data.materials:
         new_shader("PlaneMaterial", "background", 0.0, 0.0, 0.0)
 
@@ -67,6 +77,9 @@ def init_collections():
     if not 'Fibers' in bpy.data.collections:
         fiber_col = bpy.data.collections.new('Fibers')
         bpy.context.scene.collection.children.link(fiber_col)
+    if not 'Bodies' in bpy.data.collections:
+        body_col = bpy.data.collections.new('Bodies')
+        bpy.context.scene.collection.children.link(body_col)
 
 
 def nurbs_cylinder(x, obj=None):
@@ -203,11 +216,11 @@ class SkellyBlend:
     def draw(self, frameno):
         self.load_frame(frameno)
 
-        data = self.frame_data['fibers'][0]
+        fibdata = self.frame_data['fibers'][0]
         init = len(bpy.data.collections['Fibers'].objects) == 0
 
-        for ifib in range(0, len(data)):
-            pos = np.array(data[ifib]['x_'][3:])
+        for ifib in range(0, len(fibdata)):
+            pos = np.array(fibdata[ifib]['x_'][3:])
             pos = pos.reshape(pos.size // 3, 3)
 
             if init:
@@ -217,6 +230,20 @@ class SkellyBlend:
             else:
                 nurbs_cylinder(pos,
                                bpy.data.collections['Fibers'].objects[ifib])
+
+
+        bodydata = self.frame_data['bodies'][0]
+        init = len(bpy.data.collections['Bodies'].objects) == 0
+
+        for ibody in range(0, len(bodydata)):
+            pos = bodydata[ibody]['position_'][3:]
+
+            if init:
+                create_body(pos, bodydata[ibody]['radius_'])
+            else:
+                body = bpy.data.collections['Bodies'].objects[ibody]
+                body.location = pos
+
 
     def build_index(self, mtime, index_file):
         unpacker = msgpack.Unpacker(self.fh, raw=False)
