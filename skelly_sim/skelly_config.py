@@ -1,7 +1,6 @@
 from typing import List, Tuple, Callable
 from dataclasses import dataclass, asdict, field, is_dataclass
 from argparse import Namespace
-import copy
 import numpy as np
 from scipy.special import ellipeinc, ellipe
 from scipy.optimize import fsolve, bisect
@@ -18,12 +17,10 @@ def _ellipsoid(t: float, u: float, a: float, b: float, c: float):
     np.array(3)
         Point on the surface of the ellipsoid given input parameters
     """
-    return np.array(
-        [a * np.sin(u) * np.cos(t), b * np.sin(u) * np.sin(t), c * np.cos(u)])
+    return np.array([a * np.sin(u) * np.cos(t), b * np.sin(u) * np.sin(t), c * np.cos(u)])
 
 
-def _build_cdf(f: Callable[[float], float], lb: float,
-               ub: float) -> Tuple[np.array, np.array]:
+def _build_cdf(f: Callable[[float], float], lb: float, ub: float) -> Tuple[np.array, np.array]:
     """
     Builds a discretized cumulative distribution function of the arclength along the curve defined by f(x) on [lb, ub].
     Useful for distributing random positions uniformly along a curve (i.e. for placing fibers on an arbitrary surface).
@@ -111,8 +108,7 @@ def _cos_length_full(amplitude: float, xi: float, xf: float, x_max: float):
     """
     scale_factor = 2.0 * np.pi / x_max
     A2 = (scale_factor * amplitude)**2
-    return (ellipeinc(scale_factor * xf, -A2) -
-            ellipeinc(scale_factor * xi, -A2)) / scale_factor
+    return (ellipeinc(scale_factor * xf, -A2) - ellipeinc(scale_factor * xi, -A2)) / scale_factor
 
 
 def _get_random_orthogonal_vector(x: np.array):
@@ -130,8 +126,7 @@ def _get_random_orthogonal_vector(x: np.array):
     return b * np.cos(theta) + c * np.sin(theta)
 
 
-def perturbed_fiber_positions(amplitude: float, length: float, x0: np.array,
-                              n_nodes: int):
+def perturbed_fiber_positions(amplitude: float, length: float, x0: np.array, n_nodes: int):
     """
     Create a fiber x vector with a small cosine perturbation in a random direction orthogonal to the fiber.
     Fiber orientation is assumed to be along the vector x0, which is the position of the minus end of the filament (so don't place at the origin).
@@ -159,8 +154,7 @@ def perturbed_fiber_positions(amplitude: float, length: float, x0: np.array,
     arc_length_per_segment = length / (n_nodes - 1)
     lin_pos = np.zeros(n_nodes)
     for i in range(1, n_nodes):
-        fun = lambda xf: _cos_length_full(amplitude, lin_pos[i - 1], xf, x_max
-                                          ) - arc_length_per_segment
+        fun = lambda xf: _cos_length_full(amplitude, lin_pos[i - 1], xf, x_max) - arc_length_per_segment
         lin_pos[i] = fsolve(fun, lin_pos[i - 1] + arc_length_per_segment)
 
     fiber_positions = np.outer(lin_pos, normal)
@@ -195,10 +189,7 @@ def _unpack(obj):
     elif is_dataclass(obj):
         return {key: _unpack(value) for key, value in asdict(obj).items()}
     elif isinstance(obj, Namespace):
-        return _unpack(
-            dict(
-                filter(lambda keyval: not keyval[0].startswith('__'),
-                       obj.__dict__.items())))
+        return _unpack(dict(filter(lambda keyval: not keyval[0].startswith('__'), obj.__dict__.items())))
     elif isinstance(obj, tuple):
         return tuple(_unpack(value) for value in obj)
     else:
@@ -370,7 +361,8 @@ class Params():
     periphery_interaction_flag : bool, default: :obj:`False`
         Experimental repulsion between periphery and Fibers
     adaptive_timestep_flag : bool, default: :obj:`True`
-        If set, use adaptive timestepping, which attempts to control simulation error by reducing the timestep when the solution has convergence issues
+        If set, use adaptive timestepping, which attempts to control simulation error by reducing the timestep
+        when the solution has convergence issues
     """
     eta: float = 1.0
     dt_initial: float = 0.025
@@ -382,8 +374,7 @@ class Params():
     fiber_error_tol: float = 1E-1
     periphery_binding_flag: bool = False
     seed: int = 130319
-    dynamic_instability: DynamicInstability = field(
-        default_factory=DynamicInstability)
+    dynamic_instability: DynamicInstability = field(default_factory=DynamicInstability)
     velocity_field: VelocityField = field(default_factory=VelocityField)
     periphery_interaction_flag: bool = False
     adaptive_timestep_flag: bool = True
@@ -429,8 +420,7 @@ class SphericalPeriphery(Periphery):
     shape: str = 'sphere'
     radius: float = 6.0
 
-    def find_binding_site(self, fibers: List[Fiber],
-                          ds_min) -> Tuple[np.array, np.array]:
+    def find_binding_site(self, fibers: List[Fiber], ds_min) -> Tuple[np.array, np.array]:
         """
         Find an open binding site given a list of Fibers that could interfere with binding
         Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
@@ -463,6 +453,27 @@ class SphericalPeriphery(Periphery):
             if accept:
                 return (x0, u0)
 
+    def move_fibers_to_surface(self, fibers: List[Fiber], ds_min: float, verbose: bool = True) -> None:
+        """
+        Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
+
+        Arguments
+        ---------
+        fibers : List[Fiber]
+            List of fibers that will be moved. Only the Fiber.x property will be modified
+        ds_min : float
+            Minimum separation allowable between the fiber minus ends. Collisions are not searched for the rest of the fibers,
+            though they are unlikely
+        verbose : bool, default: :obj:`True`
+            If true, print a progress message
+        """
+        print("Inserting fibers")
+        for i in range(len(fibers)):
+            (x0, u0) = self.find_binding_site(fibers[0:i], ds_min)
+            if verbose:
+                print("Inserting fiber {} at {}".format(i, x0))
+            fibers[i].fill_node_positions(x0, -u0)
+
 
 @dataclass
 class EllipsoidalPeriphery(Periphery):
@@ -488,10 +499,7 @@ class EllipsoidalPeriphery(Periphery):
     b: float = 4.16
     c: float = 4.16
 
-    def move_fibers_to_surface(self,
-                               fibers: List[Fiber],
-                               ds_min: float,
-                               verbose: bool = True) -> None:
+    def move_fibers_to_surface(self, fibers: List[Fiber], ds_min: float, verbose: bool = True) -> None:
         """
         Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
 
@@ -509,20 +517,16 @@ class EllipsoidalPeriphery(Periphery):
         n_trials = 5 * len(fibers)
 
         def ellipsoid(t, u):
-            return _ellipsoid(t, u, self.a / 1.04, self.b / 1.04,
-                              self.c / 1.04)
+            return _ellipsoid(t, u, self.a / 1.04, self.b / 1.04, self.c / 1.04)
 
-        x_trial = param_tools.r_surface(n_trials, ellipsoid, *(0, 2 * np.pi),
-                                        *(0, np.pi))[0]
+        x_trial = param_tools.r_surface(n_trials, ellipsoid, *(0, 2 * np.pi), *(0, np.pi))[0]
 
         print("Inserting fibers")
         ds_min2 = ds_min * ds_min
         i_trial = 0
         for i in range(len(fibers)):
             if i_trial >= n_trials:
-                print(
-                    "Unable to insert fibers. Add more fiber trials, or decrease fiber density on the surface."
-                )
+                print("Unable to insert fibers. Add more fiber trials, or decrease fiber density on the surface.")
                 sys.exit()
 
             fib: Fiber = fibers[i]
@@ -542,15 +546,13 @@ class EllipsoidalPeriphery(Periphery):
                     continue
 
                 # Use our envelope function to calculate the gradient/normal
-                normal = np.array(
-                    [x0[0] / self.a**2, x0[1] / self.b**2, x0[2] / self.c**2])
-                normal = normal / np.linalg.norm(normal)
+                normal = np.array([x0[0] / self.a**2, x0[1] / self.b**2, x0[2] / self.c**2])
+                normal = -normal / np.linalg.norm(normal)
 
                 fibers[i].fill_node_positions(x0, normal)
 
                 i_trial += 1
-                print("Inserted fiber {} after {} trials".format(
-                    i, i_trial - i_trial_start))
+                print("Inserted fiber {} after {} trials".format(i, i_trial - i_trial_start))
                 break
 
 
@@ -596,10 +598,7 @@ class RevolutionPeriphery(Periphery):
     n_nodes: int = 0
     envelope: Namespace = field(default_factory=Namespace)
 
-    def move_fibers_to_surface(self,
-                               fibers: List[Fiber],
-                               ds_min: float,
-                               verbose: bool = True) -> None:
+    def move_fibers_to_surface(self, fibers: List[Fiber], ds_min: float, verbose: bool = True) -> None:
         """
         Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
 
@@ -616,8 +615,7 @@ class RevolutionPeriphery(Periphery):
         print("Building envelope object and CDF...")
         envelope = shape_gallery.Envelope(self.envelope)
 
-        xs, u = _build_cdf(envelope.raw_height_func, self.envelope.lower_bound,
-                           self.envelope.upper_bound)
+        xs, u = _build_cdf(envelope.raw_height_func, self.envelope.lower_bound, self.envelope.upper_bound)
         print("Finished building envelope object and CDF...")
 
         ds_min2 = ds_min * ds_min
@@ -659,14 +657,12 @@ class RevolutionPeriphery(Periphery):
                     normal = np.array([-1.0, 0.0, 0.0])
                 else:
                     # Use our envelope function to calculate the gradient/normal
-                    normal = np.array([
-                        envelope(x0[0]) * envelope.differentiate(x0[0]),
-                        -x0[1], -x0[2]
-                    ])
+                    normal = np.array([envelope(x0[0]) * envelope.differentiate(x0[0]), -x0[1], -x0[2]])
                     normal = normal / np.linalg.norm(normal)
 
                 fibers[i].fill_node_positions(x0, normal)
-                print("Inserted fiber {} after {} trials".format(i, i_trial))
+                if verbose:
+                    print("Inserted fiber {} after {} trials".format(i, i_trial))
 
 
 @dataclass
@@ -705,6 +701,61 @@ class Body():
     n_nodes: int = 600
     precompute_file: str = 'body_precompute.npz'
     external_force: List[float] = field(default_factory=_default_vector)
+
+    def find_binding_site(self, fibers: List[Fiber], ds_min) -> Tuple[np.array, np.array]:
+        """
+        Find an open binding site given a list of Fibers that could interfere with binding
+        Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
+        interacting with the periphery directly. The binding site is guaranteed to be further than the Euclidean distance ds_min from any
+        other Fiber minus end
+
+        Arguments
+        ---------
+        fibers : list[Fiber]
+            Fibers that could potentially block a binding site
+        ds_min : float
+            Minimum allowable separation between a binding site and any fiber minus end
+
+        Returns
+        -------
+        tuple(np.array, np.array)
+            position vector and its normalized version
+        """
+        com = np.array(self.position)
+        while (True):
+            u0 = _get_random_point_on_sphere()
+            x0 = u0 * self.radius + com
+
+            accept = True
+            ds_min2 = ds_min * ds_min
+            for fib in fibers:
+                dx = x0 - fib.x[0:3]
+                if np.dot(dx, dx) < ds_min2:
+                    accept = False
+                    break
+            if accept:
+                return (x0, u0)
+
+    def move_fibers_to_surface(self, fibers: List[Fiber], ds_min: float, verbose: bool = True) -> None:
+        """
+        Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
+
+        Arguments
+        ---------
+        fibers : List[Fiber]
+            List of fibers that will be moved. Only the Fiber.x property will be modified
+        ds_min : float
+            Minimum separation allowable between the fiber minus ends. Collisions are not searched for the rest of the fibers,
+            though they are unlikely
+        verbose : bool, default: :obj:`True`
+            If true, print a progress message
+        """
+        print("Inserting fibers")
+        for i in range(len(fibers)):
+            (x0, u0) = self.find_binding_site(fibers[0:i], ds_min)
+            if verbose:
+                print("Inserting fiber {} at {}".format(i, x0))
+            fibers[i].fill_node_positions(x0, u0)
 
 
 @dataclass
@@ -764,8 +815,7 @@ class Config():
         try:
             matplotlib.use(backend)
         except:
-            print("Unable to use backend: '{}'. Trying to plot with default".
-                  format(backend))
+            print("Unable to use backend: '{}'. Trying to plot with default".format(backend))
             pass
         import matplotlib.pyplot as plt
         x_fib = np.array([fib.x[0:3] for fib in self.fibers])
@@ -827,8 +877,7 @@ class ConfigEllipsoidal(Config):
     periphery : EllipsoidalPeriphery, default: :obj:`EllipsoidalPeriphery()`
         Periphery represented by an ellipsoid
     """
-    periphery: EllipsoidalPeriphery = field(
-        default_factory=EllipsoidalPeriphery)
+    periphery: EllipsoidalPeriphery = field(default_factory=EllipsoidalPeriphery)
 
 
 @dataclass
