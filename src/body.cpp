@@ -274,8 +274,7 @@ MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions, double
 /// \f[ A_{\textrm{bodies}} * x_\textrm{bodies} = y_{\textrm{bodies}} \f]
 /// where 'x' is derived from the input densities and velocities
 /// @param[in] v_bodies [3 x n_body_nodes_local] matrix of velocities at body nodes
-/// @param[in] body_densities [3 x n_body_nodes_local] matrix of body source strength "densities"
-/// @param[in] body_velocities [6 x n_bodies_global] vector of body velocities + angular velocities,
+/// @param[in] x_bodies [3 * n_body_nodes_local + 6 * n_bodies_global] vector of body source strength "densities", then com velocities, then com angular velocities
 /// @return [body_local_solution_size] vector 'y' in the formulation above
 VectorXd BodyContainer::matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const {
     VectorXd res(get_local_solution_size());
@@ -286,10 +285,11 @@ VectorXd BodyContainer::matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const {
             const int sol_size = body->get_solution_size();
             CVectorMap x_body(x_bodies.data() + solution_offset, sol_size);
             VectorMap res_body(res.data() + solution_offset, sol_size);
-            res_body = body->matvec(v_bodies.block(0, node_offset, 3, body->n_nodes_), x_body);
+            Eigen::VectorXd res_body_tmp = body->matvec(v_bodies.block(0, node_offset, 3, body->n_nodes_), x_body);
+            res_body = res_body_tmp;
 
             solution_offset += sol_size;
-            node_offset += 3 * body->n_nodes_;
+            node_offset += body->n_nodes_;
         }
     }
     return res;
