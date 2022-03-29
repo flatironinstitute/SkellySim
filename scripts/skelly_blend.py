@@ -56,10 +56,11 @@ def _create_sphere(position : np.array, radius : float, name : str, material : s
     return sphere
 
 def place_shell(radius, half=True):
-    _create_sphere(np.zeros(3), radius, 'Shell', 'ShellMaterial', half)
+    sphere = _create_sphere(np.zeros(3), radius, 'Shell', 'ShellMaterial', half)
 
 def create_body(position : np.array, radius : float):
     sphere = _create_sphere(position, radius, 'Body', 'BodyMaterial', False)
+    bpy.context.collection.objects.unlink(sphere)
     bpy.data.collections['Bodies'].objects.link(sphere)
 
 def init_materials():
