@@ -32,5 +32,6 @@ setup(
                       'toml',
                       'packaging',
                       'matplotlib',
+                      'dataclass_utils',
                       'function_generator@git+https://github.com/blackwer/function_generator@fda8b44b5edf15d1677ca7433139a43778d6659d'],
 )

@@ -6,6 +6,7 @@ from scipy.special import ellipeinc, ellipe
 from scipy.optimize import fsolve, bisect
 import toml
 from skelly_sim import shape_gallery, param_tools
+from dataclass_utils import check_type
 
 
 def _ellipsoid(t: float, u: float, a: float, b: float, c: float):
@@ -834,6 +835,7 @@ class Config():
         filename : str, default: :obj:`skelly_config.toml`
             path of configuration file to output
         """
+        check_type(self)
         with open(filename, 'w') as f:
             toml.dump(_unpack(self), f)
 
