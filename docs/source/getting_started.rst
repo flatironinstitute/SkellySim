@@ -19,8 +19,8 @@ easy.
 4. :ref:`Visualize<visualization>` or :ref:`post-process<post-processing>`
 
 
-Example simulation
-------------------
+Example simulation full workflow
+--------------------------------
 
 The following `example
 <https://github.com/flatironinstitute/SkellySim/tree/main/examples/body_fiber_periphery_constant_body_force>`_
@@ -143,3 +143,90 @@ real loss of quality.
 .. raw:: html
 
    <video controls width=600 src="_static/example.mp4"></video>
+
+
+Now we probably want to do some analysis. The following code loads in a trajectory and plots vs
+time the 'z' coordinates of the body, the fiber plus end, and the fiber minus end in the
+:obj:`body_fiber_periphery_constant_body_force` example. It also generates a 3d quiver plot of
+the velocity field at the 11th time frame of the velocity field. The full code is in the
+:obj:`examples/analysis_example.py` script.
+
+Run the :obj:`SkellySim` in post-processing mode to generate a velocity field
+
+.. code-block::
+
+    % skelly_sim --post-process
+    [2022-03-30 14:48:18.005] [SkellySim] [info] ****** SkellySim 0.9.5 (201494a2) ******
+    [2022-03-30 14:48:18.010] [SkellySim] [info] Preprocessing config file
+    [2022-03-30 14:48:18.010] [SkellySim] [info] Initializing FiberContainer
+    [2022-03-30 14:48:19.696] [SkellySim] [info] Reading in 1 fibers.
+    [2022-03-30 14:48:21.895] [SkellySim] [info] Loading raw precomputation data from file periphery_precompute.npz for periphery into rank 0
+    [2022-03-30 14:48:22.037] [SkellySim] [info] Done initializing base periphery
+    [2022-03-30 14:48:25.534] [SkellySim] [info] Reading in 1 bodies
+    [2022-03-30 14:48:25.609] [SkellySim] [info] Body 0: [ 0, 0, 0 ]
+    [2022-03-30 14:48:26.000] [SkellySim] [info] 0
+    [2022-03-30 14:48:26.498] [SkellySim] [info] 0.5
+    etc...
+    % ls
+    body_precompute.npz  gen_config.py  periphery_precompute.npz  skelly_config.toml  skelly_sim.out  skelly_sim.out.index  skelly_sim.vf
+
+Now there is :obj:`skelly_sim.vf` file in the directory, which is all of the velocity field
+data. To read it, and the trajectories in, you can use the :obj:`TrajectoryReader` class as in the example below.
+
+.. highlight:: python
+.. code-block:: python
+
+    import numpy as np
+    import matplotlib
+
+    matplotlib.use('TKAgg')
+    import matplotlib.pyplot as plt
+
+    from skelly_sim.reader import TrajectoryReader
+
+    traj = TrajectoryReader('skelly_config.toml')
+    vf = TrajectoryReader('skelly_config.toml', velocity_field=True)
+    body_pos = np.empty(shape=(len(traj), 3)) # COM body position in time
+    plus_pos = np.empty(shape=(len(traj), 3)) # fiber plus end in time
+    minus_pos = np.empty(shape=(len(traj), 3)) # fiber minus end in time
+
+    for i in range(len(traj)):
+        traj.load_frame(i)
+        body_pos[i, :] = traj['bodies'][0]['position_']
+        minus_pos[i, :] = traj['fibers'][0]['x_'][0, :]
+        plus_pos[i, :] = traj['fibers'][0]['x_'][-1, :]
+
+    vf.load_frame(10)
+    x = vf['x_grid']
+    v = vf['v_grid']
+
+    print("system keys: " + str(list(traj.keys())))
+    print("fiber keys: " + str(list(traj['fibers'][0].keys())))
+    print("body keys: " + str(list(traj['bodies'][0].keys())))
+    print("shell keys: " + str(list(traj['shell'].keys())))
+    print("velocity field keys: " + str(list(vf.keys())))
+
+    ax1 = plt.subplot(2, 1, 1)
+    ax2 = plt.subplot(2, 1, 2, projection='3d')
+
+    ax1.plot(traj.times, body_pos[:, 2], traj.times, plus_pos[:,2], traj.times, minus_pos[:,2])
+    ax2.quiver(x[:, 0], x[:, 1], x[:, 2], v[:, 0], v[:, 1], v[:, 2])
+
+    plt.show()
+
+
+.. code-block::
+
+    % python ../analysis_example.py
+    Loading trajectory index.
+    Loading trajectory index.
+    Stale trajectory index file. Rebuilding.
+    system keys: ['time', 'dt', 'rng_state', 'fibers', 'bodies', 'shell']
+    fiber keys: ['n_nodes_', 'length_', 'length_prev_', 'bending_rigidity_', 'penalty_param_', 'force_scale_', 'beta_tstep_', 'epsilon_', 'binding_site_', 'tension_', 'x_']
+    body keys: ['radius_', 'position_', 'orientation_', 'solution_vec_']
+    shell keys: ['solution_vec_']
+    velocity field keys: ['time', 'x_grid', 'v_grid']
+
+.. image:: images/example_plots.png
+   :width: 600
+   

@@ -45,25 +45,19 @@ def _eigen_to_numpy(d):
 
 class TrajectoryReader:
     """
-    Utility wrapper for reading skelly_sim trajectories. Provides a dict-like interface for access.
+    Utility wrapper for reading SkellySim trajectories. Provides a dict-like interface for access.
 
     Attributes
     ----------
-    fh : _io.BufferedReader
-        File handle of trajectory
-    fpos : List[int]
-        File position offsets of each frame in the trajectory
     times : List[float]
         Simulation time of the corresponding frames
-    frame_data : dict
-        Data associated with the currently loaded simulation frame
     config_data : dict
         Global toml data associated with the simulation
     """
-    fh = None
-    fpos = []
+    _fh = None
+    _fpos = []
+    _frame_data = None
     times = []
-    frame_data = None
     config_data = {}
 
     def __init__(self, toml_file: str = 'skelly_config.toml', velocity_field: bool = False):
@@ -88,7 +82,7 @@ class TrajectoryReader:
 
         mtime = os.stat(traj_file).st_mtime
         index_file = traj_file + '.index'
-        self.fh = open(traj_file, "rb")
+        self._fh = open(traj_file, "rb")
 
         if os.path.isfile(index_file):
             with open(index_file, 'rb') as f:
@@ -98,7 +92,7 @@ class TrajectoryReader:
                     print("Stale trajectory index file. Rebuilding.")
                     self.build_index(mtime, index_file)
                 else:
-                    self.fpos = index['fpos']
+                    self._fpos = index['fpos']
                     self.times = index['times']
         else:
             print("No trajectory index file. Building.")
@@ -108,8 +102,6 @@ class TrajectoryReader:
         """
         Loads a trajectory frame into memory, replacing the last loaded frame
         
-        Error
-        -----
         If an invalid frame number is provided, then throws an IndexError.
         
         Arguments
@@ -119,12 +111,13 @@ class TrajectoryReader:
         """
         if frameno < 0 or frameno >= len(self):
             raise IndexError("Invalid frame number provided to TrajectoryReader")
-        self.fh.seek(self.fpos[frameno])
-        self.frame_data = msgpack.Unpacker(self.fh, raw=False, object_hook=_eigen_to_numpy).unpack()
+        self._fh.seek(self._fpos[frameno])
+        self._frame_data = msgpack.Unpacker(self._fh, raw=False, object_hook=_eigen_to_numpy).unpack()
 
     def build_index(self, mtime: float, index_file: str):
         """
         Reads through the loaded trajectory, storing file position offsets and simulation times of each frame.
+        Modifies self._fpos and self.times
         
         Arguments
         ---------
@@ -132,17 +125,12 @@ class TrajectoryReader:
             Output of os.stat(traj_file).st_mtime
         index_file : str
             Path to index file we wish to create
-
-        Modifies
-        --------
-        self.fpos
-        self.times
         """
-        unpacker = msgpack.Unpacker(self.fh, raw=False)
+        unpacker = msgpack.Unpacker(self._fh, raw=False)
 
         while True:
             try:
-                self.fpos.append(unpacker.tell())
+                self._fpos.append(unpacker.tell())
                 n_keys = unpacker.read_map_header()
                 for key in range(n_keys):
                     key = unpacker.unpack()
@@ -152,12 +140,12 @@ class TrajectoryReader:
                         unpacker.skip()
 
             except msgpack.exceptions.OutOfData:
-                self.fpos.pop()
+                self._fpos.pop()
                 break
 
         index = {
             'mtime': mtime,
-            'fpos': self.fpos,
+            'fpos': self._fpos,
             'times': self.times,
         }
         with open(index_file, 'wb') as f:
@@ -165,14 +153,14 @@ class TrajectoryReader:
 
     def __getitem__(self, key):
         if key == 'bodies' or key == 'fibers':
-            return self.frame_data[key][0]
-        return self.frame_data[key]
+            return self._frame_data[key][0]
+        return self._frame_data[key]
 
     def __iter__(self):
-        return iter(self.frame_data)
+        return iter(self._frame_data)
 
     def __len__(self):
-        return len(self.fpos)
+        return len(self._fpos)
 
     def keys(self):
-        return self.frame_data.keys()
+        return self._frame_data.keys()
