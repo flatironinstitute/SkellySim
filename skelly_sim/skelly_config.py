@@ -802,7 +802,7 @@ class Config():
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
 
-    def plot_fibers(self, backend="TKAgg"):
+    def plot_fibers(self, backend : str = "TKAgg"):
         """
         Scatter plot fiber beginning and end points. Note axes are not scaled, so results may look
         'squished' and not exactly uniform.
