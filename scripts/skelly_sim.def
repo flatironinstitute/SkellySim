@@ -4,6 +4,7 @@ From: ubuntu:21.04
 %post
     export MKLROOT=/opt/intel/oneapi/mkl/latest
     export CXXFLAGS_="-I/usr/lib/x86_64-linux-gnu/openmpi/include -mavx2 -mfma"
+    SKELLY_VERS="v0.9.5"
 
     apt -y update
     apt -y install curl gpg software-properties-common
@@ -17,7 +18,7 @@ From: ubuntu:21.04
     apt -y update
     apt -y install intel-oneapi-mkl-devel build-essential libopenmpi-dev cmake libeigen3-dev ninja-build git python3-pip
 
-    pip3 install git+https://github.com/flatironinstitute/SkellySim.git@v0.9.4
+    pip3 install git+https://github.com/flatironinstitute/SkellySim.git@$SKELLY_VERS
 
     mkdir build
     cd build
