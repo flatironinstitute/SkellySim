@@ -1,6 +1,7 @@
 /build/
 /*.pyc
 *.out
+*.vf
 *.index
 /examples/*/*.npz
 /examples/*/*.toml
