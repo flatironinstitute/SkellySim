@@ -247,7 +247,7 @@ class SphericalBody : public Body {
     bool check_collision(const DeformableBody &body, double threshold) const override;
 
     /// @brief Serialize body automatically with msgpack macros
-    MSGPACK_DEFINE_MAP(radius_, position_, orientation_, solution_vec_);
+    MSGPACK_DEFINE_MAP(radius_, position_, orientation_, force_torque_, solution_vec_);
 };
 
 /// @brief Spherical Body...
