@@ -151,9 +151,9 @@ Eigen::MatrixXd kernels::rotlet(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &d
             double Myz = fr * dx;
             double Mzx = fr * dy;
             double Mzy = -fr * dx;
-            u(0, i_trg) = Mxy * density(1, i_src) + Mxz * density(2, i_src);
-            u(1, i_trg) = Myx * density(0, i_src) + Myz * density(2, i_src);
-            u(2, i_trg) = Mzx * density(0, i_src) + Mzy * density(1, i_src);
+            u(0, i_trg) += Mxy * density(1, i_src) + Mxz * density(2, i_src);
+            u(1, i_trg) += Myx * density(0, i_src) + Myz * density(2, i_src);
+            u(2, i_trg) += Mzx * density(0, i_src) + Mzy * density(1, i_src);
         }
     }
     u *= factor;
