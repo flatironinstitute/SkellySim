@@ -17,7 +17,7 @@ setup(
     author='Robert Blackwell',
     author_email='rblackwell@flatironinstitute.org',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Scientists/Mathematicians',
         'License :: Apache 2',
         'Programming Language :: Python :: 3',
