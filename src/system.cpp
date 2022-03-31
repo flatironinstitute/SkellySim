@@ -955,13 +955,14 @@ Eigen::MatrixXd VelocityField::make_grid() {
 
             for (int i_grid = 0; i_grid < sphere_centers.cols(); ++i_grid) {
                 Vector3l bottom_left =
-                    (sphere_centers.col(i_grid).array() - vf.moving_volume_radius).floor().cast<long int>();
+                    ((sphere_centers.col(i_grid).array() - vf.moving_volume_radius) / res).floor().cast<long int>();
                 for (int i = 0; i < n_points; ++i) {
                     for (int j = 0; j < n_points; ++j) {
                         for (int k = 0; k < n_points; ++k) {
                             Vector3l coord_i = Vector3l{i, j, k} + bottom_left;
                             long int key = key_map[0] * coord_i[0] + key_map[1] * coord_i[1] + key_map[2] * coord_i[2];
                             Eigen::Vector3d test_point = res * coord_i.cast<double>();
+
                             if (!shell_->check_collision(test_point, 0.0))
                                 grid_map[key] = test_point;
                         }
