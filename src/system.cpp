@@ -279,8 +279,9 @@ class TrajectoryReader {
 
         int rank;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        shell_->solution_vec_ =
-            min_state.shell.solution_vec_.segment(shell_->node_displs_[rank], shell_->node_counts_[rank]);
+        if (shell_->is_active())
+            shell_->solution_vec_ =
+                min_state.shell.solution_vec_.segment(shell_->node_displs_[rank], shell_->node_counts_[rank]);
 
         shell_sol = shell_->solution_vec_;
 
