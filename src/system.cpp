@@ -156,11 +156,12 @@ void write() {
                 fc_global.fibers.emplace_back(Fiber(min_fib, params_.eta));
 
             // FIXME: WRANGLE IN THAT SHELL.SOLUTION now
-            shell_global.solution_vec_.segment(shell_offset, min_state.shell.solution_vec_.size());
+            shell_global.solution_vec_.segment(shell_offset, min_state.shell.solution_vec_.size()) = min_state.shell.solution_vec_;
             shell_offset += min_state.shell.solution_vec_.size();
 
             to_write.rng_state.push_back(min_state.rng_state[0]);
         }
+
         msgpack::pack(ofs_, to_write);
         ofs_.flush();
     }
