@@ -64,6 +64,8 @@ Eigen::VectorXd SphericalBody::matvec(MatrixRef &v_body, VectorRef &x_body) cons
 void SphericalBody::min_copy(const std::shared_ptr<SphericalBody> &other) {
     this->position_ = other->position_;
     this->orientation_ = other->orientation_;
+    this->force_torque_ = other->force_torque_;
+    this->place(this->position_, this->orientation_);
     this->solution_vec_ = other->solution_vec_;
 }
 
