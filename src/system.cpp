@@ -1038,10 +1038,22 @@ void VelocityField::compute() {
         }
     }
 
-    v_grid = fc_.flow(x_grid, f_on_fibers, eta, false);
-    v_grid += bc_.flow(x_grid, sol_bodies, eta);
-    v_grid += shell_->flow(x_grid, sol_shell, eta);
-    v_grid += psc_.flow(x_grid, eta, properties.time);
+    // FIXME: This is likely wrong, but more right than before
+    Eigen::VectorXd sol_bodies_global(bc_.get_global_solution_size());
+    if (rank_ == 0)
+        sol_bodies_global = sol_bodies;
+    MPI_Bcast(sol_bodies_global.data(), sol_bodies_global.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    // This routine zeros out the external force. is that correct?
+    calculate_body_fiber_link_conditions(sol_fibers, sol_bodies_global);
+    for (auto &body : bc_.spherical_bodies)
+        body->force_torque_.segment(0, 3) += body->external_force_;
+
+    Eigen::MatrixXd v_grid_fibers = fc_.flow(x_grid, f_on_fibers, eta, false);
+    Eigen::MatrixXd v_grid_bodies = bc_.flow(x_grid, sol_bodies, eta);
+    Eigen::MatrixXd v_grid_shell = shell_->flow(x_grid, sol_shell, eta);
+    Eigen::MatrixXd v_grid_points = psc_.flow(x_grid, eta, properties.time);
+
+    v_grid = v_grid_fibers + v_grid_bodies + v_grid_shell + v_grid_points;
 
     // FIXME: move this to body logic with overloading
     // Replace points inside a body to have velocity v_body + w_body x r
