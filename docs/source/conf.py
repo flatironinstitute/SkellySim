@@ -22,7 +22,7 @@ copyright = '2022, Robert Blackwell, Gokberk Kabacaoglu'
 author = 'Robert Blackwell, Gokberk Kabacaoglu'
 
 # The full version, including alpha/beta/rc tags
-release = '0.9.6'
+release = '0.9.7'
 
 
 # -- General configuration ---------------------------------------------------
