@@ -221,7 +221,8 @@ def _check_invalid_attributes(obj, errorstatus=False):
         for _, value in obj.__dict__.items():
             errorstatus = _check_invalid_attributes(value, errorstatus)
     elif isinstance(obj, list):
-        [_check_invalid_attributes(value, errorstatus) for value in obj]
+        for value in obj:
+            errorstatus = _check_invalid_attributes(value, errorstatus)
     return errorstatus
 
 
