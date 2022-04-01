@@ -197,6 +197,34 @@ def _unpack(obj):
         return obj
 
 
+def _check_invalid_attributes(obj, errorstatus=False):
+    """
+    Helper routine to process a Config object recursively looking for invalid attributes.
+
+    Arguments
+    ---------
+    At entry, it should probably be a dataclass Config object
+
+    Returns
+    -------
+    bool
+        True if there is an invalid attribute, False otherwise
+    """
+    if is_dataclass(obj):
+        instance_keys = set(obj.__dict__.keys())
+        class_keys = set(obj.__dataclass_fields__.keys())
+        extra_keys = instance_keys.difference(class_keys)
+        if extra_keys:
+            for key in extra_keys:
+                print("Error: Attribute '{}' not found in class '{}'".format(key, type(obj).__name__))
+            errorstatus = True
+        for _, value in obj.__dict__.items():
+            errorstatus = _check_invalid_attributes(value, errorstatus)
+    elif isinstance(obj, list):
+        [_check_invalid_attributes(value, errorstatus) for value in obj]
+    return errorstatus
+
+
 def _default_vector():
     """
     A default vector factory for dataclass 'field' objects: :obj:`[0.0, 0.0, 0.0]`
@@ -802,7 +830,7 @@ class Config():
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
 
-    def plot_fibers(self, backend : str = "TKAgg"):
+    def plot_fibers(self, backend: str = "TKAgg"):
         """
         Scatter plot fiber beginning and end points. Note axes are not scaled, so results may look
         'squished' and not exactly uniform.
@@ -836,6 +864,10 @@ class Config():
             path of configuration file to output
         """
         check_type(self)
+        if _check_invalid_attributes(self):
+            print("Not saving configuration. Please fix listed attributes and try again")
+            return
+
         with open(filename, 'w') as f:
             toml.dump(_unpack(self), f)
 
