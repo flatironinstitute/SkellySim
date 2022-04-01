@@ -101,9 +101,9 @@ class TrajectoryReader:
     def load_frame(self, frameno: int):
         """
         Loads a trajectory frame into memory, replacing the last loaded frame
-        
+
         If an invalid frame number is provided, then throws an IndexError.
-        
+
         Arguments
         ---------
         frameno : int
@@ -118,7 +118,7 @@ class TrajectoryReader:
         """
         Reads through the loaded trajectory, storing file position offsets and simulation times of each frame.
         Modifies self._fpos and self.times
-        
+
         Arguments
         ---------
         mtime : float
@@ -127,6 +127,9 @@ class TrajectoryReader:
             Path to index file we wish to create
         """
         unpacker = msgpack.Unpacker(self._fh, raw=False)
+
+        self._fpos = []
+        self.times = []
 
         while True:
             try:
