@@ -53,11 +53,6 @@ class TrajectoryReader:
         Simulation time of the corresponding frames
     config_data : dict
         Global toml data associated with the simulation
-    
-    Methods
-    -------
-    load_frame
-        load frame into reader object by index of the trajectory frame. Raises IndexError if invalid index is provided
     """
 
     def __init__(self, toml_file: str = 'skelly_config.toml', velocity_field: bool = False):
