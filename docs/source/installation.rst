@@ -36,7 +36,21 @@ other computing centers, this is available via the :obj:`module` system already
 (e.g. :obj:`module load singularity`).
 
 Then, any command you would typically run directly in the shell, you just prefix it with
-:obj:`singularity exec /path/to/image.sif`. So the workflow would look more like...
+:obj:`singularity exec /path/to/image.sif`. Note that this only works as-is if the path you're
+writing to is in your home directory somewhere directly, which in some environments isn't
+advisable to work from. Singularity does not bind other directories not in home. Other paths
+(such as :obj:`ceph` paths at FI), might need to be bound explicitly by singularity. To bind
+the current working directory for read/write access you might have to change the command to be
+more like this
+
+.. code-block:: bash
+
+    singularity exec -B $(realpath $PWD) /path/to/skellysim_container.sif python3 gen_config.py
+
+where the :obj:`-B $(realpath $PWD)` tells singularity to bind the current directory `outside
+the container` to the same path `inside the container.` Regardless, the workflow will roughly
+look something like this for working within a singularity environment:
+
 
 .. code-block:: bash
 
@@ -45,16 +59,6 @@ Then, any command you would typically run directly in the shell, you just prefix
     singularity exec /path/to/skellysim_container.sif mpirun skelly_sim
     singularity exec /path/to/skellysim_container.sif mpirun skelly_sim --post-process
 
-
-Note that this only works if the path you're writing to is in your home directory somewhere
-directly, which in some environments isn't advisable to work from. Other paths (such as
-:obj:`ceph` paths at FI), might need to be bound explicitly by singularity. To bind the current
-working directory for read/write access you might have to change the command to be more like
-this.
-
-.. code-block:: bash
-
-    singularity exec -B $PWD /path/to/skellysim_container.sif python3 gen_config.py
 
 
 Python modules and scripts (advanced usage)
