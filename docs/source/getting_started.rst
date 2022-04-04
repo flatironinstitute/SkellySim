@@ -24,14 +24,14 @@ Example simulation full workflow
 
 The following `example
 <https://github.com/flatironinstitute/SkellySim/tree/main/examples/body_fiber_periphery_constant_body_force>`_
-example is from our github. It represents a fairly minimal system which has a Fiber attached to
-a Body and a Periphery. The Body experiences a constant upward force, while the Fiber attaches
-and hinges to the Periphery when it gets close to it. For more details about the actual
+is from our github. It represents a fairly minimal system which has a Fiber attached to a Body
+and a Periphery. The Body experiences a constant upward force, while the Fiber attaches and
+hinges to the Periphery when it gets close to it. For more details about the actual
 configuration generation process, you should check out :ref:`generate a configuration
 file<generating-configuration-files>`. If you're using :obj:`singularity`, which we recommend
 to start with, note you'll have to prefix all your commands as noted in the :ref:`installation`
-page. Now, before we get into how to generate images, let's show what this initial
-condition looks like
+page. Now, before we get into how to generate images, let's show what this initial condition
+looks like
 
 .. image:: images/example_ic.png
    :width: 600
