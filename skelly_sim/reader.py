@@ -53,12 +53,12 @@ class TrajectoryReader:
         Simulation time of the corresponding frames
     config_data : dict
         Global toml data associated with the simulation
+    
+    Methods
+    -------
+    load_frame
+        load frame into reader object by index of the trajectory frame. Raises IndexError if invalid index is provided
     """
-    _fh = None
-    _fpos = []
-    _frame_data = None
-    times = []
-    config_data = {}
 
     def __init__(self, toml_file: str = 'skelly_config.toml', velocity_field: bool = False):
         """
@@ -71,6 +71,12 @@ class TrajectoryReader:
         velocity_field : bool
             Set True to read the velocity field trajectory rather than the position trajectory
         """
+
+        self._fh = None
+        self._fpos: List[int] = []
+        self._frame_data: dict = None
+        self.times: List[float] = []
+        self.config_data: dict = {}
 
         with open(toml_file, 'r') as f:
             self.config_data = toml.load(f)
@@ -90,13 +96,13 @@ class TrajectoryReader:
                 index = pickle.load(f)
                 if index['mtime'] != mtime:
                     print("Stale trajectory index file. Rebuilding.")
-                    self.build_index(mtime, index_file)
+                    self._build_index(mtime, index_file)
                 else:
                     self._fpos = index['fpos']
                     self.times = index['times']
         else:
             print("No trajectory index file. Building.")
-            self.build_index(mtime, index_file)
+            self._build_index(mtime, index_file)
 
     def load_frame(self, frameno: int):
         """
@@ -114,7 +120,7 @@ class TrajectoryReader:
         self._fh.seek(self._fpos[frameno])
         self._frame_data = msgpack.Unpacker(self._fh, raw=False, object_hook=_eigen_to_numpy).unpack()
 
-    def build_index(self, mtime: float, index_file: str):
+    def _build_index(self, mtime: float, index_file: str):
         """
         Reads through the loaded trajectory, storing file position offsets and simulation times of each frame.
         Modifies self._fpos and self.times
