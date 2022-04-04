@@ -57,7 +57,7 @@ From: ubuntu:21.04
 
     git clone https://github.com/flatironinstitute/skellysim
     cd skellysim
-    git checkout v0.9.4
+    git checkout ${SKELLY_VERS}
     git submodule update --init
     cd ..
 
