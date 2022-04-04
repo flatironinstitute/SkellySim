@@ -2,7 +2,7 @@
 
 import sys
 import numpy as np
-from skelly_sim.skelly_config import Config, Body, Fiber
+from skelly_sim.skelly_config import Config, Body
 
 config_file = 'skelly_config.toml'
 if len(sys.argv) == 1:
