@@ -87,16 +87,13 @@ class TrajectoryReader:
 
         if os.path.isfile(index_file):
             with open(index_file, 'rb') as f:
-                print("Loading trajectory index.")
                 index = pickle.load(f)
                 if index['mtime'] != mtime:
-                    print("Stale trajectory index file. Rebuilding.")
                     self._build_index(mtime, index_file)
                 else:
                     self._fpos = index['fpos']
                     self.times = index['times']
         else:
-            print("No trajectory index file. Building.")
             self._build_index(mtime, index_file)
 
     def load_frame(self, frameno: int):
