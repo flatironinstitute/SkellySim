@@ -33,16 +33,16 @@ config.bodies = [
     Body(n_nucleation_sites=0,
          position=[0.0, 0.0, 0.0],
          shape='sphere',
-         radius=0.5,
-         n_nodes=400,
-         external_force=[0.0, 0.0, 1.5])
+         radius=1.0,
+         n_nodes=800,
+         external_force=[0.0, 0.0, 0.5])
 ]
 
 config.params.velocity_field.resolution = 0.5
 config.params.velocity_field.dt_write_field = 0.5
 
 config.periphery.n_nodes = 2000
-config.periphery.radius = 4.0
+config.periphery.radius = 5.0
 
 # output our config
 config.save(config_file)
