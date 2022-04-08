@@ -55,6 +55,17 @@ Terminology
 
   - :obj:`periphery` (optional): Single :obj:`Periphery` object
 
+- Base units
+
+  - :obj:`time`: seconds (:obj:`s`)
+
+  - :obj:`length`: micrometers (:obj:`μm`)
+
+  - :obj:`force`: piconewtons (:obj:`pN`)
+
+  - :obj:`viscosity`: Pascal-seconds (:obj:`Pa·s`)
+
+
 Example generation script
 -------------------------
 

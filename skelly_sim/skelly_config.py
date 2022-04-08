@@ -254,17 +254,17 @@ class Fiber():
         Index of :obj:`Body` the :obj:`Fiber` is bound to. A value of :obj:`-1` indicates a free fiber.
         :obj:`Fibers` attached to :obj:`Bodies` obey the :obj:`clamped` boundary condition,
         which preserves the relative angle of attachment to the body.
-    force_scale : float, default: :obj:`0.0`
+    force_scale : float, default: :obj:`0.0`, units: :obj:`pN·μm⁻¹`
         Tangential force per unit length to act along filament. A positive value pushes toward the :obj:`plus` end,
         while a negative value pushes toward the :obj:`minus` end
-    bending_rigidity : float default: :obj:`2.5E-3`
+    bending_rigidity : float default: :obj:`2.5E-3`, units: :obj:`pN·μm²`
         Bending rigidity of this filament
-    length : float, default: :obj:`1.0`
+    length : float, default: :obj:`1.0`, units: :obj:`μm`
         Constraint length of this filament
     minus_clamped : bool, default: :obj:`False`
         Fix minus end of filament with "clamped" boundary condition, preserving orientation and position (:obj:`Velocity = 0, AngularVelocity = 0`).
         If attached to a body (:obj:`parent_body >= 0`), then this parameter is implied True and ignored.
-    x : List[float], default: :obj:`[]`
+    x : List[float], default: :obj:`[]`, units: :obj:`μm`
         List of node positions in [x0,y0,z0,x1,y1,z1...] order. Extreme care must be taken when setting this since the length constraint
         can generate massive tensions with poor input. See examples.
     """
@@ -304,21 +304,21 @@ class DynamicInstability():
     ----------
     n_nodes : int, default: :obj:`0`
         Number of nodes for newly nucleated fibers (see nucleation_rate). :obj:`0` disables dynamic instability
-    v_growth : float, default: :obj:`0.0`
+    v_growth : float, default: :obj:`0.0`, units: :obj:`μm·s⁻¹`
         Growth velocity in microns/second. Growth happens at the "plus" ends
-    f_catastrophe : float, default: :obj:`0.0`
+    f_catastrophe : float, default: :obj:`0.0`, units: :obj:`s⁻¹`
         Catastrophe frequency (probability per unit time of switching from growth to deletion) in 1/second
     v_grow_collision_scale : float, default: :obj:`0.5`
         When a fiber hits a boundary, scale its velocity (v_growth) by this factor
     f_catastrophe_collision_scale : float, default: :obj:`2.0`
         When a fiber hits a boundary, scale its catastrophe frequency (f_catastrophe) by this
-    nucleation_rate : float, default: :obj:`0.0`
+    nucleation_rate : float, default: :obj:`0.0`, units: :obj:`s⁻¹`
         Fiber nucleation rate in units of MT nucleations / second
-    min_length: float, default: :obj:`0.5`
+    min_length: float, default: :obj:`0.5`, units: :obj:`μm`
         New fiber initial length in microns
-    bending_rigidity : float, default: :obj:`2.5E-3`
+    bending_rigidity : float, default: :obj:`2.5E-3`, units: :obj:`pN·μm²`
         New fiber bending rigidity
-    min_separation : float, default: :obj:`0.1`
+    min_separation : float, default: :obj:`0.1`, units: :obj:`μm`
         Minimum distance between Fiber minus ends in microns when nucleating (closer than this will be rejected)
     """
     n_nodes: int = 0
@@ -339,13 +339,13 @@ class VelocityField():
 
     Attributes
     ----------
-    resolution : float, default: :obj:`1.0`
+    resolution : float, default: :obj:`1.0`, units: :obj:`μm`
         Distance between grid points. n_points ~ (2 * radius / resolution)^3. Don't make too small unless you have lots of memory/storage :)
-    dt_write_field : float, default: :obj:`0.5`
+    dt_write_field : float, default: :obj:`0.5`, units: :obj:`s`
         Time between velocity field measurements
     moving_volume : bool, default: :obj:`False`
         Track velocity field around bodies. If two bodies are adjacent, their grids will be merged into one. Useful when no periphery.
-    moving_volume_radius : float, default: :obj:`30.0`
+    moving_volume_radius : float, default: :obj:`30.0`, units: :obj:`μm`
         not really a radius. half box size for volume around body to track
     """
     resolution: float = 1.0
@@ -360,18 +360,18 @@ class Params():
 
     Attributes
     ----------
-    eta : float, default: :obj:`1.0`
+    eta : float, default: :obj:`1.0`, units: :obj:`Pa·s`
         Viscosity of fluid
-    dt_initial : float, default: :obj:`0.025`
-        Initial length of timestep in seconds
-    dt_min : float, default: :obj:`1E-5`
+    dt_initial : float, default: :obj:`0.025`, units: :obj:`s`
+        Initial length of timestep
+    dt_min : float, default: :obj:`1E-5`, units: :obj:`s`
         Minimum timestep before simulation fails when using adaptive timestepping (adaptive_timestep_flag)
-    dt_max : float, default: :obj:`0.1`
+    dt_max : float, default: :obj:`0.1`, units: :obj:`s`
         Maximum timestep size allowable when using adaptive timestepping (adaptive_timestep_flag)
-    dt_write : float, default: :obj:`0.1`
+    dt_write : float, default: :obj:`0.1`, units: :obj:`s`
         Amount of simulation time between writes. Due to adaptive timestepping (and floating point issues) the
         time between writes is only approximately dt_write
-    t_final : float, default: :obj:`100.0`
+    t_final : float, default: :obj:`100.0`, units: :obj:`s`
         Simulation time to quit the simulation
     gmres_tol : float, default: :obj:`1E-8`
         GMRES tolerance, might be tuned later, but recommend at least 1E-8
@@ -443,7 +443,7 @@ class SphericalPeriphery(Periphery):
         Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
     shape : str, default: :obj:`'sphere'`
         Shape of the periphery. Don't modify it!
-    radius : float, default: :obj:`6.0`
+    radius : float, default: :obj:`6.0`, units: :obj:`μm`
         Radius of our sphere in microns
     """
 
@@ -516,11 +516,11 @@ class EllipsoidalPeriphery(Periphery):
         Number of nodes to represent Periphery object. larger peripheries = more nodes. Memory scales as n_nodes^2, so don't exceed ~10000
     shape : str, default: :obj:`'ellipsoid'`
         Shape of the periphery. Don't modify it!
-    a : float, default: :obj:`7.8`
+    a : float, default: :obj:`7.8`, units: :obj:`μm`
          Length of axis 'a'
-    b : float, default: :obj:`4.16`
+    b : float, default: :obj:`4.16`, units: :obj:`μm`
          Length of axis 'b'
-    c : float, default: :obj:`4.16`
+    c : float, default: :obj:`4.16`, units: :obj:`μm`
          Length of axis 'c'
     """
 
@@ -606,6 +606,7 @@ class RevolutionPeriphery(Periphery):
 
         # required option. this is the function you're revolving around the 'x' axis. 'x' needs to be
         # the independent variable. Currently the function has to be a one-liner
+        # Unit lengths should be in μm
         config.periphery.envelope.height = "0.5 * T * ((1 + 2*x/length)**p1) * ((1 - 2*x/length)**p2) * length"
         config.periphery.envelope.T = 0.72
         config.periphery.envelope.p1 = 0.4
@@ -705,13 +706,13 @@ class Body():
         How nucleation sites are made (just leave as 'auto', which will place the nucleation site at the fiber minus end automatically)
     n_nucleation_sites : int, default: :obj:`0`
         Number of available Fiber sites on the body. Don't add more fibers than this to body
-    position : List[float], default: :obj:`[0.0, 0.0, 0.0]`
+    position : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
         Lab frame coordinate of the body center [x,y,z]
     orientation : List[float], default: :obj:`[0.0, 0.0, 0.0, 1.0]`
         Orientation quaternion of the body. Not worth changing
     shape : str, default: :obj:`'sphere'`
         Shape of the body. Sphere is currently only supported option
-    radius : float, default: :obj:`1.0`
+    radius : float, default: :obj:`1.0`, units: :obj:`μm`
         Radius of the body. This is the attachment radius for nucleation sites, the hydrodynamic radius is a bit smaller
     n_nodes : int, default: :obj:`600`
         Number of nodes to represent surface. WARNING: MAKE NEW PRECOMPUTE DATA WHEN CHANGING or you will regret it.
@@ -719,7 +720,7 @@ class Body():
         Where precompute data is stored (quadrature data, mostly). Can be different on
         different bodies, though should be the same if the bodies are the same radius and have
         the same numbers of nodes.
-    external_force : List[float], default: :obj:`[0.0, 0.0, 0.0]`
+    external_force : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`pN`
         Lab frame external force applied to body - useful for testing things like stokes flow
     """
     nucleation_type: str = 'auto'
@@ -794,13 +795,13 @@ class Point():
 
     Attributes
     ----------
-    position : List[float], default: :obj:`[0.0, 0.0, 0.0]`
+    position : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
         Position of the point source (x,y,z)
-    force : List[float], default: :obj:`[0.0, 0.0, 0.0]`
+    force : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`pN`
         Constant force to emit from point source
-    torque : List[float], default: :obj:`[0.0, 0.0, 0.0]`
+    torque : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`pN·μm`
         Constant torque to emit from point source
-    time_to_live : float, default: :obj:`0.0`
+    time_to_live : float, default: :obj:`0.0`, units: :obj:`s`
         Simulation time after which the point source deactivates and does nothing. A value of
         0.0 means to live forever.
     """
