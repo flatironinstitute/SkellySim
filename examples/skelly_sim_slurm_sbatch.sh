@@ -9,7 +9,7 @@
 
 module purge
 module use ~rblackwell/modules
-module load gcc/11 openmpi intel-oneapi-mkl trilinos pvfmm stkfmm fftw skelly_sim
+module load gcc/11 openmpi intel-oneapi-mkl trilinos pvfmm stkfmm fftw flexiblas skelly_sim
 module list
 ldd $(which skelly_sim)
 
