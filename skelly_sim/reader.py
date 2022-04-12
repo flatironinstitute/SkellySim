@@ -107,7 +107,7 @@ class TrajectoryReader:
         frameno : int
             Frame of simulation to load. Valid values are [0, len(TrajectoryReader) - 1]
         """
-        if frameno < 0 or frameno >= len(self):
+        if abs(frameno) >= len(self):
             raise IndexError("Invalid frame number provided to TrajectoryReader")
         self._fh.seek(self._fpos[frameno])
         self._frame_data = msgpack.Unpacker(self._fh, raw=False, object_hook=_eigen_to_numpy).unpack()

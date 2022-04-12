@@ -19,20 +19,22 @@ np.random.seed(100)
 # create a config object and set the system parameters
 config = Config()
 config.params.eta = 1.0
-config.params.dt_initial = 1E-1
+config.params.dt_initial = 1E-4
 config.params.dt_min = 1E-4
-config.params.dt_max = 1E-1
-config.params.dt_write = 1E-1
-config.params.t_final = 10.0
+config.params.dt_max = 1E-4
+config.params.dt_write = 1E-3
+config.params.t_final = 1E-2
 config.params.gmres_tol = 1E-10
 config.params.seed = 130319
 
+length = 0.75
 config.fibers = [Fiber(
-    force_scale=0.015,
-    length=1.0,
-    n_nodes=32,
+    force_scale=0.1,
+    length=length,
+    n_nodes=8,
+    bending_rigidity=0.0025
 )]
-config.fibers[0].fill_node_positions(np.array([0.0, 0.0, -0.5]), np.array([0.0, 0.0, 1.0]))
+config.fibers[0].fill_node_positions(np.array([0.0, 0.0, 0.0]), np.array([0.0, 0.0, 1.0]))
 
 config.params.velocity_field.resolution = 0.5
 config.params.velocity_field.dt_write_field = 0.5
