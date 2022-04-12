@@ -198,9 +198,6 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
-    MatrixXd D_2 = mats.D_2_0 * std::pow(2.0 / length_, 2);
-    MatrixXd D_3 = mats.D_3_0 * std::pow(2.0 / length_, 3);
-    MatrixXd D_4 = mats.D_4_0 * std::pow(2.0 / length_, 4);
 
     ArrayXd x_x = x_.block(0, 0, 1, np).transpose().array();
     ArrayXd x_y = x_.block(1, 0, 1, np).transpose().array();
@@ -445,7 +442,7 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         Vector3d BC_plus_vec_0 = {0.0, 0.0, 0.0};
         // FIXME: hack to fix BCs for motor forces at end
         if (f_on_fiber.size())
-            BC_plus_vec_0 = f_on_fiber.col(f_on_fiber.cols() - 1) - force_scale_ * xs_.col(n_nodes_ - 1);
+            BC_plus_vec_0 = f_on_fiber.col(f_on_fiber.cols() - 1);
 
         B_RHS.segment(7, 3) = BC_plus_vec_0;
         B_RHS(10) = BC_plus_vec_0.dot(xs_.col(xs_.cols() - 1));

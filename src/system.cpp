@@ -1135,7 +1135,7 @@ void prep_state_for_solver() {
     MatrixXd total_force_fibers = motor_force_fibers + external_force_fibers;
     fc_.update_RHS(properties.dt, v_all.block(0, 0, 3, fib_node_count), total_force_fibers);
     fc_.update_boundary_conditions(*shell_, params_.periphery_binding_flag);
-    fc_.apply_bc_rectangular(properties.dt, v_all.block(0, 0, 3, fib_node_count), total_force_fibers);
+    fc_.apply_bc_rectangular(properties.dt, v_all.block(0, 0, 3, fib_node_count), external_force_fibers);
 
     shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
 }
