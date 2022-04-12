@@ -18,7 +18,7 @@ np.random.seed(100)
 
 # create a config object and set the system parameters
 config = Config()
-config.params.eta = 1.0
+config.params.eta = 0.7
 config.params.dt_initial = 1E-4
 config.params.dt_min = 1E-4
 config.params.dt_max = 1E-4
@@ -29,7 +29,7 @@ config.params.seed = 130319
 
 length = 0.75
 config.fibers = [Fiber(
-    force_scale=0.1,
+    force_scale=0.31,
     length=length,
     n_nodes=8,
     bending_rigidity=0.0025
