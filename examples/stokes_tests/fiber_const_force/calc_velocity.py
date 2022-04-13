@@ -12,11 +12,15 @@ xf = traj['fibers'][0]['x_'][0, :]
 
 dt = traj.times[-1] - traj.times[0]
 v = (xf - x0) / dt
-fib = traj.config_data['fibers'][0]
-epsilon = 1E-3
 
-gamma = fib["force_scale"] * fib["length"] / v[-1]
-gamma_theory = -4 * np.pi * fib['length'] * traj.config_data['params']['eta'] / (np.log(np.exp(1) * epsilon**2))
+fib = traj.config_data['fibers'][0]
+length = fib['length']
+radius = fib['radius']
+
+epsilon = radius / length
+
+gamma = fib["force_scale"] * length / v[-1]
+gamma_theory = -4 * np.pi * length * traj.config_data['params']['eta'] / (np.log(np.exp(1) * epsilon**2))
 
 print("theoretical drag: {}".format(gamma_theory))
 print("measured drag: {}".format(gamma))

@@ -259,6 +259,8 @@ class Fiber():
         while a negative value pushes toward the :obj:`minus` end
     bending_rigidity : float default: :obj:`2.5E-3`, units: :obj:`pN·μm²`
         Bending rigidity of this filament
+    radius : float, default: :obj:`0.0125`, units: :obj:`μm`
+        Radius of fiber (for purposes of SBT, currently no physical dimension)
     length : float, default: :obj:`1.0`, units: :obj:`μm`
         Constraint length of this filament
     minus_clamped : bool, default: :obj:`False`
@@ -272,6 +274,7 @@ class Fiber():
     parent_body: int = -1
     force_scale: float = 0.0
     bending_rigidity: float = 2.5E-3
+    radius: float = 0.0125
     length: float = 1.0
     minus_clamped: bool = False
     x: List[float] = field(default_factory=list)

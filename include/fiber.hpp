@@ -24,6 +24,7 @@ class Fiber {
 
     // Input parameters
     int n_nodes_;                  ///< number of nodes representing the fiber
+    double radius_;                ///< radius of the fiber (for slender-body-theory, though possibly for collisions eventually)
     double length_;                ///< Desired 'constraint' length of fiber
     double length_prev_;           ///< Last accepted length_
     double bending_rigidity_;      ///< bending rigidity 'E' of fiber
@@ -124,11 +125,13 @@ class Fiber {
         xss_.resize(3, n_nodes_);
         xsss_.resize(3, n_nodes_);
         xssss_.resize(3, n_nodes_);
-
-        c_0_ = -log(M_E * std::pow(epsilon_, 2)) / (8 * M_PI * eta);
-        c_1_ = 2.0 / (8.0 * M_PI * eta);
     };
 
+    void update_constants(double eta) {
+        epsilon_ = radius_ / length_;
+        c_0_ = -log(M_E * std::pow(epsilon_, 2)) / (8 * M_PI * eta);
+        c_1_ = 2.0 / (8.0 * M_PI * eta);
+    }
     void update_preconditioner();
     void update_force_operator();
     void update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external);

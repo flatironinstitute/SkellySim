@@ -41,12 +41,15 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     init(eta);
 
     bending_rigidity_ = toml::find<double>(fiber_table, "bending_rigidity");
+    radius_ = toml::find_or<double>(fiber_table, "radius", 0.0125);
     length_ = toml::find<double>(fiber_table, "length");
     length_prev_ = toml::find<double>(fiber_table, "length");
     force_scale_ = toml::find_or<double>(fiber_table, "force_scale", 0.0);
     binding_site_.first = toml::find_or<int>(fiber_table, "parent_body", -1);
     binding_site_.second = toml::find_or<int>(fiber_table, "parent_site", -1);
     minus_clamped_ = toml::find_or<bool>(fiber_table, "minus_clamped", false);
+
+    update_constants(eta);
 }
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
@@ -748,6 +751,7 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
 
 void FiberContainer::update_cache_variables(double dt, double eta) {
     for (auto &fib : fibers) {
+        fib.update_constants(eta);
         fib.update_derivatives();
         fib.update_stokeslet(eta);
         fib.update_linear_operator(dt, eta);
