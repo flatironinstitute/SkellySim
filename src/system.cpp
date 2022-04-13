@@ -651,9 +651,9 @@ Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, Vecto
         // FIXME: Fiber torque assumes body is a sphere :(
         Vector3d w_fiber = site_pos.normalized().cross(w_body);
 
-        velocities_on_fiber.block(0, i_fib, 3, 1) = v_fiber;
+        velocities_on_fiber.col(i_fib).segment(0, 3) = v_fiber;
         velocities_on_fiber(3, i_fib) = tension_condition;
-        velocities_on_fiber.block(4, i_fib, 3, 1) = w_fiber;
+        velocities_on_fiber.col(i_fib).segment(4, 3) = w_fiber;
 
         i_fib++;
         xt_offset += 4 * n_pts;
