@@ -5,5 +5,8 @@ plot the `x` position of the unclamped end of the fiber.
 
 Credit: Brato Chakrabarti for the [derivation](hopf-bifurcation.pdf)
 
-![Plot of sigma=72](sigma72.png)
-![Plot of sigma=80](sigma80.png)
+# Sigma = 72
+![Plot of sigma=72](sigma72.png "Sigma = 72")
+
+# Sigma = 80
+![Plot of sigma=80](sigma80.png "Sigma = 80")
