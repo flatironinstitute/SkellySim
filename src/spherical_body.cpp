@@ -12,12 +12,12 @@
 void SphericalBody::step(double dt, VectorRef &body_solution) {
     int sol_offset = 3 * n_nodes_;
 
-    Eigen::Vector3d body_velocity = body_solution.segment(sol_offset, 3);
-    Eigen::Vector3d body_angular_velocity = body_solution.segment(sol_offset + 3, 3);
+    velocity_ = body_solution.segment(sol_offset, 3);
+    angular_velocity_ = body_solution.segment(sol_offset + 3, 3);
     solution_vec_ = body_solution;
 
-    Eigen::Vector3d x_new = position_ + body_velocity * dt;
-    Eigen::Vector3d phi = body_angular_velocity * dt;
+    Eigen::Vector3d x_new = position_ + velocity_ * dt;
+    Eigen::Vector3d phi = angular_velocity_ * dt;
 
     double phi_norm = phi.norm();
     Eigen::Quaterniond orientation_new = orientation_;
