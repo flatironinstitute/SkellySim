@@ -14,4 +14,6 @@ for i in range(len(traj)):
     x.append(traj['fibers'][0]['x_'][-1, 0])
 
 plt.plot(traj.times, x)
+plt.xlabel('Time (s)')
+plt.ylabel('Deflection (micrometers)')
 plt.show()
