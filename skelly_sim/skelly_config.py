@@ -127,10 +127,9 @@ def _get_random_orthogonal_vector(x: np.array):
     return b * np.cos(theta) + c * np.sin(theta)
 
 
-def perturbed_fiber_positions(amplitude: float, length: float, x0: np.array, n_nodes: int):
+def perturbed_fiber_positions(amplitude: float, length: float, x0: np.array, normal: np.array, n_nodes: int, ortho: np.array = None):
     """
     Create a fiber x vector with a small cosine perturbation in a random direction orthogonal to the fiber.
-    Fiber orientation is assumed to be along the vector x0, which is the position of the minus end of the filament (so don't place at the origin).
 
     Arguments
     ---------
@@ -140,17 +139,20 @@ def perturbed_fiber_positions(amplitude: float, length: float, x0: np.array, n_n
         Length of the fiber
     x0 : np.array(3)
         3D position of the base of the Fiber. Don't place at the origin since the orientation is determined from this.
+    normal : np.array(3)
+        Direction fiber points at the two tips of the perturbation
     n_nodes : int
         number of nodes to represent the fiber
+    ortho : np.array(3)
+        Normalized 3D orientation vector for the perturbation. Not sanity checked (that it's actually normal, or length 1)
 
     Returns: [n_nodes, 3] matrix of positions of each node in a perturbed fiber
     """
     x_max_fun = lambda xf: _sin_length(amplitude, xf) - length
     x_max = fsolve(x_max_fun, length)
 
-    normal = -x0 / np.linalg.norm(x0)
-
-    ortho = _get_random_orthogonal_vector(normal)
+    if ortho is None:
+        ortho = _get_random_orthogonal_vector(normal)
 
     arc_length_per_segment = length / (n_nodes - 1)
     lin_pos = np.zeros(n_nodes)
@@ -160,7 +162,7 @@ def perturbed_fiber_positions(amplitude: float, length: float, x0: np.array, n_n
 
     fiber_positions = np.outer(lin_pos, normal)
 
-    cos_perturbation = amplitude * (np.cos(lin_pos) - 1)
+    cos_perturbation = amplitude * (np.cos(2 * np.pi * lin_pos / lin_pos[-1]) - 1)
     fiber_positions += np.outer(cos_perturbation, ortho)
     fiber_positions += x0
 
