@@ -34,7 +34,7 @@ class Fiber {
     double force_scale_ = 0.0;
     // FIXME: Magic numbers in linear operator calculation
     double beta_tstep_ = 1.0; ///< penalty parameter to ensure inextensibility
-    double epsilon;   ///< slenderness parameter
+    double epsilon_;   ///< slenderness parameter
     bool minus_clamped_ = false; ///< Fix minus end in space with clamped condition
 
     /// (body, site) pair for minus end binding. -1 implies unbound
