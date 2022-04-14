@@ -68,7 +68,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
 
     Eigen::MatrixXd r_sl, f_sl; // dummy SL positions/values
     Eigen::MatrixXd pvel = (*stresslet_kernel_)(r_sl, node_pos_, r_trg, f_sl, f_dl);
-    Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg) / eta;
+    Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     spdlog::debug("Finished shell flow");
