@@ -443,7 +443,6 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
         B(10, 4 * np - 1) = 1.0;
 
         Vector3d BC_plus_vec_0 = {0.0, 0.0, 0.0};
-        // FIXME: hack to fix BCs for motor forces at end
         if (f_on_fiber.size())
             BC_plus_vec_0 = f_on_fiber.col(f_on_fiber.cols() - 1);
 
