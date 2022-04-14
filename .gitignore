@@ -3,8 +3,8 @@
 *.out
 *.vf
 *.index
-/examples/*/*.npz
-/examples/*/*.toml
+/examples/**/*.npz
+/examples/**/*.toml
 /skelly_sim.egg-info
 __pycache__
 *.blend1
