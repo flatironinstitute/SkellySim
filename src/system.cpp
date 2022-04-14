@@ -1038,6 +1038,9 @@ void VelocityField::compute() {
         }
     }
 
+    if (properties.time >= params_.implicit_motor_activation_delay)
+        f_on_fibers += fc_.generate_constant_force();
+
     // FIXME: This is likely wrong, but more right than before
     Eigen::VectorXd sol_bodies_global(bc_.get_global_solution_size());
     if (rank_ == 0)
