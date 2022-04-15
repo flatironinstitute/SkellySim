@@ -40,6 +40,9 @@ def precompute_periphery(config):
     periphery_type = config['periphery']['shape']
     eta = config['params']['eta']
 
+    # FIXME: Scaling hack until we figure out wtf is going on with periphery::flow
+    eta = 1.0
+
     # Build shape
     if periphery_type == 'sphere':
         n_periphery = config['periphery']['n_nodes']
