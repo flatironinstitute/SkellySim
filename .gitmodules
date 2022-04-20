@@ -10,12 +10,3 @@
 [submodule "extern/msgpack-c"]
 	path = extern/msgpack-c
 	url = https://github.com/msgpack/msgpack-c
-[submodule "utils/lib/function_generator"]
-	path = utils/lib/function_generator
-	url = https://github.com/blackwer/function_generator
-[submodule "extern/pvfmm"]
-	path = extern/pvfmm
-	url = https://github.com/dmalhotra/pvfmm.git
-[submodule "extern/stkfmm"]
-	path = extern/stkfmm
-	url = https://github.com/flatironinstitute/stkfmm.git
