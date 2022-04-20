@@ -10,25 +10,24 @@
 namespace kernels {
 typedef Eigen::MatrixXd (*fmm_kernel_func_t)(const int n_trg, MatrixRef &f_sl, MatrixRef &f_dl, stkfmm::STKFMM *);
 
-Eigen::MatrixXd oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta = 1.0,
+Eigen::MatrixXd oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta,
                                              double reg = 5E-3, double epsilon_distance = 1E-5);
 
 Eigen::MatrixXd stokes_vel_fmm(const int n_trg, MatrixRef &f_sl, MatrixRef &f_dl, stkfmm::STKFMM *fmmPtr);
 
 Eigen::MatrixXd stokes_pvel_fmm(const int n_trg, MatrixRef &f_sl, MatrixRef &f_dl, stkfmm::STKFMM *fmmPtr);
 
-Eigen::MatrixXd oseen_tensor_direct(MatrixRef &r_src, MatrixRef &r_trg, double eta = 1.0, double reg = 5E-3,
+Eigen::MatrixXd oseen_tensor_direct(MatrixRef &r_src, MatrixRef &r_trg, double eta, double reg = 5E-3,
                                     double epsilon_distance = 1E-5);
 
-Eigen::MatrixXd rotlet(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta = 1.0, double reg = 5E-3,
+Eigen::MatrixXd rotlet(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta, double reg = 5E-3,
                        double epsilon_distance = 1E-5);
 
-Eigen::MatrixXd stresslet_times_normal(MatrixRef &r_src, MatrixRef &normals, double eta = 1.0, double reg = 5E-3,
+Eigen::MatrixXd stresslet_times_normal(MatrixRef &r_src, MatrixRef &normals, double eta, double reg = 5E-3,
                                        double epsilon_distance = 1E-5);
 
 Eigen::MatrixXd stresslet_times_normal_times_density(MatrixRef &r_src, MatrixRef &normals, MatrixRef &density,
-                                                     double eta = 1.0, double reg = 5E-3,
-                                                     double epsilon_distance = 1E-5);
+                                                     double eta, double reg = 5E-3, double epsilon_distance = 1E-5);
 
 /// Convenience class to represent an FMM interaction, which stores the STKFMM pointer. This
 /// setup allows for a direct call to the FMM object which returns the relevant target kernel
@@ -55,7 +54,8 @@ class FMM {
     /// @param[in] f_sl [ k_dim_sl x n_src ] matrix of 'single-layer' source strengths
     /// @param[in] f_sl [ k_dim_dl x n_src ] matrix of 'double-layer' source strengths
     /// @returns [ k_dim_trg x n_trg ] matrix of kernel evaluated at target positions given the sources
-    Eigen::MatrixXd operator()(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl, MatrixRef &f_dl) {
+    Eigen::MatrixXd operator()(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl, MatrixRef &f_dl,
+                               double eta) {
         // Check if LOCAL source/target points have changed, and then broadcast that for a GLOBAL update
         char setup_flag_local =
             (force_setup_tree_ || r_sl_old_.size() != r_sl.size() || r_dl_old_.size() != r_dl.size() ||
@@ -97,7 +97,7 @@ class FMM {
         }
 
         int n_trg = r_trg.size() / 3;
-        return kernel_func_(n_trg, f_sl, f_dl, fmmPtr_.get());
+        return kernel_func_(n_trg, f_sl, f_dl, fmmPtr_.get()) / eta;
     }
 
   private:

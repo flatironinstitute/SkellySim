@@ -61,13 +61,15 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
     CMatrixMap density_reshaped(density.data(), 3, n_dl);
 
     // double layer density is 2 * outer product of normals with density
+    // scales with viscosity since the stresslet_kernel_ routine divides by the viscosity, and the double-layer
+    // stresslet is independent of viscosity
     for (int node = 0; node < n_dl; ++node)
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 3; ++j)
-                f_dl(i * 3 + j, node) = 2.0 * node_normal_(i, node) * density_reshaped(j, node);
+                f_dl(i * 3 + j, node) = 2.0 * eta * node_normal_(i, node) * density_reshaped(j, node);
 
     Eigen::MatrixXd r_sl, f_sl; // dummy SL positions/values
-    Eigen::MatrixXd pvel = (*stresslet_kernel_)(r_sl, node_pos_, r_trg, f_sl, f_dl);
+    Eigen::MatrixXd pvel = (*stresslet_kernel_)(r_sl, node_pos_, r_trg, f_sl, f_dl, eta);
     Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg);
     redirect.flush(spdlog::level::debug, "STKFMM");
 

@@ -212,10 +212,10 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
     for (int node = 0; node < n_nodes; ++node)
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 3; ++j)
-                f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node);
+                f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node) * eta;
 
     spdlog::debug("body_stresslet");
-    MatrixXd v_bdy2all = (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl).block(1, 0, 3, n_trg) / eta;
+    MatrixXd v_bdy2all = (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl, eta).block(1, 0, 3, n_trg);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Section: Oseen kernel
@@ -228,7 +228,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
     // We actually only need the summed forces on the first rank
     if (world_rank_)
         forces.resize(3, 0);
-    v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix) / eta;
+    v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each

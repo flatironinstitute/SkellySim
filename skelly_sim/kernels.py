@@ -430,9 +430,9 @@ def stresslet_kernel(r_vectors, eta=1.0, reg=5e-3, epsilon_distance=1e-5, input_
     # Compute scalar functions f(r) and g(r)
     sel = dr > epsilon_distance
     fr = np.zeros_like(dr)
-    fr[sel] = -3.0 / (4.0 * np.pi * eta * dr[sel]**5)
+    fr[sel] = -3.0 / (4.0 * np.pi * dr[sel]**5)
     sel = dr <= epsilon_distance
-    fr[sel] = -3.0 / (4.0 * np.pi * eta * np.power(dr[sel]**2 + reg**2, 2.5))
+    fr[sel] = -3.0 / (4.0 * np.pi * np.power(dr[sel]**2 + reg**2, 2.5))
 
     # Compute stresslet
     S = np.zeros((r_vectors.size, r_vectors.size, 3))
@@ -507,9 +507,9 @@ def stresslet_kernel_times_normal(r_vectors, normal, eta=1.0, reg=5e-3, epsilon_
     # Compute scalar functions f(r) and g(r)
     sel = dr > epsilon_distance
     fr = np.zeros_like(dr)
-    fr[sel] = 3.0 / (4.0 * np.pi * eta * dr[sel]**5)
+    fr[sel] = 3.0 / (4.0 * np.pi * dr[sel]**5)
     sel = dr <= epsilon_distance
-    fr[sel] = 3.0 / (4.0 * np.pi * eta * np.power(dr[sel]**2 + reg**2, 2.5))
+    fr[sel] = 3.0 / (4.0 * np.pi * np.power(dr[sel]**2 + reg**2, 2.5))
 
     # Contract r_k with vector
     normal = np.reshape(normal, (normal.size // 3, 3))
@@ -562,7 +562,7 @@ def stresslet_kernel_times_normal_numba(r_vectors, normal, eta=1.0, reg=5e-3, ep
     """
     # Variables
     N = r_vectors.size // 3
-    factor = -3.0 / (4.0 * np.pi * eta)
+    factor = -3.0 / (4.0 * np.pi)
     r_vectors = r_vectors.reshape(N, 3)
     normal = normal.reshape(N, 3)
     Snormal = np.zeros((3 * N, 3 * N))
@@ -616,7 +616,7 @@ def stresslet_kernel_times_normal_times_density_numba(r_vectors,
     """
     # Variables
     N = r_vectors.size // 3
-    factor = -3.0 / (4.0 * np.pi * eta)
+    factor = -3.0 / (4.0 * np.pi)
     r_vectors = r_vectors.reshape(N, 3)
     normal = normal.reshape(N, 3)
     density = density.reshape(N, 3)
@@ -665,7 +665,7 @@ def stresslet_kernel_source_target_numba(r_source, r_target, normal, density, et
     # Variables
     Nsource = r_source.size // 3
     Ntarget = r_target.size // 3
-    factor = -3.0 / (4.0 * np.pi * eta)
+    factor = -3.0 / (4.0 * np.pi)
     r_source = r_source.reshape((Nsource, 3))
     r_target = r_target.reshape(Ntarget, 3)
     normal = normal.reshape(Nsource, 3)
@@ -893,7 +893,7 @@ def stresslet_kernel_source_target_stkfmm(r_source,
     # Set density with right format
     # MIND FACTOR TWO IN THE DOUBLE LAYER DENSITY!!!
     trg_value = np.zeros((ntrg, 4))
-    src_DL_value = np.einsum('ij,ik->ijk', normal, density).reshape((nsrc, 9)) * 2.0
+    src_DL_value = np.einsum('ij,ik->ijk', normal, density).reshape((nsrc, 9)) * 2.0 * eta
 
     # Evaluate fmm; format pressure = trg_value[:,0], velocity = trg_value[:,1:4]
     fmm_PVel.clear_fmm(PySTKFMM.KERNEL.PVel)

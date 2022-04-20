@@ -183,7 +183,7 @@ Eigen::MatrixXd kernels::rotlet(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &d
 ///     S_normal12 has dimensions 3 x 3.
 Eigen::MatrixXd kernels::stresslet_times_normal(MatrixRef &r_src, MatrixRef &normals, double eta, double reg,
                                                 double epsilon_distance) {
-    const double factor = -3.0 / (4.0 * M_PI * eta);
+    const double factor = -3.0 / (4.0 * M_PI);
     const double reg2 = reg * reg;
     const int N = r_src.cols();
     Eigen::MatrixXd Snormal = Eigen::MatrixXd::Zero(3 * N, 3 * N);
@@ -227,7 +227,7 @@ Eigen::MatrixXd kernels::stresslet_times_normal(MatrixRef &r_src, MatrixRef &nor
 Eigen::MatrixXd kernels::stresslet_times_normal_times_density(MatrixRef &r_src, MatrixRef &normals, MatrixRef &density,
                                                               double eta, double reg, double epsilon_distance) {
     const int N = r_src.size() / 3;
-    const double factor = -3.0 / (4.0 * M_PI * eta);
+    const double factor = -3.0 / (4.0 * M_PI);
     const double reg2 = reg * reg;
     Eigen::MatrixXd Sdn = Eigen::MatrixXd::Zero(3, r_src.cols());
 

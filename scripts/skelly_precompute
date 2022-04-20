@@ -33,15 +33,11 @@ body_quadrature_radius_threshold = 2.0
 periphery_node_scale_factor = 1.04
 
 
-def precompute_periphery(config):
+def precompute_periphery(config : dict):
     if 'periphery' not in config:
         return
     shell_precompute_file = config['periphery']['precompute_file']
     periphery_type = config['periphery']['shape']
-    eta = config['params']['eta']
-
-    # FIXME: Scaling hack until we figure out wtf is going on with periphery::flow
-    eta = 1.0
 
     # Build shape
     if periphery_type == 'sphere':
@@ -75,7 +71,7 @@ def precompute_periphery(config):
         )
         config['periphery']['n_nodes'] = boundary.nodes.shape[0]
     else:
-        print("Invalid periphery " + periphery_type)
+        print("Invalid periphery: '" + periphery_type + "'")
         sys.exit()
 
     # Normals are in the opposite direction to bodies' normals
@@ -104,7 +100,7 @@ def precompute_periphery(config):
     print('Finished creating periphery object')
 
     # Compute singularity subtraction vectors
-    shell.get_singularity_subtraction_vectors(eta=eta)
+    shell.get_singularity_subtraction_vectors(eta=1.0)
 
     # Precompute shell's r_vectors and normals
     trg_shell_surf = shell.get_r_vectors()
@@ -113,7 +109,7 @@ def precompute_periphery(config):
     # Build shell preconditioner
     N = shell.Nblobs
     weights = shell.quadrature_weights
-    shell_stresslet = kernels.stresslet_kernel_times_normal_numba(trg_shell_surf, normals_shell, eta=eta)
+    shell_stresslet = kernels.stresslet_kernel_times_normal_numba(trg_shell_surf, normals_shell, eta=1.0)
 
     I = np.zeros(shape=(3 * N, 3 * N))
     for i in range(N):
@@ -151,7 +147,7 @@ def precompute_periphery(config):
                  **boundary.envelope.get_state())
 
 
-def precompute_body_sphere(body):
+def precompute_body_sphere(body: dict):
     precompute_file = body['precompute_file']
     n_nodes = body['n_nodes']
 

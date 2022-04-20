@@ -702,7 +702,7 @@ MatrixXd FiberContainer::flow(const MatrixRef &r_trg, const MatrixRef &fib_force
     // All-to-all
     MatrixXd r_dl_dummy, f_dl_dummy;
     utils::LoggerRedirect redirect(std::cout);
-    MatrixXd vel = (*stokeslet_kernel_)(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy) / eta;
+    MatrixXd vel = (*stokeslet_kernel_)(r_src, r_dl_dummy, r_trg, weighted_forces, f_dl_dummy, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Subtract self term
