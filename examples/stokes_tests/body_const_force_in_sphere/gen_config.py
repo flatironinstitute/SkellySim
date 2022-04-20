@@ -20,29 +20,29 @@ np.random.seed(100)
 
 # create a config object and set the system parameters
 config = ConfigSpherical()
-config.params.eta = 1.0
-config.params.dt_initial = 1E-1
+config.params.eta = 0.19884428157961156
+config.params.dt_initial = 1E-2
 config.params.dt_min = 1E-4
-config.params.dt_max = 1E-1
-config.params.dt_write = 1E-1
+config.params.dt_max = 1E-2
+config.params.dt_write = 1E-2
 config.params.t_final = 40.0
-config.params.gmres_tol = 1E-10
+config.params.gmres_tol = 1E-8
 config.params.seed = 130319
 
 config.bodies = [
     Body(n_nucleation_sites=0,
          position=[0.0, 0.0, 0.0],
          shape='sphere',
-         radius=1.0,
-         n_nodes=800,
-         external_force=[0.0, 0.0, 0.5])
+         radius=0.5,
+         n_nodes=2000,
+         external_force=[0.0, 0.0, 10.0])
 ]
 
 config.params.velocity_field.resolution = 0.5
 config.params.velocity_field.dt_write_field = 0.5
 
-config.periphery.n_nodes = 2000
-config.periphery.radius = 5.0
+config.periphery.n_nodes = 6000
+config.periphery.radius = 4.0 / 1.04
 
 # output our config
 config.save(config_file)

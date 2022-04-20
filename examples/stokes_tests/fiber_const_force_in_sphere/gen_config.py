@@ -18,9 +18,9 @@ np.random.seed(100)
 
 # create a config object and set the system parameters
 config = ConfigSpherical()
-config.params.eta = 0.7
+config.params.eta = 1.0
 config.params.dt_initial = 1E-2
-config.params.dt_write = 1E-3
+config.params.dt_write = 1E-1
 config.params.t_final = 1.0
 config.params.gmres_tol = 1E-10
 config.params.seed = 130319
@@ -37,6 +37,9 @@ config.fibers[0].fill_node_positions(np.array([1.0, 0.0, 0.0]), np.array([0.0, 0
 
 config.periphery.n_nodes = 4000
 config.periphery.radius = 4.0
+
+config.params.velocity_field.dt_write_field = 0.1
+config.params.velocity_field.resolution = 0.2
 
 # output our config
 config.save(config_file)
