@@ -3,7 +3,7 @@ SkellySim is a simulation package for simulating cellular components such as fle
 It's designed to be highly scalable, capable of both OpenMP and MPI style parallelism, while using the efficient STKFMM/PVFMM libraries for hydrodynamic resolution.
 
 # Documentation
-Flatiron users should read [Intallation/Running at FI first](#installation-running-at-fi),
+Flatiron users should read [Installation/Running at FI first](#installation-running-at-fi),
 since users there should not have to install the `C++` portion themselves.
 
 [SkellySim documentation](https://users.flatironinstitute.org/~rblackwell/py-skellysim)
