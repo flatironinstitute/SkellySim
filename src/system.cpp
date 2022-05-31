@@ -240,7 +240,6 @@ class TrajectoryReader {
         const int fib_count_big = n_fib_tot / size_ + 1;
         const int fib_count_small = n_fib_tot / size_;
         const int n_fib_big = n_fib_tot % size_;
-        auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
 
         std::vector<int> counts(size_);
         std::vector<int> displs(size_ + 1);
@@ -284,6 +283,7 @@ class TrajectoryReader {
             shell_->solution_vec_ =
                 min_state.shell.solution_vec_.segment(shell_->node_displs_[rank], shell_->node_counts_[rank]);
 
+        auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
         shell_sol = shell_->solution_vec_;
 
         if (rank == 0) {
@@ -1358,6 +1358,7 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
     if (param_table_.contains("point_sources"))
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
 
+    curr_solution_.resize(get_local_solution_size());
     std::string filename = "skelly_sim.out";
     auto trajectory_open_mode = std::ofstream::binary | (post_process_flag ? std::ofstream::in : std::ofstream::out);
     if (resume_flag) {
@@ -1370,6 +1371,5 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
     if (post_process_flag && rank_ == 0)
         ofs_vf_ = std::ofstream("skelly_sim.vf", std::ofstream::binary | std::ofstream::out);
 
-    curr_solution_.resize(get_local_solution_size());
 }
 } // namespace System

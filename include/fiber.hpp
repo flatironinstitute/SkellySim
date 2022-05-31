@@ -109,6 +109,12 @@ class Fiber {
     Fiber(const Fiber &old_fib, const double eta) {
         *this = old_fib;
         init(eta);
+
+        // FIXME: hack to recalculate the radius since for some reason i saved epsilon instead...
+        // Future versions should just use the radius, and make epsilon properly calculated
+        if (radius_ == 0)
+            radius_ = epsilon_ * length_;
+        update_constants(eta);
     };
 
     ///< @brief Set some default values and resize arrays

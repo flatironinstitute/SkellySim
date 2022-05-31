@@ -31,17 +31,21 @@ int main(int argc, char *argv[]) {
         if (resume_flag && overwrite_flag)
             throw std::runtime_error("Can't resume and overwrite simultaneously.");
         namespace fs = std::filesystem;
-        if (!post_process_flag) {
-            if (!overwrite_flag && (fs::exists(fs::path{"skelly_sim.out"}) || fs::exists(fs::path{"skelly_sim.vf"})))
-                throw std::runtime_error("Existing trajectory detected. Supply --overwrite flag to overwrite.");
-        }
-        else {
+        if (post_process_flag) {
             if (!fs::exists(fs::path{"skelly_sim.out"}))
                 throw std::runtime_error("No trajectory detected for post-process.");
             if (resume_flag)
                 throw std::runtime_error("--post-process and --resume are mutually exclusive.");
             if (overwrite_flag)
                 throw std::runtime_error("--post-process and --overwrite are mutually exclusive.");
+        }
+        else if (resume_flag) {
+            if (!fs::exists(fs::path{"skelly_sim.out"}))
+                throw std::runtime_error("--resume flag supplied without existing trajectory.");
+        }
+        else {
+            if (!overwrite_flag && (fs::exists(fs::path{"skelly_sim.out"}) || fs::exists(fs::path{"skelly_sim.vf"})))
+                throw std::runtime_error("Existing trajectory detected. Supply --overwrite flag to overwrite.");
         }
 
         System::init(config_file, resume_flag, post_process_flag);
