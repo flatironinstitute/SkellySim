@@ -4,7 +4,7 @@ From: ubuntu:21.04
 %post
     export MKLROOT=/opt/intel/oneapi/mkl/latest
     export CXXFLAGS_="-I/usr/lib/x86_64-linux-gnu/openmpi/include -mavx2 -mfma"
-    SKELLY_VERS="v0.9.8"
+    SKELLY_VERS="v0.9.9"
 
     apt -y update
     apt -y install curl gpg software-properties-common
