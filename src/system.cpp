@@ -1185,8 +1185,6 @@ void restore() {
 void run() {
     Params &params = params_;
 
-    System::write();
-
     while (properties.time < params.t_final) {
         // Store system state so we can revert if the timestep fails
         System::backup();
@@ -1243,8 +1241,6 @@ void run() {
 
         spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
     }
-
-    System::write();
 }
 
 /// @brief Run the post processing step
