@@ -109,11 +109,6 @@ class Fiber {
     Fiber(const Fiber &old_fib, const double eta) {
         *this = old_fib;
         init(eta);
-
-        // FIXME: hack to recalculate the radius since for some reason i saved epsilon instead...
-        // Future versions should just use the radius, and make epsilon properly calculated
-        if (radius_ == 0)
-            radius_ = epsilon_ * length_;
         update_constants(eta);
     };
 
@@ -149,12 +144,12 @@ class Fiber {
     bool attached_to_body() { return binding_site_.first >= 0; };
     bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
 #ifndef SKELLY_DEBUG
-    MSGPACK_DEFINE_MAP(n_nodes_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_,
-                       epsilon_, binding_site_, tension_, x_);
+    MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
+                       beta_tstep_, binding_site_, tension_, x_);
 #else
-    MSGPACK_DEFINE_MAP(n_nodes_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_,
-                       epsilon_, binding_site_, tension_, x_, A_, RHS_, force_operator_, bc_minus_, bc_plus_, xs_, xss_, xsss_,
-                       xssss_, stokeslet_);
+    MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
+                       beta_tstep_, binding_site_, tension_, x_, A_, RHS_, force_operator_, bc_minus_, bc_plus_, xs_,
+                       xss_, xsss_, xssss_, stokeslet_);
 #endif
 };
 
