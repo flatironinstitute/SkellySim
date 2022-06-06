@@ -55,6 +55,8 @@ Terminology
 
   - :obj:`periphery` (optional): Single :obj:`Periphery` object
 
+  - :obj:`point_sources` (optional): List of :obj:`Point` objects
+
 - Base units
 
   - :obj:`time`: seconds (:obj:`s`)
@@ -209,8 +211,8 @@ Bodies
 
 .. autoclass:: skelly_sim.skelly_config.Body
 
-Peripheries
-~~~~~~~~~~~
+Periphery
+~~~~~~~~~
 :obj:`Config.periphery`
 
 Spherical periphery
@@ -230,3 +232,9 @@ Periphery of revolution
 :obj:`Config.periphery`
 
 .. autoclass:: skelly_sim.skelly_config.RevolutionPeriphery
+
+Point Sources
+~~~~~~~~~~~~~
+:obj:`Config.point_sources` (must be a list of :obj:`Point` objects!)
+
+.. autoclass:: skelly_sim.skelly_config.Point
