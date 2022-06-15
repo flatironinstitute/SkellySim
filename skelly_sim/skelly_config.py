@@ -244,6 +244,21 @@ def _default_quaternion():
 
 
 @dataclass
+class Site():
+    """dataclass for a point force/torque source
+
+    Attributes
+    ----------
+    x : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
+        Position of the site (x,y,z)
+    state : int, default: :obj:`0`
+        State the site is in. 0: inactive, 1: active, 2: bound
+    """
+    x: List[float] = field(default_factory=_default_vector)
+    state: int = 0
+
+
+@dataclass
 class Fiber():
     """
     dataclass representing a single fiber
@@ -741,8 +756,8 @@ class Body():
     def find_binding_site(self, fibers: List[Fiber], ds_min) -> Tuple[np.array, np.array]:
         """
         Find an open binding site given a list of Fibers that could interfere with binding
-        Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
-        interacting with the periphery directly. The binding site is guaranteed to be further than the Euclidean distance ds_min from any
+        Binding site is assumed uniform on the surface. 
+        The binding site is guaranteed to be further than the Euclidean distance ds_min from any
         other Fiber minus end
 
         Arguments
@@ -836,6 +851,7 @@ class Config():
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
+    sites: List[Site] = field(default_factory=list)
 
     def plot_fibers(self, backend: str = "TKAgg"):
         """

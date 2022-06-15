@@ -15,6 +15,7 @@
 #include <periphery.hpp>
 #include <point_source.hpp>
 #include <solver_hydro.hpp>
+#include <site.hpp>
 #include <system.hpp>
 
 #include <mpi.h>
@@ -30,6 +31,7 @@ Params params_;                    ///< Simulation input parameters
 FiberContainer fc_;                ///< Fibers
 BodyContainer bc_;                 ///< Bodies
 PointSourceContainer psc_;         ///< Point Sources
+SiteContainer sc_;                 ///< Dynamic attachment sites
 std::unique_ptr<Periphery> shell_; ///< Periphery
 std::vector<PointSource> points_;  ///< External point sources
 
@@ -1353,6 +1355,9 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
 
     if (param_table_.contains("point_sources"))
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
+
+    if (param_table_.contains("sites"))
+        sc_ = SiteContainer(param_table_.at("sites").as_array());
 
     curr_solution_.resize(get_local_solution_size());
     std::string filename = "skelly_sim.out";
