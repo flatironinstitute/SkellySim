@@ -12,6 +12,7 @@
 
 class Periphery;
 class BodyContainer;
+class SiteContainer;
 
 /// @brief Class to represent a single flexible filament
 ///
@@ -23,18 +24,18 @@ class Fiber {
     static const std::string BC_name[];
 
     // Input parameters
-    int n_nodes_;                  ///< number of nodes representing the fiber
-    double radius_;                ///< radius of the fiber (for slender-body-theory, though possibly for collisions eventually)
-    double length_;                ///< Desired 'constraint' length of fiber
-    double length_prev_;           ///< Last accepted length_
+    int n_nodes_;        ///< number of nodes representing the fiber
+    double radius_;      ///< radius of the fiber (for slender-body-theory, though possibly for collisions eventually)
+    double length_;      ///< Desired 'constraint' length of fiber
+    double length_prev_; ///< Last accepted length_
     double bending_rigidity_;      ///< bending rigidity 'E' of fiber
     double penalty_param_ = 500.0; ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
     /// @brief scale of external force on node @see generate_external_force
     /// \f[{\bf f} = f_s * {\bf x}_s\f]
     double force_scale_ = 0.0;
     // FIXME: Magic numbers in linear operator calculation
-    double beta_tstep_ = 1.0; ///< penalty parameter to ensure inextensibility
-    double epsilon_;   ///< slenderness parameter
+    double beta_tstep_ = 1.0;    ///< penalty parameter to ensure inextensibility
+    double epsilon_;             ///< slenderness parameter
     bool minus_clamped_ = false; ///< Fix minus end in space with clamped condition
 
     /// (body, site) pair for minus end binding. -1 implies unbound
@@ -57,11 +58,11 @@ class Fiber {
     std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
 
     Eigen::VectorXd tension_; ///< [ n_nodes ] vector representing local tension on fiber nodes
-    Eigen::MatrixXd x_;     ///< [ 3 x n_nodes_ ] matrix representing coordinates of fiber nodes
-    Eigen::MatrixXd xs_;    ///< [ 3 x n_nodes_ ] matrix representing first derivative of fiber nodes
-    Eigen::MatrixXd xss_;   ///< [ 3 x n_nodes_ ] matrix representing second derivative of fiber nodes
-    Eigen::MatrixXd xsss_;  ///< [ 3 x n_nodes_ ] matrix representing third derivative of fiber nodes
-    Eigen::MatrixXd xssss_; ///< [ 3 x n_nodes_ ] matrix representing fourth derivative of fiber nodes
+    Eigen::MatrixXd x_;       ///< [ 3 x n_nodes_ ] matrix representing coordinates of fiber nodes
+    Eigen::MatrixXd xs_;      ///< [ 3 x n_nodes_ ] matrix representing first derivative of fiber nodes
+    Eigen::MatrixXd xss_;     ///< [ 3 x n_nodes_ ] matrix representing second derivative of fiber nodes
+    Eigen::MatrixXd xsss_;    ///< [ 3 x n_nodes_ ] matrix representing third derivative of fiber nodes
+    Eigen::MatrixXd xssss_;   ///< [ 3 x n_nodes_ ] matrix representing fourth derivative of fiber nodes
 
     /// [ 3*n_nodes_ x 3*n_nodes_] Oseen tensor for fiber @see Fiber::update_stokeslet
     Eigen::MatrixXd stokeslet_;
@@ -141,8 +142,10 @@ class Fiber {
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
     void update_stokeslet(double);
-    bool attached_to_body() { return binding_site_.first >= 0; };
-    bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
+    bool attached_to_body() const { return binding_site_.first >= 0; };
+    bool is_minus_clamped() const { return minus_clamped_ || attached_to_body(); };
+    bool overlaps_with_sphere(const Eigen::Vector3d &x, double r) const;
+
 #ifndef SKELLY_DEBUG
     MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
                        beta_tstep_, binding_site_, tension_, x_);
@@ -213,6 +216,7 @@ class FiberContainer {
     Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
+    void find_capture_sites(const SiteContainer &sites) const;
 
     void update_boundary_conditions(Periphery &shell, bool periphery_binding_flag);
 

@@ -251,11 +251,15 @@ class Site():
     ----------
     x : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
         Position of the site (x,y,z)
+    capture_radius : float, default: :obj:`0.5`
+        Distance between a sphere and fiber where attachment is possible
     state : int, default: :obj:`0`
         State the site is in. 0: inactive, 1: active, 2: bound
     """
     x: List[float] = field(default_factory=_default_vector)
+    capture_radius : float = 0.5
     state: int = 0
+
 
 
 @dataclass
@@ -756,7 +760,7 @@ class Body():
     def find_binding_site(self, fibers: List[Fiber], ds_min) -> Tuple[np.array, np.array]:
         """
         Find an open binding site given a list of Fibers that could interfere with binding
-        Binding site is assumed uniform on the surface. 
+        Binding site is assumed uniform on the surface.
         The binding site is guaranteed to be further than the Euclidean distance ds_min from any
         other Fiber minus end
 

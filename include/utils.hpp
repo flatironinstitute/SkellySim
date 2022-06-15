@@ -16,6 +16,9 @@ Eigen::VectorXd collect_into_global(VectorRef &local_vec);
 Eigen::MatrixXd load_mat(cnpy::npz_t &npz, const char *var);
 Eigen::VectorXd load_vec(cnpy::npz_t &npz, const char *var);
 
+bool point_line_overlap(const Eigen::Vector3d &r_point, const Eigen::Vector3d &r_line, const Eigen::Vector3d &u_line,
+                        double length, double dr2);
+
 template <typename DerivedA, typename DerivedB>
 bool allclose(
     const Eigen::DenseBase<DerivedA> &a, const Eigen::DenseBase<DerivedB> &b,

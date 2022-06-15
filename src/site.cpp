@@ -19,7 +19,7 @@ void SiteContainer::insert(const toml::value &site_config) {
     pos_.col(site_index) = x;
 
     std::reference_wrapper<sublist> states[] = {inactive_, active_, bound_};
-    int state = toml::find<int>(site_config, "state");
+    int state = toml::find_or<int>(site_config, "state", 0);
     if (state > 2 || state < 0)
         throw std::runtime_error("Invalid site state \"" + std::to_string(state) + ".\n");
 

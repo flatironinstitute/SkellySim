@@ -4,6 +4,19 @@
 
 #include <cnpy.hpp>
 
+bool utils::point_line_overlap(const Eigen::Vector3d &r_point, const Eigen::Vector3d &r_line,
+                               const Eigen::Vector3d &u_line, double length, double dr2) {
+    const Eigen::Vector3d dr = r_line - r_point;
+
+    double mu = -dr.dot(u_line);
+    if (mu > length)
+        mu = length;
+    else if (mu < 0.0)
+        mu = 0.0;
+
+    return (dr + mu * u_line).squaredNorm() <= dr2;
+}
+
 //  Following the paper Calculation of weights in finite different formulas,
 //  Bengt Fornberg, SIAM Rev. 40 (3), 685 (1998).
 //
@@ -107,7 +120,9 @@ Eigen::VectorXd utils::collect_into_global(VectorRef &local_vec) {
 }
 
 Eigen::MatrixXd utils::load_mat(cnpy::npz_t &npz, const char *var) {
-    return Eigen::Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0]).matrix().transpose();
+    return Eigen::Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0])
+        .matrix()
+        .transpose();
 }
 
 Eigen::VectorXd utils::load_vec(cnpy::npz_t &npz, const char *var) {

@@ -7,7 +7,7 @@
 
 class SiteContainer {
   private:
-    using sublist = std::vector<std::size_t>;
+    using sublist = std::vector<unsigned int>;
     void swap_state(const std::size_t &index, sublist &from, sublist &to) {
         std::size_t site_index = from[index];
         from[index] = from.back();
@@ -16,6 +16,8 @@ class SiteContainer {
     }
 
   public:
+    double capture_radius_ = 0.5; // FIXME: need different constructor to specify SC types
+
     void insert(const toml::value &site_config);
 
     SiteContainer() = default;
@@ -43,6 +45,5 @@ class SiteContainer {
     sublist active_;
     sublist bound_;
 };
-
 
 #endif
