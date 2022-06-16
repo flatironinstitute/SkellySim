@@ -1,12 +1,21 @@
-#include <mpi.h>
 #include <skelly_sim.hpp>
+
 #include <utils.hpp>
 
 #include <cnpy.hpp>
+#include <mpi.h>
 
-bool utils::point_line_overlap(const Eigen::Vector3d &r_point, const Eigen::Vector3d &r_line,
-                               const Eigen::Vector3d &u_line, double length, double dr2) {
-    const Eigen::Vector3d dr = r_line - r_point;
+/// @brief Calculates if a line segment intersects a sphere
+///
+/// @param[in] r_point Position vector of sphere center
+/// @param[in] r_line Position vector of one end of segment
+/// @param[in] u_line Normalized orientation vector connecting r_line to other end-point
+/// @param[in] length Length of line segment
+/// @param[in] squared_radius Radius of sphere
+/// @returns true if segment intersects sphere, false otherwise
+bool utils::sphere_segment_intersect(const Eigen::Vector3d &r_sphere, const Eigen::Vector3d &r_line,
+                                     const Eigen::Vector3d &u_line, double length, double squared_radius) {
+    const Eigen::Vector3d dr = r_line - r_sphere;
 
     double mu = -dr.dot(u_line);
     if (mu > length)
@@ -14,7 +23,7 @@ bool utils::point_line_overlap(const Eigen::Vector3d &r_point, const Eigen::Vect
     else if (mu < 0.0)
         mu = 0.0;
 
-    return (dr + mu * u_line).squaredNorm() <= dr2;
+    return (dr + mu * u_line).squaredNorm() <= squared_radius;
 }
 
 //  Following the paper Calculation of weights in finite different formulas,

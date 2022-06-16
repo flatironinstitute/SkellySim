@@ -85,7 +85,7 @@ bool Fiber::overlaps_with_sphere(const Eigen::Vector3d &x_site, double r) const 
         Eigen::Vector3d u_seg = x_.col(i) - x_.col(i - 1);
         const double length = u_seg.norm();
         u_seg /= length;
-        if (utils::point_line_overlap(x_site, x_.col(i - 1), u_seg, length, dr2))
+        if (utils::sphere_segment_intersect(x_site, x_.col(i - 1), u_seg, length, dr2))
             return true;
     }
     return false;
