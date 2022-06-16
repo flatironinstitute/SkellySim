@@ -3,7 +3,6 @@
 #include <utils.hpp>
 
 #include <cnpy.hpp>
-#include <mpi.h>
 
 /// @brief Calculates if a line segment intersects a sphere
 ///

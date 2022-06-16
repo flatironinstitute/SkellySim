@@ -80,12 +80,12 @@ void FiberContainer::update_boundary_conditions(Periphery &shell, bool periphery
 /// @param[in] x_site Position of sphere
 /// @param[in] r Radius of sphere
 bool Fiber::overlaps_with_sphere(const Eigen::Vector3d &x_site, double r) const {
-    const double dr2 = r * r;
+    const double squared_radius = r * r;
     for (int i = 1; i < x_.cols(); ++i) {
         Eigen::Vector3d u_seg = x_.col(i) - x_.col(i - 1);
         const double length = u_seg.norm();
         u_seg /= length;
-        if (utils::sphere_segment_intersect(x_site, x_.col(i - 1), u_seg, length, dr2))
+        if (utils::sphere_segment_intersect(x_site, x_.col(i - 1), u_seg, length, squared_radius))
             return true;
     }
     return false;
@@ -830,28 +830,31 @@ void FiberContainer::find_capture_sites(const SiteContainer &sites) const {
         int rank;
         Fiber *fib;
     };
+    struct condensed_neighbor_entry {
+        int rank;
+        Fiber *fib;
+    };
 
     std::vector<neighbor_entry> neighbs_local;
-    std::vector<neighbor_entry> neighbs_global;
     for (const auto &fib : fibers)
         for (auto &i_site : sites.active())
             if (fib.overlaps_with_sphere(sites[i_site], sites.capture_radius_))
                 neighbs_local.push_back({i_site, world_rank_, const_cast<Fiber *>(&fib)});
 
-    const int count_local = neighbs_local.size() * sizeof(neighbor_entry);
-    std::vector<int> counts(world_size_);
-    std::vector<int> displs(world_size_ + 1);
-    MPI_Allgather(&count_local, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+    const std::vector<neighbor_entry> neighbs_global = utils::allgatherv(neighbs_local);
 
-    for (int i = 1; i <= world_size_; ++i)
-        displs[i] = displs[i - 1] + counts[i - 1];
-    neighbs_global.resize(displs[world_size_] / sizeof(neighbor_entry));
+    std::unordered_map<int, std::vector<condensed_neighbor_entry>> neighbs_condensed;
+    for (const auto &e : neighbs_global) {
+        if (!neighbs_condensed.count(e.motor_id))
+            neighbs_condensed[e.motor_id] = {{.rank = e.rank, .fib = e.fib}};
+        else
+            neighbs_condensed[e.motor_id].push_back({.rank = e.rank, .fib = e.fib});
+    }
 
-    MPI_Allgatherv(neighbs_local.data(), sizeof(neighbor_entry) * neighbs_local.size(), MPI_BYTE, neighbs_global.data(),
-                   counts.data(), displs.data(), MPI_BYTE, MPI_COMM_WORLD);
-
-    for (const auto &e : neighbs_global)
-        spdlog::debug("neighbor pair {}, {}, {}", e.motor_id, e.rank, (void *)e.fib);
+    for (const auto &[id, neighbs] : neighbs_condensed) {
+        for (const auto &neighb : neighbs)
+            spdlog::debug("neighbor pair {}, {}, {}", id, neighb.rank, (void *)neighb.fib);
+    }
 }
 
 FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {

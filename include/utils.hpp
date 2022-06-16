@@ -2,6 +2,8 @@
 #define UTILS_HPP
 
 #include <skelly_sim.hpp>
+
+#include <mpi.h>
 #include <spdlog/spdlog.h>
 
 namespace cnpy {
@@ -18,6 +20,27 @@ Eigen::VectorXd load_vec(cnpy::npz_t &npz, const char *var);
 
 bool sphere_segment_intersect(const Eigen::Vector3d &r_point, const Eigen::Vector3d &r_line,
                               const Eigen::Vector3d &u_line, double length, double squared_radius);
+
+template <typename T>
+std::vector<T> allgatherv(const std::vector<T> &local_vec) {
+    int world_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+    const int count_local = local_vec.size() * sizeof(T);
+    std::vector<int> counts(world_size);
+    std::vector<int> displs(world_size + 1);
+    MPI_Allgather(&count_local, 1, MPI_INT, counts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+
+    for (int i = 1; i <= world_size; ++i)
+        displs[i] = displs[i - 1] + counts[i - 1];
+
+    std::vector<T> global_vec(displs[world_size] / sizeof(T));
+
+    MPI_Allgatherv(local_vec.data(), sizeof(T) * local_vec.size(), MPI_BYTE, global_vec.data(), counts.data(),
+                   displs.data(), MPI_BYTE, MPI_COMM_WORLD);
+
+    return global_vec;
+}
 
 template <typename DerivedA, typename DerivedB>
 bool allclose(
