@@ -9,6 +9,7 @@
 
 #include <kernels.hpp>
 #include <params.hpp>
+#include <vector>
 
 class Periphery;
 class BodyContainer;
@@ -56,6 +57,8 @@ class Fiber {
     std::pair<BC, BC> bc_minus_ = {BC::Velocity, BC::AngularVelocity};
     /// Boundary condition pair for plus end of fiber
     std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
+
+    std::vector<int> attached_sites_list_;
 
     Eigen::VectorXd tension_; ///< [ n_nodes ] vector representing local tension on fiber nodes
     Eigen::MatrixXd x_;       ///< [ 3 x n_nodes_ ] matrix representing coordinates of fiber nodes
@@ -146,6 +149,8 @@ class Fiber {
     bool is_minus_clamped() const { return minus_clamped_ || attached_to_body(); };
     bool overlaps_with_sphere(const Eigen::Vector3d &x, double r) const;
 
+    void attach_to_site(int i_site) { attached_sites_list_.push_back(i_site); }
+
 #ifndef SKELLY_DEBUG
     MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
                        beta_tstep_, binding_site_, tension_, x_);
@@ -216,7 +221,7 @@ class FiberContainer {
     Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
-    void find_capture_sites(const SiteContainer &sites) const;
+    void find_capture_sites(SiteContainer &sites);
 
     void update_boundary_conditions(Periphery &shell, bool periphery_binding_flag);
 

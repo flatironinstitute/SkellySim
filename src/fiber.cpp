@@ -8,6 +8,7 @@
 #include <fiber.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
+#include <rng.hpp>
 #include <site.hpp>
 #include <utils.hpp>
 
@@ -824,7 +825,7 @@ void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
     }
 }
 
-void FiberContainer::find_capture_sites(const SiteContainer &sites) const {
+void FiberContainer::find_capture_sites(SiteContainer &sites) {
     struct neighbor_entry {
         unsigned int motor_id;
         int rank;
@@ -851,10 +852,18 @@ void FiberContainer::find_capture_sites(const SiteContainer &sites) const {
             neighbs_condensed[e.motor_id].push_back({.rank = e.rank, .fib = e.fib});
     }
 
-    for (const auto &[id, neighbs] : neighbs_condensed) {
-        for (const auto &neighb : neighbs)
-            spdlog::debug("neighbor pair {}, {}, {}", id, neighb.rank, (void *)neighb.fib);
+    const auto &glogger = spdlog::get("SkellySim global");
+    for (const auto &[motor_id, neighbs] : neighbs_condensed) {
+        int site_index = neighbs.size() == 1 ? 0 : RNG::uniform_int_unsplit(0, neighbs.size());
+        if (world_rank_ == neighbs[site_index].rank) {
+            const auto &neighb = neighbs[site_index];
+            neighb.fib->attach_to_site(motor_id);
+            glogger->debug("attaching motor {} to fib {} on rank {}", motor_id, (void *)neighb.fib, neighb.rank);
+        }
+        sites.bind(motor_id);
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 }
 
 FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
