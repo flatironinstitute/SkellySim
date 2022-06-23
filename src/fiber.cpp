@@ -827,7 +827,7 @@ void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
 
 void FiberContainer::find_capture_sites(SiteContainer &sites) {
     struct neighbor_entry {
-        unsigned int motor_id;
+        unsigned int site_id;
         int rank;
         Fiber *fib;
     };
@@ -842,25 +842,25 @@ void FiberContainer::find_capture_sites(SiteContainer &sites) {
             if (fib.overlaps_with_sphere(sites[i_site], sites.capture_radius_))
                 neighbs_local.push_back({i_site, world_rank_, const_cast<Fiber *>(&fib)});
 
-    const std::vector<neighbor_entry> neighbs_global = utils::allgatherv(neighbs_local);
+    const auto neighbs_global = utils::allgatherv(neighbs_local);
 
     std::unordered_map<int, std::vector<condensed_neighbor_entry>> neighbs_condensed;
     for (const auto &e : neighbs_global) {
-        if (!neighbs_condensed.count(e.motor_id))
-            neighbs_condensed[e.motor_id] = {{.rank = e.rank, .fib = e.fib}};
+        if (!neighbs_condensed.count(e.site_id))
+            neighbs_condensed[e.site_id] = {{.rank = e.rank, .fib = e.fib}};
         else
-            neighbs_condensed[e.motor_id].push_back({.rank = e.rank, .fib = e.fib});
+            neighbs_condensed[e.site_id].push_back({.rank = e.rank, .fib = e.fib});
     }
 
     const auto &glogger = spdlog::get("SkellySim global");
-    for (const auto &[motor_id, neighbs] : neighbs_condensed) {
+    for (const auto &[site_id, neighbs] : neighbs_condensed) {
         int site_index = neighbs.size() == 1 ? 0 : RNG::uniform_int_unsplit(0, neighbs.size());
         if (world_rank_ == neighbs[site_index].rank) {
             const auto &neighb = neighbs[site_index];
-            neighb.fib->attach_to_site(motor_id);
-            glogger->debug("attaching motor {} to fib {} on rank {}", motor_id, (void *)neighb.fib, neighb.rank);
+            neighb.fib->attach_to_site(site_id);
+            glogger->debug("attaching motor {} to fib {} on rank {}", site_id, (void *)neighb.fib, neighb.rank);
         }
-        sites.bind(motor_id);
+        sites.bind(site_id);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

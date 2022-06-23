@@ -14,8 +14,8 @@
 #include <parse_util.hpp>
 #include <periphery.hpp>
 #include <point_source.hpp>
-#include <solver_hydro.hpp>
 #include <site.hpp>
+#include <solver_hydro.hpp>
 #include <system.hpp>
 
 #include <mpi.h>
@@ -158,7 +158,8 @@ void write() {
                 fc_global.fibers.emplace_back(Fiber(min_fib, params_.eta));
 
             // FIXME: WRANGLE IN THAT SHELL.SOLUTION now
-            shell_global.solution_vec_.segment(shell_offset, min_state.shell.solution_vec_.size()) = min_state.shell.solution_vec_;
+            shell_global.solution_vec_.segment(shell_offset, min_state.shell.solution_vec_.size()) =
+                min_state.shell.solution_vec_;
             shell_offset += min_state.shell.solution_vec_.size();
 
             to_write.rng_state.push_back(min_state.rng_state[0]);
@@ -1187,6 +1188,8 @@ void restore() {
 void run() {
     Params &params = params_;
 
+    fc_.find_capture_sites(sc_);
+
     while (properties.time < params.t_final) {
         // Store system state so we can revert if the timestep fails
         System::backup();
@@ -1340,9 +1343,10 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
 
     if (param_table_.contains("periphery")) {
         const toml::value &periphery_table = param_table_.at("periphery");
-        if (toml::find_or(periphery_table, "shape", "") == std::string("sphere"))
+        const std::string shape = toml::find_or(periphery_table, "shape", "");
+        if (shape == "sphere")
             shell_ = std::make_unique<SphericalPeriphery>(periphery_table, params_);
-        else if (toml::find_or(periphery_table, "shape", "") == std::string("ellipsoid"))
+        else if ("ellipsoid")
             shell_ = std::make_unique<EllipsoidalPeriphery>(periphery_table, params_);
         else // Assume generic periphery for all other shapes
             shell_ = std::make_unique<GenericPeriphery>(periphery_table, params_);
@@ -1371,6 +1375,5 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
 
     if (post_process_flag && rank_ == 0)
         ofs_vf_ = std::ofstream("skelly_sim.vf", std::ofstream::binary | std::ofstream::out);
-
 }
 } // namespace System
