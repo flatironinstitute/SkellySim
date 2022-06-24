@@ -221,7 +221,7 @@ class FiberContainer {
     Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
-    void find_capture_sites(SiteContainer &sites);
+    void capture_sites(SiteContainer &sites);
 
     void update_boundary_conditions(Periphery &shell, bool periphery_binding_flag);
 

@@ -23,8 +23,8 @@ class SiteContainer {
     SiteContainer() = default;
     SiteContainer(toml::array &site_tables);
 
-    void bind(const std::size_t &active_index) { swap_state(active_index, active_, bound_); }
-    void unbind(const std::size_t &bound_index) { swap_state(bound_index, bound_, active_); }
+    void bind(const std::size_t &active_index, const global_fiber_pointer &p) { bound_[active_index] = p; }
+    void unbind(const std::size_t &bound_index) { bound_[bound_index] = {.rank = 0, .fib = nullptr}; }
     void activate(const std::size_t &inactive_index) { swap_state(inactive_index, inactive_, active_); }
     void deactivate(const std::size_t &active_index) { swap_state(active_index, active_, inactive_); }
 
@@ -35,7 +35,6 @@ class SiteContainer {
 
     const sublist &inactive() const { return inactive_; }
     const sublist &active() const { return active_; }
-    const sublist &bound() const { return bound_; }
 
     const Eigen::Vector3d operator[](std::size_t index) const { return pos_.col(index); }
 
@@ -43,7 +42,8 @@ class SiteContainer {
     Eigen::Matrix3Xd pos_;
     sublist inactive_;
     sublist active_;
-    sublist bound_;
+    // FIXME: THIS HAS TO BE REBUILT ON RESUME. RELIES ON RUNTIME VALUES (pointers yippee)!!
+    std::vector<global_fiber_pointer> bound_;
 };
 
 #endif

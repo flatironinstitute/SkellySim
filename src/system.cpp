@@ -1188,7 +1188,7 @@ void restore() {
 void run() {
     Params &params = params_;
 
-    fc_.find_capture_sites(sc_);
+    fc_.capture_sites(sc_);
 
     while (properties.time < params.t_final) {
         // Store system state so we can revert if the timestep fails

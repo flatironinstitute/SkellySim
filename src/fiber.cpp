@@ -825,45 +825,44 @@ void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
     }
 }
 
-void FiberContainer::find_capture_sites(SiteContainer &sites) {
-    struct neighbor_entry {
+void FiberContainer::capture_sites(SiteContainer &sites) {
+    struct site_fiber_pair {
         unsigned int site_id;
         int rank;
         Fiber *fib;
     };
-    struct condensed_neighbor_entry {
-        int rank;
-        Fiber *fib;
-    };
 
-    std::vector<neighbor_entry> neighbs_local;
+    // Find all potential site-fiber pairs for each site on this rank
+    std::vector<site_fiber_pair> local_pairs;
     for (const auto &fib : fibers)
         for (auto &i_site : sites.active())
             if (fib.overlaps_with_sphere(sites[i_site], sites.capture_radius_))
-                neighbs_local.push_back({i_site, world_rank_, const_cast<Fiber *>(&fib)});
+                local_pairs.push_back({i_site, world_rank_, const_cast<Fiber *>(&fib)});
 
-    const auto neighbs_global = utils::allgatherv(neighbs_local);
+    // Join all rank-local site-fiber pairs into a global list
+    const auto global_pairs = utils::allgatherv(local_pairs);
 
-    std::unordered_map<int, std::vector<condensed_neighbor_entry>> neighbs_condensed;
-    for (const auto &e : neighbs_global) {
-        if (!neighbs_condensed.count(e.site_id))
-            neighbs_condensed[e.site_id] = {{.rank = e.rank, .fib = e.fib}};
+    // Collect all neighbors for each site (that has a neighbor)
+    std::unordered_map<int, std::vector<global_fiber_pointer>> global_pairs_joined;
+    for (const auto &e : global_pairs) {
+        if (!global_pairs_joined.count(e.site_id))
+            global_pairs_joined[e.site_id] = {{.rank = e.rank, .fib = e.fib}};
         else
-            neighbs_condensed[e.site_id].push_back({.rank = e.rank, .fib = e.fib});
+            global_pairs_joined[e.site_id].push_back({.rank = e.rank, .fib = e.fib});
     }
 
+    // Bind fibers to sites GLOBALLY (and sites to fibers, to make removal easier)
     const auto &glogger = spdlog::get("SkellySim global");
-    for (const auto &[site_id, neighbs] : neighbs_condensed) {
-        int site_index = neighbs.size() == 1 ? 0 : RNG::uniform_int_unsplit(0, neighbs.size());
-        if (world_rank_ == neighbs[site_index].rank) {
-            const auto &neighb = neighbs[site_index];
-            neighb.fib->attach_to_site(site_id);
-            glogger->debug("attaching motor {} to fib {} on rank {}", site_id, (void *)neighb.fib, neighb.rank);
-        }
-        sites.bind(site_id);
-    }
+    for (const auto &[site_id, neighbs] : global_pairs_joined) {
+        int fib_index = neighbs.size() == 1 ? 0 : RNG::uniform_int_unsplit(0, neighbs.size());
 
-    MPI_Barrier(MPI_COMM_WORLD);
+        if (world_rank_ == neighbs[fib_index].rank) {
+            const auto &neighb = neighbs[fib_index];
+            neighb.fib->attach_to_site(site_id);
+            glogger->debug("attaching site {} to fib {} on rank {}", site_id, (void *)neighb.fib, neighb.rank);
+        }
+        sites.bind(site_id, neighbs[fib_index]);
+    }
 }
 
 FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {

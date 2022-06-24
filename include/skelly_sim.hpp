@@ -33,4 +33,10 @@ typedef struct  {
     double l_0; ///< characteristic length of interaction
 } fiber_periphery_interaction_t;
 
+class Fiber;
+struct global_fiber_pointer {
+    int rank;
+    Fiber *fib;
+};
+
 #endif
