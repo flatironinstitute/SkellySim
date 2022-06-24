@@ -1,4 +1,6 @@
 #include <functional>
+
+#include <rng.hpp>
 #include <site.hpp>
 
 #include <spdlog/spdlog.h>
@@ -11,6 +13,18 @@ SiteContainer::SiteContainer(toml::array &site_tables) {
         insert(site_config);
 
     bound_.resize(this->size());
+}
+
+void SiteContainer::kmc_step(const double &dt) {
+    using namespace RNG;
+    const int n_activate = poisson_int_unsplit(n_inactive() * k_on_ * dt);
+    const int n_deactivate = poisson_int_unsplit(n_active() * k_off_ * dt);
+
+    for (int i = 0; i < n_activate; ++i)
+        activate(uniform_int_unsplit(0, n_inactive()));
+
+    for (int i = 0; i < n_deactivate; ++i)
+        deactivate(uniform_int_unsplit(0, n_active()));
 }
 
 void SiteContainer::insert(const toml::value &site_config) {

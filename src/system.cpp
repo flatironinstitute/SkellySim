@@ -1188,6 +1188,7 @@ void restore() {
 void run() {
     Params &params = params_;
 
+    sc_.kmc_step(params_.dt_initial);
     fc_.capture_sites(sc_);
 
     while (properties.time < params.t_final) {
