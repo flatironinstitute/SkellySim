@@ -257,9 +257,31 @@ class Site():
         State the site is in. 0: inactive, 1: active, 2: bound
     """
     x: List[float] = field(default_factory=_default_vector)
-    capture_radius : float = 0.5
     state: int = 0
 
+
+@dataclass
+class SiteGroup():
+    """dataclass container of sites with fixed properties
+
+    Attributes
+    ----------
+    sites : List[Site], default: :obj:`[]`
+        List of sites belonging to this group
+    capture_radius : float, default: :obj:`0.5`
+        Distance between a sphere and fiber where attachment is possible
+    k_on : float, default: :obj:`0.0`
+        Probability per unit time for a single deactivated site to activate
+    k_off : float, default: :obj:`0.0`
+        Probability per unit time for a single activated site to deactivate
+    state : int, default: :obj:`0`
+        State the site is in. 0: inactive, 1: active, 2: bound
+    """
+    sites: List[Site] = field(default_factory=list)
+    capture_radius : float = 0.5
+    k_on : float = 0.0
+    k_off : float = 0.0
+    state: int = 0
 
 
 @dataclass
@@ -850,12 +872,14 @@ class Config():
         List of fibers
     point_sources : List[Point], default: :obj:`[]`
         List of point sources
+    site_groups : List[SiteGroup], default: :obj:`[]`
+        List of site groups (sites of the same type/attached to same object, etc)
     """
     params: Params = field(default_factory=Params)
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
-    sites: List[Site] = field(default_factory=list)
+    site_groups: List[SiteGroup] = field(default_factory=list)
 
     def plot_fibers(self, backend: str = "TKAgg"):
         """

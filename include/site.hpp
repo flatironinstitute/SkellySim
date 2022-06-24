@@ -23,7 +23,7 @@ class SiteContainer {
     void insert(const toml::value &site_config);
 
     SiteContainer() = default;
-    SiteContainer(toml::array &site_tables);
+    SiteContainer(toml::value &site_group_table);
 
     void bind(const std::size_t &active_index, const global_fiber_pointer &p) { bound_[active_index] = p; }
     void unbind(const std::size_t &bound_index) { bound_[bound_index] = {.rank = 0, .fib = nullptr}; }

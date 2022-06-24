@@ -7,8 +7,13 @@
 #include <stdexcept>
 #include <string>
 
-SiteContainer::SiteContainer(toml::array &site_tables) {
+SiteContainer::SiteContainer(toml::value &site_group_table) {
     spdlog::info("Initializing SiteContainer");
+    capture_radius_ = toml::find_or(site_group_table, "capture_radius", 0.5);
+    k_on_ = toml::find_or(site_group_table, "k_on", 0.0);
+    k_off_ = toml::find_or(site_group_table, "k_off", 0.0);
+
+    toml::array site_tables = toml::find(site_group_table, "sites").as_array();
     for (toml::value &site_config : site_tables)
         insert(site_config);
 

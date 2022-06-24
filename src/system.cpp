@@ -31,7 +31,7 @@ Params params_;                    ///< Simulation input parameters
 FiberContainer fc_;                ///< Fibers
 BodyContainer bc_;                 ///< Bodies
 PointSourceContainer psc_;         ///< Point Sources
-SiteContainer sc_;                 ///< Dynamic attachment sites
+std::vector<SiteContainer> scs_;   ///< Dynamic attachment sites
 std::unique_ptr<Periphery> shell_; ///< Periphery
 std::vector<PointSource> points_;  ///< External point sources
 
@@ -1188,8 +1188,10 @@ void restore() {
 void run() {
     Params &params = params_;
 
-    sc_.kmc_step(params_.dt_initial);
-    fc_.capture_sites(sc_);
+    for (auto &sc : scs_) {
+        sc.kmc_step(params_.dt_initial);
+        fc_.capture_sites(sc);
+    }
 
     while (properties.time < params.t_final) {
         // Store system state so we can revert if the timestep fails
@@ -1361,8 +1363,10 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
     if (param_table_.contains("point_sources"))
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
 
-    if (param_table_.contains("sites"))
-        sc_ = SiteContainer(param_table_.at("sites").as_array());
+    if (param_table_.contains("site_groups")) {
+        for (auto &group_table : param_table_.at("site_groups").as_array())
+            scs_.push_back(SiteContainer(group_table));
+    }
 
     curr_solution_.resize(get_local_solution_size());
     std::string filename = "skelly_sim.out";
