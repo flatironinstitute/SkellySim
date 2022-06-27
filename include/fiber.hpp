@@ -60,7 +60,11 @@ class Fiber {
     /// Boundary condition pair for plus end of fiber
     std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
 
-    std::vector<int> attached_sites_;
+    typedef struct {
+        int site_index;
+        double pos;
+    } attachment_t;
+    std::vector<attachment_t> attached_sites_;
 
     Eigen::VectorXd tension_; ///< [ n_nodes ] vector representing local tension on fiber nodes
     Eigen::MatrixXd x_;       ///< [ 3 x n_nodes_ ] matrix representing coordinates of fiber nodes
@@ -151,13 +155,10 @@ class Fiber {
     bool is_minus_clamped() const { return minus_clamped_ || attached_to_body(); };
     bool overlaps_with_sphere(const Eigen::Vector3d &x, double r) const;
 
-    void attach_to_site(const int i_site) {
-        spdlog::debug("Attached site {} to fiber {}", i_site, (void *)this);
-        attached_sites_.push_back(i_site);
-    }
+    void attach_to_site(const int i_site, const SiteContainer &sc);
     void detach_from_site(const int i_site) {
         for (int i = 0; i < attached_sites_.size(); i++) {
-            if (i_site == attached_sites_[i]) {
+            if (i_site == attached_sites_[i].site_index) {
                 spdlog::debug("Detached site {} from fiber {}", i_site, (void *)this);
                 attached_sites_[i] = attached_sites_.back();
                 attached_sites_.pop_back();

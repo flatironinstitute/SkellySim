@@ -21,6 +21,9 @@ Eigen::VectorXd load_vec(cnpy::npz_t &npz, const char *var);
 bool sphere_segment_intersect(const Eigen::Vector3d &r_point, const Eigen::Vector3d &r_line,
                               const Eigen::Vector3d &u_line, double length, double squared_radius);
 
+std::pair<double, double> min_distance_point_segment(const Eigen::Vector3d &r_sphere, const Eigen::Vector3d &r0,
+                                                     const Eigen::Vector3d &r1);
+
 template <typename T>
 std::vector<T> allgatherv(const std::vector<T> &local_vec) {
     int world_size;

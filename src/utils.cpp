@@ -1,5 +1,6 @@
 #include <skelly_sim.hpp>
 
+#include <utility>
 #include <utils.hpp>
 
 #include <cnpy.hpp>
@@ -23,6 +24,32 @@ bool utils::sphere_segment_intersect(const Eigen::Vector3d &r_sphere, const Eige
         mu = 0.0;
 
     return (dr + mu * u_line).squaredNorm() <= squared_radius;
+}
+
+/// @brief Calculates if a line segment intersects a sphere
+///
+/// @param[in] r_point Position vector of sphere center
+/// @param[in] r0 Point at one end of line
+/// @param[in] r1 Point at other end of line
+///
+/// @returns pair of <minimum_distance, mu> where minimum_distance is self-explanatory and mu
+//  is the distance along the line segment defined by r0->r1 where the distance is between the
+//  objects is minimized
+std::pair<double, double> utils::min_distance_point_segment(const Eigen::Vector3d &r_point, const Eigen::Vector3d &r0,
+                                                            const Eigen::Vector3d &r1) {
+    const Eigen::Vector3d v_line = r1 - r0;
+    const double length = v_line.norm();
+    const Eigen::Vector3d u_line = v_line / length;
+    const Eigen::Vector3d dr = r0 - r_point;
+
+    double mu = -dr.dot(u_line);
+    if (mu > length)
+        mu = length;
+    else if (mu < 0.0)
+        mu = 0.0;
+
+    double min_dist = (dr + mu * u_line).norm();
+    return std::make_pair(min_dist, mu);
 }
 
 //  Following the paper Calculation of weights in finite different formulas,

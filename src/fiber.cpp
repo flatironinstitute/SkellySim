@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include <unordered_map>
 
 #include <body.hpp>
@@ -52,6 +53,26 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     minus_clamped_ = toml::find_or<bool>(fiber_table, "minus_clamped", false);
 
     update_constants(eta);
+}
+
+/// @brief Attach fiber to global site
+///
+/// Updates: Fiber::attached_sites_
+void Fiber::attach_to_site(const int i_site, const SiteContainer &sc) {
+    spdlog::debug("Attached site {} to fiber {}", i_site, (void *)this);
+    int segment = 0;
+    double pos = 0;
+    double min_dist = std::numeric_limits<double>::max();
+    for (int i_seg = 0; i_seg < n_nodes_ - 1; ++i_seg) {
+        auto [dist, mu] = utils::min_distance_point_segment(sc[i_site], x_.col(i_seg), x_.col(i_seg + 1));
+        if (dist < min_dist) {
+            segment = i_seg;
+            pos = mu;
+        }
+    }
+
+    pos += segment * length_ / (n_nodes_ - 1);
+    attached_sites_.push_back({.site_index = i_site, .pos = pos});
 }
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
