@@ -859,10 +859,11 @@ void FiberContainer::capture_sites(SiteContainer &sites) {
         if (world_rank_ == neighbs[fib_index].rank) {
             const auto &neighb = neighbs[fib_index];
             neighb.fib->attach_to_site(site_id);
+            sites.queue_for_attachment(std::make_pair(site_id, neighb));
             glogger->debug("attaching site {} to fib {} on rank {}", site_id, (void *)neighb.fib, neighb.rank);
         }
-        sites.bind(site_id, neighbs[fib_index]);
     }
+    sites.sync_attachments();
 }
 
 FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {

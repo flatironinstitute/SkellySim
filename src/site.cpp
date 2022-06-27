@@ -2,6 +2,7 @@
 
 #include <rng.hpp>
 #include <site.hpp>
+#include <utils.hpp>
 
 #include <spdlog/spdlog.h>
 #include <stdexcept>
@@ -17,7 +18,14 @@ SiteContainer::SiteContainer(toml::value &site_group_table) {
     for (toml::value &site_config : site_tables)
         insert(site_config);
 
-    bound_.resize(this->size());
+    attached_.resize(this->size());
+}
+
+void SiteContainer::sync_attachments() {
+    auto global_attachment_queue = utils::allgatherv(attachment_queue_);
+    for (const auto &el : global_attachment_queue)
+        attach(el.first, el.second);
+    attachment_queue_.clear();
 }
 
 void SiteContainer::kmc_step(const double &dt) {

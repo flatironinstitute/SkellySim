@@ -17,26 +17,27 @@ class SiteContainer {
 
   public:
     double capture_radius_ = 0.5; // FIXME: need different constructor to specify SC types
-    double k_on_ = 0.1; // FIXME: need different constructor to specify SC types
-    double k_off_ = 0.1; // FIXME: need different constructor to specify SC types
+    double k_on_ = 0.1;           // FIXME: need different constructor to specify SC types
+    double k_off_ = 0.1;          // FIXME: need different constructor to specify SC types
 
     void insert(const toml::value &site_config);
 
     SiteContainer() = default;
     SiteContainer(toml::value &site_group_table);
 
-    void bind(const std::size_t &active_index, const global_fiber_pointer &p) { bound_[active_index] = p; }
-    void unbind(const std::size_t &bound_index) { bound_[bound_index] = {.rank = 0, .fib = nullptr}; }
+    void queue_for_attachment(const std::pair<std::size_t, global_fiber_pointer> &pair) {
+        attachment_queue_.push_back(pair);
+    }
+    void sync_attachments();
     void activate(const std::size_t &inactive_index) { swap_state(inactive_index, inactive_, active_); }
     void deactivate(const std::size_t &active_index) {
         const int site = active_[active_index];
-        bound_[site] = {.rank = 0, .fib = nullptr};
+        attached_[site] = {.rank = 0, .fib = nullptr};
         swap_state(active_index, active_, inactive_);
     }
 
     const int n_inactive() const { return inactive_.size(); }
     const int n_active() const { return active_.size(); }
-    const int n_bound() const { return bound_.size(); }
     const int size() const { return pos_.cols(); }
 
     const sublist &inactive() const { return inactive_; }
@@ -50,8 +51,13 @@ class SiteContainer {
     Eigen::Matrix3Xd pos_;
     sublist inactive_;
     sublist active_;
+
     // FIXME: THIS HAS TO BE REBUILT ON RESUME. RELIES ON RUNTIME VALUES (pointers yippee)!!
-    std::vector<global_fiber_pointer> bound_;
+    std::vector<global_fiber_pointer> attached_;
+    std::vector<std::pair<std::size_t, global_fiber_pointer>> attachment_queue_;
+
+    void attach(const std::size_t &active_index, const global_fiber_pointer &p) { attached_[active_index] = p; }
+    void detach(const std::size_t &site_id) { attached_[site_id] = {.rank = 0, .fib = nullptr}; }
 };
 
 #endif
