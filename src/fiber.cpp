@@ -57,22 +57,25 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 
 /// @brief Attach fiber to global site
 ///
-/// Updates: Fiber::attached_sites_
-void Fiber::attach_to_site(const int i_site, const SiteContainer &sc) {
-    spdlog::debug("Attached site {} to fiber {}", i_site, (void *)this);
+/// Updates: Fiber::attached_sites_, SiteContainer attachment queue: MUST BE SYNCED
+void Fiber::attach_to_site(const int i_site, SiteContainer &sites, const int rank) {
     int segment = 0;
     double pos = 0;
     double min_dist = std::numeric_limits<double>::max();
     for (int i_seg = 0; i_seg < n_nodes_ - 1; ++i_seg) {
-        auto [dist, mu] = utils::min_distance_point_segment(sc[i_site], x_.col(i_seg), x_.col(i_seg + 1));
+        auto [dist, mu] = utils::min_distance_point_segment(sites[i_site], x_.col(i_seg), x_.col(i_seg + 1));
         if (dist < min_dist) {
             segment = i_seg;
             pos = mu;
+            min_dist = dist;
         }
     }
 
     pos += segment * length_ / (n_nodes_ - 1);
     attached_sites_.push_back({.site_index = i_site, .pos = pos});
+    sites.queue_for_attachment(std::make_pair(i_site, global_fiber_pointer{.rank = rank, .fib = this}));
+    spdlog::get("SkellySim global")
+        ->debug("Attached site {} to fiber {} at pos {} on rank {}", i_site, (void *)this, pos, rank);
 }
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
@@ -873,15 +876,11 @@ void FiberContainer::capture_sites(SiteContainer &sites) {
     }
 
     // Bind fibers to sites GLOBALLY (and sites to fibers, to make removal easier)
-    const auto &glogger = spdlog::get("SkellySim global");
     for (const auto &[site_id, neighbs] : global_pairs_joined) {
         int fib_index = neighbs.size() == 1 ? 0 : RNG::uniform_int_unsplit(0, neighbs.size());
 
         if (world_rank_ == neighbs[fib_index].rank) {
-            const auto &neighb = neighbs[fib_index];
-            neighb.fib->attach_to_site(site_id);
-            sites.queue_for_attachment(std::make_pair(site_id, neighb));
-            glogger->debug("attaching site {} to fib {} on rank {}", site_id, (void *)neighb.fib, neighb.rank);
+            neighbs[fib_index].fib->attach_to_site(site_id, sites, world_rank_);
         }
     }
     sites.sync_attachments();

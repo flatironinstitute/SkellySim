@@ -155,7 +155,7 @@ class Fiber {
     bool is_minus_clamped() const { return minus_clamped_ || attached_to_body(); };
     bool overlaps_with_sphere(const Eigen::Vector3d &x, double r) const;
 
-    void attach_to_site(const int i_site, const SiteContainer &sc);
+    void attach_to_site(const int i_site, SiteContainer &sc, const int rank);
     void detach_from_site(const int i_site) {
         for (int i = 0; i < attached_sites_.size(); i++) {
             if (i_site == attached_sites_[i].site_index) {
