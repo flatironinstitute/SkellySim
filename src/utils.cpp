@@ -37,10 +37,11 @@ bool utils::sphere_segment_intersect(const Eigen::Vector3d &r_sphere, const Eige
 //  objects is minimized
 std::pair<double, double> utils::min_distance_point_segment(const Eigen::Vector3d &r_point, const Eigen::Vector3d &r0,
                                                             const Eigen::Vector3d &r1) {
-    const Eigen::Vector3d v_line = r1 - r0;
-    const double length = v_line.norm();
-    const Eigen::Vector3d u_line = v_line / length;
     const Eigen::Vector3d dr = r0 - r_point;
+
+    Eigen::Vector3d u_line = r1 - r0;
+    const double length = u_line.norm();
+    u_line /= length;
 
     double mu = -dr.dot(u_line);
     if (mu > length)
