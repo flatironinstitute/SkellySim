@@ -17,6 +17,8 @@
 
 #include <Eigen/Core>
 
+#include <spdlog/spdlog.h>
+
 typedef Eigen::Map<Eigen::VectorXd> VectorMap;
 typedef Eigen::Map<const Eigen::VectorXd> CVectorMap;
 typedef Eigen::Map<Eigen::ArrayXd> ArrayMap;

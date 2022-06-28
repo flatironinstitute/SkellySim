@@ -11,9 +11,9 @@
 #include <periphery.hpp>
 #include <rng.hpp>
 #include <site.hpp>
+#include <utility>
 #include <utils.hpp>
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 /// @file
@@ -58,7 +58,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 /// @brief Attach fiber to global site
 ///
 /// Updates: Fiber::attached_sites_, SiteContainer attachment queue: MUST BE SYNCED
-void Fiber::attach_to_site(const int i_site, SiteContainer &sites, const int rank) {
+void Fiber::attach_to_site(const int i_site, const SiteContainer &sites) {
     int segment = 0;
     double pos = 0;
     double min_dist = std::numeric_limits<double>::max();
@@ -73,9 +73,7 @@ void Fiber::attach_to_site(const int i_site, SiteContainer &sites, const int ran
 
     pos += segment * length_ / (n_nodes_ - 1);
     attached_sites_.push_back({.site_index = i_site, .pos = pos});
-    sites.queue_for_attachment(std::make_pair(i_site, global_fiber_pointer{.rank = rank, .fib = this}));
-    spdlog::get("SkellySim global")
-        ->debug("Attached site {} to fiber {} at pos {} on rank {}", i_site, (void *)this, pos, rank);
+    spdlog::get("SkellySim global")->debug("Attached site {} to fiber {} at pos {}", i_site, (void *)this, pos);
 }
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
@@ -879,9 +877,8 @@ void FiberContainer::capture_sites(SiteContainer &sites) {
     for (const auto &[site_id, neighbs] : global_pairs_joined) {
         int fib_index = neighbs.size() == 1 ? 0 : RNG::uniform_int_unsplit(0, neighbs.size());
 
-        if (world_rank_ == neighbs[fib_index].rank) {
-            neighbs[fib_index].fib->attach_to_site(site_id, sites, world_rank_);
-        }
+        if (world_rank_ == neighbs[fib_index].rank)
+            sites.queue_for_attachment(std::make_pair(site_id, neighbs[fib_index]));
     }
     sites.sync_attachments();
 }

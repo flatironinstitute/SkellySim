@@ -3,6 +3,7 @@
 
 #include <skelly_sim.hpp>
 
+#include <stdexcept>
 #include <vector>
 
 class SiteContainer {
@@ -29,12 +30,9 @@ class SiteContainer {
         attachment_queue_.push_back(pair);
     }
     void sync_attachments();
-    void activate(const std::size_t &inactive_index) { swap_state(inactive_index, inactive_, active_); }
-    void deactivate(const std::size_t &active_index) {
-        const int site = active_[active_index];
-        attached_[site] = {.rank = 0, .fib = nullptr};
-        swap_state(active_index, active_, inactive_);
-    }
+    void activate(const std::size_t &inactive_index);
+
+    void deactivate(const std::size_t &active_index);
 
     const int n_inactive() const { return inactive_.size(); }
     const int n_active() const { return active_.size(); }
@@ -48,16 +46,20 @@ class SiteContainer {
     void kmc_step(const double &dt);
 
   private:
+    int mpi_rank_;
+    int mpi_size_ = -1;
+
     Eigen::Matrix3Xd pos_;
     sublist inactive_;
     sublist active_;
 
     // FIXME: THIS HAS TO BE REBUILT ON RESUME. RELIES ON RUNTIME VALUES (pointers yippee)!!
     std::vector<global_fiber_pointer> attached_;
+    sublist detached_;
     std::vector<std::pair<std::size_t, global_fiber_pointer>> attachment_queue_;
 
-    void attach(const std::size_t &active_index, const global_fiber_pointer &p) { attached_[active_index] = p; }
-    void detach(const std::size_t &site_id) { attached_[site_id] = {.rank = 0, .fib = nullptr}; }
+    void attach(const std::size_t &site_id, const global_fiber_pointer &p);
+    void detach(const std::size_t &site_id);
 };
 
 #endif
