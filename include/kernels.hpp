@@ -10,6 +10,9 @@
 namespace kernels {
 typedef Eigen::MatrixXd (*fmm_kernel_func_t)(const int n_trg, MatrixRef &f_sl, MatrixRef &f_dl, stkfmm::STKFMM *);
 
+using Evaluator = std::function<Eigen::MatrixXd(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
+                                                MatrixRef &f_dl, double eta)>;
+
 Eigen::MatrixXd oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta,
                                              double reg = 5E-3, double epsilon_distance = 1E-5);
 
@@ -101,7 +104,7 @@ class FMM {
     }
 
   private:
-    std::unique_ptr<stkfmm::STKFMM> fmmPtr_; ///< Pointer to underlying STKFMM object
+    std::shared_ptr<stkfmm::STKFMM> fmmPtr_; ///< Pointer to underlying STKFMM object
     bool force_setup_tree_ = true; ///< When set, forces tree to rebuild on next call, then is cleared. Useful for
                                    ///< testing/benchmarking
     Eigen::MatrixXd r_sl_old_;     ///< cached 'single-layer' source positions to check for FMM tree invalidation

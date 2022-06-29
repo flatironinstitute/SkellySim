@@ -69,8 +69,10 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
                 f_dl(i * 3 + j, node) = 2.0 * eta * node_normal_(i, node) * density_reshaped(j, node);
 
     Eigen::MatrixXd r_sl, f_sl; // dummy SL positions/values
-    Eigen::MatrixXd pvel = (*stresslet_kernel_)(r_sl, node_pos_, r_trg, f_sl, f_dl, eta);
-    Eigen::MatrixXd vel = pvel.block(1, 0, 3, n_trg);
+    Eigen::MatrixXd pvel = stresslet_kernel_(r_sl, node_pos_, r_trg, f_sl, f_dl, eta);
+    // Workaround for the STKFMM stokes DL kernel returning pressure+velocity rather than just velocity
+    // Other kernels should just return vel, ideally
+    Eigen::MatrixXd vel = pvel.rows() == 3 ? pvel : pvel.block(1, 0, 3, n_trg);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     spdlog::debug("Finished shell flow");
@@ -307,8 +309,7 @@ Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
         const int mult_order = params.stkfmm.periphery_stresslet_multipole_order;
         const int max_pts = params.stkfmm.periphery_stresslet_max_points;
         utils::LoggerRedirect redirect(std::cout);
-        stresslet_kernel_ = std::unique_ptr<FMM<Stk3DFMM>>(
-            new FMM<Stk3DFMM>(mult_order, max_pts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm));
+        stresslet_kernel_ = FMM<Stk3DFMM>(mult_order, max_pts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
 
