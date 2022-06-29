@@ -43,7 +43,7 @@ class Periphery {
     Eigen::VectorXd matvec(VectorRef &x_local, MatrixRef &v_local) const;
 
     /// pointer to FMM object (pointer to avoid constructing object with empty Periphery)
-    std::shared_ptr<kernels::FMM<stkfmm::Stk3DFMM>> stresslet_kernel_;
+    kernels::Evaluator stresslet_kernel_;
     Eigen::MatrixXd M_inv_;                            ///< Process local elements of inverse matrix
     Eigen::MatrixXd stresslet_plus_complementary_;     ///< Process local elements of stresslet tensor
     Eigen::MatrixXd node_pos_ = Eigen::MatrixXd(3, 0); ///< [3xn_nodes_local] matrix representing node positions

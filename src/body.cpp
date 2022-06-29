@@ -215,7 +215,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
                 f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node) * eta;
 
     spdlog::debug("body_stresslet");
-    MatrixXd v_bdy2all = (*stresslet_kernel_)(null_matrix, r_dl, r_trg, null_matrix, f_dl, eta).block(1, 0, 3, n_trg);
+    MatrixXd v_bdy2all = stresslet_kernel_(null_matrix, r_dl, r_trg, null_matrix, f_dl, eta).block(1, 0, 3, n_trg);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Section: Oseen kernel
@@ -228,7 +228,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
     // We actually only need the summed forces on the first rank
     if (world_rank_)
         forces.resize(3, 0);
-    v_bdy2all += (*oseen_kernel_)(center_positions, null_matrix, r_trg, forces, null_matrix, eta);
+    v_bdy2all += oseen_kernel_(center_positions, null_matrix, r_trg, forces, null_matrix, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
@@ -274,7 +274,8 @@ MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions, double
 /// \f[ A_{\textrm{bodies}} * x_\textrm{bodies} = y_{\textrm{bodies}} \f]
 /// where 'x' is derived from the input densities and velocities
 /// @param[in] v_bodies [3 x n_body_nodes_local] matrix of velocities at body nodes
-/// @param[in] x_bodies [3 * n_body_nodes_local + 6 * n_bodies_global] vector of body source strength "densities", then com velocities, then com angular velocities
+/// @param[in] x_bodies [3 * n_body_nodes_local + 6 * n_bodies_global] vector of body source strength "densities", then
+/// com velocities, then com angular velocities
 /// @return [body_local_solution_size] vector 'y' in the formulation above
 VectorXd BodyContainer::matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const {
     VectorXd res(get_local_solution_size());
@@ -374,13 +375,13 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
     {
         auto &sp = params.stkfmm;
         utils::LoggerRedirect redirect(std::cout);
-        stresslet_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(
-            new kernels::FMM<stkfmm::Stk3DFMM>(sp.body_stresslet_multipole_order, sp.body_stresslet_max_points,
-                                               stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm));
+        stresslet_kernel_ =
+            kernels::FMM<stkfmm::Stk3DFMM>(sp.body_stresslet_multipole_order, sp.body_stresslet_max_points,
+                                           stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
-        oseen_kernel_ = std::unique_ptr<kernels::FMM<stkfmm::Stk3DFMM>>(
-            new kernels::FMM<stkfmm::Stk3DFMM>(sp.body_oseen_multipole_order, sp.body_oseen_max_points,
-                                               stkfmm::PAXIS::NONE, stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm));
+        oseen_kernel_ =
+            kernels::FMM<stkfmm::Stk3DFMM>(sp.body_oseen_multipole_order, sp.body_oseen_max_points, stkfmm::PAXIS::NONE,
+                                           stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
 
