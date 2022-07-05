@@ -10,7 +10,7 @@
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <rng.hpp>
-#include <site.hpp>
+#include <link.hpp>
 #include <utility>
 #include <utils.hpp>
 
@@ -57,13 +57,13 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 
 /// @brief Attach fiber to global site
 ///
-/// Updates: Fiber::attached_sites_, SiteContainer attachment queue: MUST BE SYNCED
-void Fiber::attach_to_site(const int i_site, const SiteContainer &sites) {
+/// Updates: Fiber::attached_sites_, LinkContainer attachment queue: MUST BE SYNCED
+void Fiber::attach_to_link(const int i_link, const LinkContainer &links) {
     int segment = 0;
     double pos = 0;
     double min_dist = std::numeric_limits<double>::max();
     for (int i_seg = 0; i_seg < n_nodes_ - 1; ++i_seg) {
-        auto [dist, mu] = utils::min_distance_point_segment(sites[i_site], x_.col(i_seg), x_.col(i_seg + 1));
+        auto [dist, mu] = utils::min_distance_point_segment(links[i_link], x_.col(i_seg), x_.col(i_seg + 1));
         if (dist < min_dist) {
             segment = i_seg;
             pos = mu;
@@ -72,8 +72,8 @@ void Fiber::attach_to_site(const int i_site, const SiteContainer &sites) {
     }
 
     pos += segment * length_ / (n_nodes_ - 1);
-    attached_sites_.push_back({.site_index = i_site, .pos = pos});
-    spdlog::get("SkellySim global")->debug("Attached site {} to fiber {} at pos {}", i_site, (void *)this, pos);
+    attached_links_.push_back({.link_index = i_link, .pos = pos});
+    spdlog::get("SkellySim global")->debug("Attached link {} to fiber {} at pos {}", i_link, (void *)this, pos);
 }
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
@@ -847,7 +847,7 @@ void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
     }
 }
 
-void FiberContainer::capture_sites(SiteContainer &sites) {
+void FiberContainer::capture_links(LinkContainer &sites) {
     struct site_fiber_pair {
         unsigned int site_id;
         int rank;

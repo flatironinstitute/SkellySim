@@ -10,11 +10,11 @@
 
 #include <body.hpp>
 #include <fiber.hpp>
+#include <link.hpp>
 #include <params.hpp>
 #include <parse_util.hpp>
 #include <periphery.hpp>
 #include <point_source.hpp>
-#include <site.hpp>
 #include <solver_hydro.hpp>
 #include <system.hpp>
 
@@ -31,7 +31,7 @@ Params params_;                    ///< Simulation input parameters
 FiberContainer fc_;                ///< Fibers
 BodyContainer bc_;                 ///< Bodies
 PointSourceContainer psc_;         ///< Point Sources
-std::vector<SiteContainer> scs_;   ///< Dynamic attachment sites
+std::vector<LinkContainer> scs_;   ///< Dynamic attachment links
 std::unique_ptr<Periphery> shell_; ///< Periphery
 std::vector<PointSource> points_;  ///< External point sources
 
@@ -1190,7 +1190,7 @@ void run() {
 
     for (auto &sc : scs_) {
         sc.kmc_step(params_.dt_initial);
-        fc_.capture_sites(sc);
+        fc_.capture_links(sc);
     }
 
     while (properties.time < params.t_final) {
@@ -1365,7 +1365,7 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
 
     if (param_table_.contains("site_groups")) {
         for (auto &group_table : param_table_.at("site_groups").as_array())
-            scs_.push_back(SiteContainer(group_table));
+            scs_.push_back(LinkContainer(group_table));
     }
 
     curr_solution_.resize(get_local_solution_size());

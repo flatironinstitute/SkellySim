@@ -1,30 +1,31 @@
-#ifndef SITE_HPP
-#define SITE_HPP
+#ifndef LINK_HPP
+#define LINK_HPP
 
 #include <skelly_sim.hpp>
 
 #include <stdexcept>
 #include <vector>
 
-class SiteContainer {
+class LinkContainer {
   private:
     using sublist = std::vector<unsigned int>;
     void swap_state(const std::size_t &index, sublist &from, sublist &to) {
-        std::size_t site_index = from[index];
+        std::size_t link_index = from[index];
         from[index] = from.back();
         from.pop_back();
-        to.push_back(site_index);
+        to.push_back(link_index);
     }
 
   public:
     double capture_radius_ = 0.5; // FIXME: need different constructor to specify SC types
     double k_on_ = 0.1;           // FIXME: need different constructor to specify SC types
     double k_off_ = 0.1;          // FIXME: need different constructor to specify SC types
+    double rest_length_ = 0.0;
 
-    void insert(const toml::value &site_config);
+    void insert(const toml::value &link_config);
 
-    SiteContainer() = default;
-    SiteContainer(toml::value &site_group_table);
+    LinkContainer() = default;
+    LinkContainer(toml::value &link_group_table);
 
     void queue_for_attachment(const std::pair<std::size_t, global_fiber_pointer> &pair) {
         attachment_queue_.push_back(pair);
@@ -58,8 +59,8 @@ class SiteContainer {
     sublist detached_;
     std::vector<std::pair<std::size_t, global_fiber_pointer>> attachment_queue_;
 
-    void attach(const std::size_t &site_id, const global_fiber_pointer &p);
-    void detach(const std::size_t &site_id);
+    void attach(const std::size_t &link_id, const global_fiber_pointer &p);
+    void detach(const std::size_t &link_id);
 };
 
 #endif

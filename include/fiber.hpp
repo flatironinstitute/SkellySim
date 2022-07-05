@@ -15,7 +15,7 @@
 
 class Periphery;
 class BodyContainer;
-class SiteContainer;
+class LinkContainer;
 
 /// @brief Class to represent a single flexible filament
 ///
@@ -61,10 +61,10 @@ class Fiber {
     std::pair<BC, BC> bc_plus_ = {BC::Force, BC::Torque};
 
     typedef struct {
-        int site_index;
+        int link_index;
         double pos;
     } attachment_t;
-    std::vector<attachment_t> attached_sites_;
+    std::vector<attachment_t> attached_links_;
 
     Eigen::VectorXd tension_; ///< [ n_nodes ] vector representing local tension on fiber nodes
     Eigen::MatrixXd x_;       ///< [ 3 x n_nodes_ ] matrix representing coordinates of fiber nodes
@@ -155,23 +155,23 @@ class Fiber {
     bool is_minus_clamped() const { return minus_clamped_ || attached_to_body(); };
     bool overlaps_with_sphere(const Eigen::Vector3d &x, double r) const;
 
-    void attach_to_site(const int i_site, const SiteContainer &sites);
-    void detach_from_site(const int i_site) {
-        for (int i = 0; i < attached_sites_.size(); i++) {
-            if (i_site == attached_sites_[i].site_index) {
-                spdlog::debug("Detached site {} from fiber {}", i_site, (void *)this);
-                attached_sites_[i] = attached_sites_.back();
-                attached_sites_.pop_back();
+    void attach_to_link(const int i_link, const LinkContainer &links);
+    void detach_from_link(const int i_link) {
+        for (int i = 0; i < attached_links_.size(); i++) {
+            if (i_link == attached_links_[i].link_index) {
+                spdlog::debug("Detached link {} from fiber {}", i_link, (void *)this);
+                attached_links_[i] = attached_links_.back();
+                attached_links_.pop_back();
                 return;
             }
         }
-        spdlog::error("Unable to detach site {} from fiber {}", i_site, (void *)this);
-        throw std::runtime_error("Invalid detachment site index");
+        spdlog::error("Unable to detach link {} from fiber {}", i_link, (void *)this);
+        throw std::runtime_error("Invalid detachment link index");
     }
-    void detach_from_all_sites() {
-        if (attached_sites_.size()) {
-            spdlog::debug("Detached all sites from fiber {}", (void *)this);
-            attached_sites_.clear();
+    void detach_from_all_links() {
+        if (attached_links_.size()) {
+            spdlog::debug("Detached all links from fiber {}", (void *)this);
+            attached_links_.clear();
         }
     }
 
@@ -245,7 +245,7 @@ class FiberContainer {
     Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
-    void capture_sites(SiteContainer &sites);
+    void capture_links(LinkContainer &links);
 
     void update_boundary_conditions(Periphery &shell, bool periphery_binding_flag);
 
