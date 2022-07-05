@@ -244,40 +244,40 @@ def _default_quaternion():
 
 
 @dataclass
-class Site():
+class Link():
     """dataclass for a point force/torque source
 
     Attributes
     ----------
     x : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
-        Position of the site (x,y,z)
+        Position of the link (x,y,z)
     capture_radius : float, default: :obj:`0.5`
         Distance between a sphere and fiber where attachment is possible
     state : int, default: :obj:`0`
-        State the site is in. 0: inactive, 1: active, 2: bound
+        State the link is in. 0: inactive, 1: active, 2: bound
     """
     x: List[float] = field(default_factory=_default_vector)
     state: int = 0
 
 
 @dataclass
-class SiteGroup():
-    """dataclass container of sites with fixed properties
+class LinkGroup():
+    """dataclass container of links with fixed properties
 
     Attributes
     ----------
-    sites : List[Site], default: :obj:`[]`
-        List of sites belonging to this group
+    links : List[Link], default: :obj:`[]`
+        List of links belonging to this group
     capture_radius : float, default: :obj:`0.5`
         Distance between a sphere and fiber where attachment is possible
     k_on : float, default: :obj:`0.0`
-        Probability per unit time for a single deactivated site to activate
+        Probability per unit time for a single deactivated link to activate
     k_off : float, default: :obj:`0.0`
-        Probability per unit time for a single activated site to deactivate
+        Probability per unit time for a single activated link to deactivate
     state : int, default: :obj:`0`
-        State the site is in. 0: inactive, 1: active, 2: bound
+        State the link is in. 0: inactive, 1: active, 2: bound
     """
-    sites: List[Site] = field(default_factory=list)
+    links: List[Link] = field(default_factory=list)
     capture_radius : float = 0.5
     k_on : float = 0.0
     k_off : float = 0.0
@@ -879,7 +879,7 @@ class Config():
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
-    site_groups: List[SiteGroup] = field(default_factory=list)
+    link_groups: List[LinkGroup] = field(default_factory=list)
 
     def plot_fibers(self, backend: str = "TKAgg"):
         """

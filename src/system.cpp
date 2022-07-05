@@ -1363,8 +1363,8 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
     if (param_table_.contains("point_sources"))
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
 
-    if (param_table_.contains("site_groups")) {
-        for (auto &group_table : param_table_.at("site_groups").as_array())
+    if (param_table_.contains("link_groups")) {
+        for (auto &group_table : param_table_.at("link_groups").as_array())
             scs_.push_back(LinkContainer(group_table));
     }
 
