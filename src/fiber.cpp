@@ -56,7 +56,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 /// @param[in] Periphery object
 void FiberContainer::update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
     /// FIXME: magic number in cortex interaction
-    for (auto &fib : fibers) {
+    for (auto &fib : *this) {
         fib.bc_minus_ = fib.is_minus_clamped()
                             ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
                             : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
@@ -576,25 +576,25 @@ int FiberContainer::get_global_total_fib_nodes() const {
 /// @brief Update derivatives on all fibers
 /// See: Fiber::update_derivatives
 void FiberContainer::update_derivatives() {
-    for (auto &fib : fibers)
+    for (auto &fib : *this)
         fib.update_derivatives();
 }
 
 void FiberContainer::update_stokeslets(double eta) {
     // FIXME: Remove default arguments for stokeslets
-    for (auto &fib : fibers)
+    for (auto &fib : *this)
         fib.update_stokeslet(eta);
 }
 
 void FiberContainer::update_linear_operators(double dt, double eta) {
-    for (auto &fib : fibers)
+    for (auto &fib : *this)
         fib.update_linear_operator(dt, eta);
 }
 
 VectorXd FiberContainer::apply_preconditioner(VectorRef &x_all) const {
     VectorXd y(x_all.size());
     size_t offset = 0;
-    for (auto &fib : fibers) {
+    for (auto &fib : *this) {
         y.segment(offset, 4 * fib.n_nodes_) = fib.A_LU_.solve(x_all.segment(offset, 4 * fib.n_nodes_));
         offset += 4 * fib.n_nodes_;
     }
@@ -606,7 +606,7 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
 
     size_t offset = 0;
     int i_fib = 0;
-    for (const auto &fib : fibers) {
+    for (const auto &fib : *this) {
         auto &mats = fib.matrices_.at(fib.n_nodes_);
         const int np = fib.n_nodes_;
         const int bc_start_i = 4 * np - 14;
@@ -652,7 +652,7 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
 VectorXd FiberContainer::get_RHS() const {
     Eigen::VectorXd RHS(get_local_solution_size());
     int offset = 0;
-    for (const auto &fib : fibers) {
+    for (const auto &fib : *this) {
         RHS.segment(offset, fib.RHS_.size()) = fib.RHS_;
         offset += fib.RHS_.size();
     }
@@ -665,7 +665,7 @@ MatrixXd FiberContainer::get_local_node_positions() const {
     MatrixXd r(3, n_pts_tot);
     size_t offset = 0;
 
-    for (const auto &fib : fibers) {
+    for (const auto &fib : *this) {
         for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt) {
             for (int i = 0; i < 3; ++i) {
                 r(i, i_pt + offset) = fib.x_(i, i_pt);
@@ -689,7 +689,7 @@ MatrixXd FiberContainer::flow(const MatrixRef &r_trg, const MatrixRef &fib_force
     MatrixXd r_src = get_local_node_positions();
     size_t offset = 0;
 
-    for (const auto &fib : fibers) {
+    for (const auto &fib : *this) {
         const ArrayXd &weights = 0.5 * fib.length_ * fib.matrices_.at(fib.n_nodes_).weights_0;
 
         for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt)
@@ -708,7 +708,7 @@ MatrixXd FiberContainer::flow(const MatrixRef &r_trg, const MatrixRef &fib_force
     // Subtract self term
     offset = 0;
     if (subtract_self) {
-        for (const auto &fib : fibers) {
+        for (const auto &fib : *this) {
             VectorMap wf_flat(weighted_forces.data() + offset * 3, fib.n_nodes_ * 3);
             VectorMap vel_flat(vel.data() + offset * 3, fib.n_nodes_ * 3);
             vel_flat -= fib.stokeslet_ * wf_flat;
@@ -724,7 +724,7 @@ MatrixXd FiberContainer::generate_constant_force() const {
     const int n_fib_pts = get_local_node_count();
     MatrixXd f(3, n_fib_pts);
     size_t offset = 0;
-    for (const auto &fib : fibers) {
+    for (const auto &fib : *this) {
         f.block(0, offset, 3, fib.n_nodes_) = fib.force_scale_ * fib.xs_;
         offset += fib.n_nodes_;
     }
@@ -735,7 +735,7 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
     MatrixXd fw(3, x_all.size() / 4);
 
     size_t offset = 0;
-    for (const auto &fib : fibers) {
+    for (const auto &fib : *this) {
         const int np = fib.n_nodes_;
         Eigen::VectorXd force_fibers = fib.force_operator_ * x_all.segment(offset * 4, np * 4);
         fw.block(0, offset, 1, np) = force_fibers.segment(0 * np, np).transpose();
@@ -749,7 +749,7 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
 }
 
 void FiberContainer::update_cache_variables(double dt, double eta) {
-    for (auto &fib : fibers) {
+    for (auto &fib : *this) {
         fib.update_constants(eta);
         fib.update_derivatives();
         fib.update_stokeslet(eta);
@@ -760,7 +760,7 @@ void FiberContainer::update_cache_variables(double dt, double eta) {
 
 void FiberContainer::update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
     size_t offset = 0;
-    for (auto &fib : fibers) {
+    for (auto &fib : *this) {
         fib.update_RHS(dt, v_on_fibers.block(0, offset, 3, fib.n_nodes_),
                        f_on_fibers.block(0, offset, 3, fib.n_nodes_));
         offset += fib.n_nodes_;
@@ -769,7 +769,7 @@ void FiberContainer::update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_
 
 void FiberContainer::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
     size_t offset = 0;
-    for (auto &fib : fibers) {
+    for (auto &fib : *this) {
         fib.apply_bc_rectangular(dt, v_on_fibers.block(0, offset, 3, fib.n_nodes_),
                                  f_on_fibers.block(0, offset, 3, fib.n_nodes_));
         // FIXME: preconditioner update probably shouldn't be here. think of how to organize it with other cache
@@ -783,7 +783,7 @@ void FiberContainer::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, Mat
 /// @param[in] fiber_sol [4 x n_nodes_tot] fiber solution vector
 void FiberContainer::step(VectorRef &fiber_sol) {
     size_t offset = 0;
-    for (auto &fib : fibers) {
+    for (auto &fib : *this) {
         for (int i = 0; i < 3; ++i) {
             fib.x_.row(i) = fiber_sol.segment(offset, fib.n_nodes_);
             offset += fib.n_nodes_;
@@ -798,7 +798,7 @@ void FiberContainer::step(VectorRef &fiber_sol) {
 /// Updates: [fibers].x_
 /// @param[in] bodies BodyContainer object that contains fiber binding sites
 void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
-    for (auto &fib : fibers) {
+    for (auto &fib : *this) {
         if (fib.binding_site_.first >= 0) {
             Eigen::Vector3d delta =
                 bodies.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);

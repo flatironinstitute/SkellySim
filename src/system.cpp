@@ -653,7 +653,7 @@ void VelocityField::compute() {
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
     if (params_.periphery_interaction_flag) {
         int i_fib = 0;
-        for (const auto &fib : fc_.fibers) {
+        for (const auto &fib : fc_) {
             f_on_fibers.col(i_fib) += shell_->fiber_interaction(fib, fp);
             i_fib++;
         }
