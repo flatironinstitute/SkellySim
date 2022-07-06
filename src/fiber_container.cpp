@@ -294,7 +294,7 @@ void FiberContainer::capture_links(LinkContainer &sites) {
     std::vector<site_fiber_pair> local_pairs;
     for (const auto &fib : *this)
         for (auto &i_site : sites.active())
-            if (fib.overlaps_with_sphere(sites[i_site], sites.capture_radius_))
+            if (fib.overlaps_with_sphere(sites[i_site].pos, sites.capture_radius_))
                 local_pairs.push_back({i_site, world_rank_, &fib - &fibers[0]});
 
     // Join all rank-local site-fiber pairs into a global list

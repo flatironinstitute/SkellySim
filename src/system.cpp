@@ -334,10 +334,6 @@ void resume_from_trajectory(std::string input_file) {
 /// Ordering is [fib1.nodes.x, fib1.nodes.y, fib1.nodes.z, fib1.T, fib2.nodes.x, ...]
 /// @param[in] x_bodies entire body component of the solution vector (deformable+rigid)
 Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, VectorRef &x_bodies) {
-    using Eigen::ArrayXXd;
-    using Eigen::MatrixXd;
-    using Eigen::Vector3d;
-
     auto &fc = fc_;
     auto &bc = bc_;
 
@@ -355,7 +351,7 @@ Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, Vecto
     for (auto &body : bc.spherical_bodies)
         body->force_torque_.setZero();
 
-    for (const auto &fib : fc.fibers) {
+    for (const auto &fib : fc) {
         const auto &fib_mats = fib.matrices_.at(fib.n_nodes_);
         const int n_pts = fib.n_nodes_;
 

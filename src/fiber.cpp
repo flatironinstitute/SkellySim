@@ -63,7 +63,7 @@ void Fiber::attach_to_link(const int i_link, const LinkContainer &links) {
     double pos = 0;
     double min_dist = std::numeric_limits<double>::max();
     for (int i_seg = 0; i_seg < n_nodes_ - 1; ++i_seg) {
-        auto [dist, mu] = utils::min_distance_point_segment(links[i_link], x_.col(i_seg), x_.col(i_seg + 1));
+        auto [dist, mu] = utils::min_distance_point_segment(links[i_link].pos, x_.col(i_seg), x_.col(i_seg + 1));
         if (dist < min_dist) {
             segment = i_seg;
             pos = mu;

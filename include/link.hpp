@@ -1,11 +1,18 @@
 #ifndef LINK_HPP
 #define LINK_HPP
 
-#include "fiber.hpp"
 #include <skelly_sim.hpp>
 
 #include <stdexcept>
 #include <vector>
+
+class FiberContainer;
+
+struct Link {
+    enum Type : uint8_t { Fixed, Body, Fiber };
+    Vector3d pos;
+    std::pair<Type, Type> type;
+};
 
 class LinkContainer {
   private:
@@ -38,12 +45,12 @@ class LinkContainer {
 
     const int n_inactive() const { return inactive_.size(); }
     const int n_active() const { return active_.size(); }
-    const int size() const { return pos_.cols(); }
+    const int size() const { return links.size(); }
 
     const sublist &inactive() const { return inactive_; }
     const sublist &active() const { return active_; }
 
-    const Eigen::Vector3d operator[](std::size_t index) const { return pos_.col(index); }
+    const Link operator[](std::size_t index) const { return links[index]; }
 
     void kmc_step(const double &dt);
 
@@ -51,7 +58,7 @@ class LinkContainer {
     int mpi_rank_;
     int mpi_size_ = -1;
 
-    Eigen::Matrix3Xd pos_;
+    std::vector<Link> links;
     sublist inactive_;
     sublist active_;
 

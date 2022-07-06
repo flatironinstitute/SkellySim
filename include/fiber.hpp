@@ -122,6 +122,7 @@ class Fiber {
         update_constants(eta);
     };
 
+    /// TODO: Make inactive links :)
     bool active() const { return true; }
 
     ///< @brief Set some default values and resize arrays

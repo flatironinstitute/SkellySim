@@ -3,6 +3,7 @@
 #include <fiber.hpp>
 #include <link.hpp>
 #include <rng.hpp>
+#include <utility>
 #include <utils.hpp>
 
 #include <stdexcept>
@@ -95,11 +96,9 @@ void LinkContainer::deactivate(const std::size_t &active_index) {
 void LinkContainer::insert(const toml::value &link_config) {
     Eigen::Vector3d x = Eigen::Map<Eigen::Vector3d>(toml::find<std::vector<double>>(link_config, "x").data());
 
-    std::size_t link_index = pos_.cols();
-    pos_.conservativeResize(Eigen::NoChange, link_index + 1);
-    pos_.col(link_index) = x;
+    links.push_back({.pos = x, .type = std::make_pair(Link::Fixed, Link::Fiber)});
+    inactive_.push_back(this->size());
 
-    inactive_.push_back(link_index);
     int state = toml::find_or<int>(link_config, "state", 0);
     if (state > 1 || state < 0)
         throw std::runtime_error("Invalid link state \"" + std::to_string(state) + ".\n");
@@ -107,5 +106,5 @@ void LinkContainer::insert(const toml::value &link_config) {
     if (state == 1)
         activate(inactive_.size() - 1);
 
-    spdlog::debug("Inserted link {} with position ({}, {}, {}) and state {}.", link_index, x[0], x[1], x[2], state);
+    spdlog::debug("Inserted link {} with position ({}, {}, {}) and state {}.", this->size(), x[0], x[1], x[2], state);
 }
