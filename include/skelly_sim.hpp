@@ -21,15 +21,22 @@
 
 #include <spdlog/spdlog.h>
 
-typedef Eigen::Map<Eigen::VectorXd> VectorMap;
-typedef Eigen::Map<const Eigen::VectorXd> CVectorMap;
-typedef Eigen::Map<Eigen::ArrayXd> ArrayMap;
-typedef Eigen::Map<const Eigen::ArrayXd> CArrayMap;
+using Eigen::ArrayXd;
+using Eigen::ArrayXXd;
+using Eigen::MatrixXd;
+using Eigen::Vector3d;
+using Eigen::VectorXd;
+
+typedef Eigen::Map<VectorXd> VectorMap;
+typedef Eigen::Map<const VectorXd> CVectorMap;
+typedef Eigen::Map<ArrayXd> ArrayMap;
+typedef Eigen::Map<const ArrayXd> CArrayMap;
 typedef Eigen::Map<Eigen::MatrixXd> MatrixMap;
-typedef Eigen::Map<const Eigen::MatrixXd> CMatrixMap;
-typedef const Eigen::Ref<const Eigen::ArrayXd> ArrayRef;
-typedef const Eigen::Ref<const Eigen::VectorXd> VectorRef;
-typedef const Eigen::Ref<const Eigen::MatrixXd> MatrixRef;
+typedef Eigen::Map<const MatrixXd> CMatrixMap;
+typedef const Eigen::Ref<const ArrayXd> ArrayRef;
+typedef const Eigen::Ref<const VectorXd> VectorRef;
+typedef const Eigen::Ref<const MatrixXd> MatrixRef;
+
 
 /// Struct of parameters for exponentially decaying fiber-periphery interaction
 typedef struct {
