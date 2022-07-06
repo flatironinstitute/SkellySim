@@ -98,6 +98,10 @@ add_executable(skelly_sim src/skelly_sim.cpp)
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
+if(SKELLY_TIME_BUILD)
+  set_property(TARGET skelly_sim PROPERTY RULE_LAUNCH_COMPILE "${CMAKE_COMMAND} -E time")
+endif()
+
 
 configure_file(module_template.in module)
 
