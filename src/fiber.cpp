@@ -516,36 +516,6 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     }
 }
 
-/// @brief Return resampling matrix P_{N,-m}.
-/// @param[in] x [N] vector of points x_k.
-/// @param[in] y [N-m] vector
-/// @return Resampling matrix P_{N, -m}
-MatrixXd barycentric_matrix(ArrayRef &x, ArrayRef &y) {
-    int N = x.size();
-    int M = y.size();
-
-    ArrayXd w = ArrayXd::Ones(N);
-    for (int i = 1; i < N; i += 2)
-        w(i) = -1.0;
-    w(0) = 0.5;
-    w(N - 1) = -0.5 * std::pow(-1, N);
-
-    MatrixXd P = MatrixXd::Zero(M, N);
-    for (int j = 0; j < M; ++j) {
-        double S = 0.0;
-        for (int k = 0; k < N; ++k) {
-            S += w(k) / (y(j) - x(k));
-        }
-        for (int k = 0; k < N; ++k) {
-            if (std::fabs(y(j) - x(k)) > std::numeric_limits<double>::epsilon())
-                P(j, k) = w(k) / (y(j) - x(k)) / S;
-            else
-                P(j, k) = 1.0;
-        }
-    }
-    return P;
-}
-
 /// @brief Helper function to initialize Fiber::matrices_
 /// @tparam n_nodes_finite_diff Number of neighboring points to use in finite difference approximation
 /// @return map of Fiber::fib_mat_t initialized for various numbers of points, where the key will be Fiber::n_nodes_
@@ -572,8 +542,8 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices(int n_nodes_finite_di
         mats.D_3_0 = utils::finite_diff(mats.alpha, 3, n_nodes_finite_diff + 3).transpose();
         mats.D_4_0 = utils::finite_diff(mats.alpha, 4, n_nodes_finite_diff + 4).transpose();
 
-        mats.P_X = barycentric_matrix(mats.alpha, mats.alpha_roots);
-        mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
+        mats.P_X = utils::barycentric_matrix(mats.alpha, mats.alpha_roots);
+        mats.P_T = utils::barycentric_matrix(mats.alpha, mats.alpha_tension);
 
         mats.weights_0 = ArrayXd::Ones(mats.alpha.size()) * 2.0;
         mats.weights_0(0) = 1.0;
