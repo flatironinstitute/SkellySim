@@ -9,6 +9,8 @@
 #define GIT_COMMIT "<undefined commit>"
 #endif
 
+#include <vector>
+
 #include <toml.hpp>
 
 #include <msgpack.hpp>
@@ -30,7 +32,7 @@ typedef const Eigen::Ref<const Eigen::VectorXd> VectorRef;
 typedef const Eigen::Ref<const Eigen::MatrixXd> MatrixRef;
 
 /// Struct of parameters for exponentially decaying fiber-periphery interaction
-typedef struct  {
+typedef struct {
     double f_0; ///< strength of interaction
     double l_0; ///< characteristic length of interaction
 } fiber_periphery_interaction_t;
@@ -39,6 +41,47 @@ class Fiber;
 struct global_fiber_pointer {
     int rank;
     Fiber *fib;
+};
+
+template <class T>
+struct ActiveIterator {
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = T;
+    using pointer = value_type *;
+    using reference = value_type &;
+
+    ActiveIterator(int index, std::vector<T> &objs) : m_index(index), container_ref(objs) {
+        while (m_index < container_ref.size() && !container_ref[m_index].active()) {
+            m_index++;
+        }
+    }
+
+    reference operator*() const { return container_ref[m_index]; }
+    pointer operator->() { return &container_ref[m_index]; }
+
+    // Prefix increment
+    ActiveIterator &operator++() {
+        do {
+            m_index++;
+        } while (m_index < container_ref.size() && !container_ref[m_index].active());
+
+        return *this;
+    }
+
+    // Postfix increment
+    ActiveIterator operator++(int) {
+        ActiveIterator tmp = *this;
+        ++(*this);
+        return tmp;
+    }
+
+    friend bool operator==(const ActiveIterator &a, const ActiveIterator &b) { return a.m_index == b.m_index; };
+    friend bool operator!=(const ActiveIterator &a, const ActiveIterator &b) { return a.m_index != b.m_index; };
+
+  private:
+    int m_index;
+    std::vector<T> &container_ref;
 };
 
 #endif

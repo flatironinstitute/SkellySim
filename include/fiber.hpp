@@ -122,6 +122,8 @@ class Fiber {
         update_constants(eta);
     };
 
+    bool active() const { return true; }
+
     ///< @brief Set some default values and resize arrays
     ///
     ///< _MUST_ be called from constructors.
@@ -199,7 +201,7 @@ MSGPACK_ADD_ENUM(Fiber::BC);
 /// is ill-advised.
 class FiberContainer {
   public:
-    std::list<Fiber> fibers; ///< Array of fibers local to this MPI rank
+    std::vector<Fiber> fibers; ///< Array of fibers local to this MPI rank
     /// pointer to FMM object (pointer to avoid constructing stokeslet_kernel_ with default FiberContainer)
     kernels::Evaluator stokeslet_kernel_;
 
@@ -248,6 +250,14 @@ class FiberContainer {
     void capture_links(LinkContainer &links);
 
     void update_boundary_conditions(Periphery &shell, bool periphery_binding_flag);
+
+    ActiveIterator<Fiber> begin() { return ActiveIterator<Fiber>(0, fibers); }
+    ActiveIterator<Fiber> end() { return ActiveIterator<Fiber>(fibers.size(), fibers); }
+
+    ActiveIterator<Fiber> begin() const { return ActiveIterator<Fiber>(0, const_cast<decltype(fibers) &>(fibers)); }
+    ActiveIterator<Fiber> end() const {
+        return ActiveIterator<Fiber>(fibers.size(), const_cast<decltype(fibers) &>(fibers));
+    }
 
   private:
     int world_size_ = -1;
