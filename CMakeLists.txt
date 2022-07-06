@@ -102,7 +102,6 @@ if(SKELLY_TIME_BUILD)
   set_property(TARGET skelly_sim PROPERTY RULE_LAUNCH_COMPILE "${CMAKE_COMMAND} -E time")
 endif()
 
-
 configure_file(module_template.in module)
 
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/paraview
