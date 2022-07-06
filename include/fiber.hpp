@@ -240,6 +240,8 @@ class FiberContainer {
 
     int get_global_count() const;
 
+    Fiber &at(int i) { return fibers[i]; }
+
     Eigen::MatrixXd generate_constant_force() const;
     Eigen::MatrixXd get_local_node_positions() const;
     Eigen::VectorXd get_RHS() const;

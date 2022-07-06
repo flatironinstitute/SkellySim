@@ -40,7 +40,7 @@ typedef struct {
 class Fiber;
 struct global_fiber_pointer {
     int rank;
-    Fiber *fib;
+    long fib;
 };
 
 template <class T>

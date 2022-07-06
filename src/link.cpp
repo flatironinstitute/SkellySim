@@ -1,8 +1,8 @@
 #include <functional>
 
 #include <fiber.hpp>
-#include <rng.hpp>
 #include <link.hpp>
+#include <rng.hpp>
 #include <utils.hpp>
 
 #include <stdexcept>
@@ -28,10 +28,10 @@ LinkContainer::LinkContainer(toml::value &link_group_table) {
     attached_.resize(this->size());
 }
 
-void LinkContainer::sync_attachments() {
+void LinkContainer::sync_attachments(FiberContainer &fc) {
     auto global_attachment_queue = utils::allgatherv(attachment_queue_);
     for (const auto &el : global_attachment_queue)
-        attach(el.first, el.second);
+        attach(el.first, el.second, fc);
     attachment_queue_.clear();
 }
 
@@ -47,10 +47,10 @@ void LinkContainer::kmc_step(const double &dt) {
         deactivate(uniform_int_unsplit(0, n_active()));
 }
 
-void LinkContainer::attach(const std::size_t &link_id, const global_fiber_pointer &p) {
+void LinkContainer::attach(const std::size_t &link_id, const global_fiber_pointer &p, FiberContainer &fc) {
     attached_[link_id] = p;
     if (mpi_rank_ == p.rank)
-        p.fib->attach_to_link(link_id, *this);
+        fc.at(p.fib).attach_to_link(link_id, *this);
 
     for (int i = 0; i < detached_.size(); ++i) {
         if (detached_[i] == link_id) {
@@ -65,12 +65,12 @@ void LinkContainer::attach(const std::size_t &link_id, const global_fiber_pointe
     throw std::runtime_error("link_id error");
 }
 
-void LinkContainer::detach(const std::size_t &link_id) {
+void LinkContainer::detach(const std::size_t &link_id, FiberContainer &fc) {
     auto &link = attached_[link_id];
     if (link.rank == mpi_rank_)
-        link.fib->detach_from_link(link_id);
+        fc.at(link.fib).detach_from_link(link_id);
 
-    attached_[link_id] = {.rank = 0, .fib = nullptr};
+    attached_[link_id] = {.rank = 0, .fib = -1};
     detached_.push_back(link_id);
 }
 
@@ -81,7 +81,7 @@ void LinkContainer::activate(const std::size_t &inactive_index) {
 
 void LinkContainer::deactivate(const std::size_t &active_index) {
     const int link = active_[active_index];
-    attached_[link] = {.rank = 0, .fib = nullptr};
+    attached_[link] = {.rank = 0, .fib = -1};
     swap_state(active_index, active_, inactive_);
     for (int i = 0; i < detached_.size(); ++i) {
         if (detached_[i] == link) {

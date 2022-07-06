@@ -1,6 +1,7 @@
 #ifndef LINK_HPP
 #define LINK_HPP
 
+#include "fiber.hpp"
 #include <skelly_sim.hpp>
 
 #include <stdexcept>
@@ -30,7 +31,7 @@ class LinkContainer {
     void queue_for_attachment(const std::pair<std::size_t, global_fiber_pointer> &pair) {
         attachment_queue_.push_back(pair);
     }
-    void sync_attachments();
+    void sync_attachments(FiberContainer &fc);
     void activate(const std::size_t &inactive_index);
 
     void deactivate(const std::size_t &active_index);
@@ -59,8 +60,8 @@ class LinkContainer {
     sublist detached_;
     std::vector<std::pair<std::size_t, global_fiber_pointer>> attachment_queue_;
 
-    void attach(const std::size_t &link_id, const global_fiber_pointer &p);
-    void detach(const std::size_t &link_id);
+    void attach(const std::size_t &link_id, const global_fiber_pointer &p, FiberContainer &fc);
+    void detach(const std::size_t &link_id, FiberContainer &fc);
 };
 
 #endif

@@ -851,7 +851,7 @@ void FiberContainer::capture_links(LinkContainer &sites) {
     struct site_fiber_pair {
         unsigned int site_id;
         int rank;
-        Fiber *fib;
+        long fib;
     };
 
     // Find all potential site-fiber pairs for each site on this rank
@@ -859,7 +859,7 @@ void FiberContainer::capture_links(LinkContainer &sites) {
     for (const auto &fib : *this)
         for (auto &i_site : sites.active())
             if (fib.overlaps_with_sphere(sites[i_site], sites.capture_radius_))
-                local_pairs.push_back({i_site, world_rank_, const_cast<Fiber *>(&fib)});
+                local_pairs.push_back({i_site, world_rank_, &fib - &fibers[0]});
 
     // Join all rank-local site-fiber pairs into a global list
     const auto global_pairs = utils::allgatherv(local_pairs);
@@ -880,7 +880,7 @@ void FiberContainer::capture_links(LinkContainer &sites) {
         if (world_rank_ == neighbs[fib_index].rank)
             sites.queue_for_attachment(std::make_pair(site_id, neighbs[fib_index]));
     }
-    sites.sync_attachments();
+    sites.sync_attachments(*this);
 }
 
 FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
