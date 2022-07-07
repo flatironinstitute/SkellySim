@@ -244,24 +244,24 @@ def _default_quaternion():
 
 
 @dataclass
-class Link():
+class PointFiberLink():
     """dataclass for a point force/torque source
 
     Attributes
     ----------
     x : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
         Position of the link (x,y,z)
-    capture_radius : float, default: :obj:`0.5`
-        Distance between a sphere and fiber where attachment is possible
-    state : int, default: :obj:`0`
-        State the link is in. 0: inactive, 1: active, 2: bound
+    active : bool, default: :obj:`True`
+        Is site actually active, or placeholder?
     """
     x: List[float] = field(default_factory=_default_vector)
-    state: int = 0
+    active: bool = True
+    fiber_id : int = -1
+    fiber_pos : float = 0.0
 
 
 @dataclass
-class LinkGroup():
+class PointFiberLinkGroup():
     """dataclass container of links with fixed properties
 
     Attributes
@@ -274,14 +274,39 @@ class LinkGroup():
         Probability per unit time for a single deactivated link to activate
     k_off : float, default: :obj:`0.0`
         Probability per unit time for a single activated link to deactivate
-    state : int, default: :obj:`0`
-        State the link is in. 0: inactive, 1: active, 2: bound
     """
-    links: List[Link] = field(default_factory=list)
+    links: List[PointFiberLink] = field(default_factory=list)
     capture_radius : float = 0.5
     k_on : float = 0.0
     k_off : float = 0.0
-    state: int = 0
+
+
+@dataclass
+class BodyFiberLink():
+    """dataclass for a point force/torque source
+
+    Attributes
+    ----------
+    x : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
+        Position of the link (x,y,z)
+    """
+    x: List[float] = field(default_factory=_default_vector)
+    body_id: int = 0
+    fiber_id: int = -1
+    fiber_pos: float = 0.0
+
+
+@dataclass
+class BodyFiberLinkGroup():
+    """dataclass container of links with fixed properties
+
+    Attributes
+    ----------
+    links : List[Link], default: :obj:`[]`
+        List of links belonging to this group
+    """
+    links: List[BodyFiberLink] = field(default_factory=list)
+    nucleation_rate : float = 0.0
 
 
 @dataclass
@@ -336,8 +361,7 @@ class Fiber():
         normal : np.array
             normalized vector of fiber orientation
         """
-        fiber_positions = x0 + \
-            self.length * np.linspace(0, normal, self.n_nodes)
+        fiber_positions = x0 + self.length * np.linspace(0, normal, self.n_nodes)
         self.x = fiber_positions.ravel().tolist()
 
 
@@ -879,7 +903,8 @@ class Config():
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
-    link_groups: List[LinkGroup] = field(default_factory=list)
+    point_fiber_link_groups: List[PointFiberLinkGroup] = field(default_factory=list)
+    body_fiber_link_groups: List[BodyFiberLinkGroup] = field(default_factory=list)
 
     def plot_fibers(self, backend: str = "TKAgg"):
         """

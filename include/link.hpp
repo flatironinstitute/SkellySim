@@ -3,19 +3,16 @@
 
 #include <skelly_sim.hpp>
 
-#include <stdexcept>
 #include <vector>
 
 class FiberContainer;
 
 struct Link {
-    enum Type : uint8_t { Fixed, Body, Fiber };
     Vector3d pos;
-    std::pair<Type, Type> type;
 };
 
 class LinkContainer {
-  private:
+  protected:
     using sublist = std::vector<unsigned int>;
     void swap_state(const std::size_t &index, sublist &from, sublist &to) {
         std::size_t link_index = from[index];
@@ -25,10 +22,9 @@ class LinkContainer {
     }
 
   public:
-    double capture_radius_ = 0.5; // FIXME: need different constructor to specify SC types
-    double k_on_ = 0.1;           // FIXME: need different constructor to specify SC types
-    double k_off_ = 0.1;          // FIXME: need different constructor to specify SC types
-    double rest_length_ = 0.0;
+    double capture_radius_ = 0.5;
+    double k_on_ = 0.1;
+    double k_off_ = 0.1;
 
     void insert(const toml::value &link_config);
 
@@ -54,7 +50,7 @@ class LinkContainer {
 
     void kmc_step(const double &dt);
 
-  private:
+  protected:
     int mpi_rank_;
     int mpi_size_ = -1;
 
@@ -69,6 +65,18 @@ class LinkContainer {
 
     void attach(const std::size_t &link_id, const global_fiber_pointer &p, FiberContainer &fc);
     void detach(const std::size_t &link_id, FiberContainer &fc);
+};
+
+class BodyFiberLinkContainer : public LinkContainer {
+  public:
+    BodyFiberLinkContainer() = default;
+    BodyFiberLinkContainer(toml::value &link_group_table) : LinkContainer(link_group_table){};
+};
+
+class PointFiberLinkContainer : public LinkContainer {
+  public:
+    PointFiberLinkContainer() = default;
+    PointFiberLinkContainer(toml::value &link_group_table) : LinkContainer(link_group_table){};
 };
 
 #endif

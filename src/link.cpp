@@ -1,13 +1,13 @@
+#include <cstdint>
 #include <functional>
+#include <stdexcept>
+#include <string>
 
 #include <fiber.hpp>
 #include <link.hpp>
 #include <rng.hpp>
 #include <utility>
 #include <utils.hpp>
-
-#include <stdexcept>
-#include <string>
 
 #include <mpi.h>
 #include <spdlog/spdlog.h>
@@ -96,15 +96,13 @@ void LinkContainer::deactivate(const std::size_t &active_index) {
 void LinkContainer::insert(const toml::value &link_config) {
     Eigen::Vector3d x = Eigen::Map<Eigen::Vector3d>(toml::find<std::vector<double>>(link_config, "x").data());
 
-    links.push_back({.pos = x, .type = std::make_pair(Link::Fixed, Link::Fiber)});
+    links.push_back({.pos = x});
     inactive_.push_back(this->size());
 
-    int state = toml::find_or<int>(link_config, "state", 0);
-    if (state > 1 || state < 0)
-        throw std::runtime_error("Invalid link state \"" + std::to_string(state) + ".\n");
-
-    if (state == 1)
+    bool active = toml::find_or<bool>(link_config, "active", false);
+    if (active)
         activate(inactive_.size() - 1);
 
-    spdlog::debug("Inserted link {} with position ({}, {}, {}) and state {}.", this->size(), x[0], x[1], x[2], state);
+    spdlog::debug("Inserted {} link {} with position ({}, {}, {}).", active ? "active" : "inactive", this->size(), x[0],
+                  x[1], x[2], active);
 }

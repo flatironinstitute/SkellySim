@@ -27,13 +27,14 @@
 #include <spdlog/spdlog.h>
 
 namespace System {
-Params params_;                    ///< Simulation input parameters
-FiberContainer fc_;                ///< Fibers
-BodyContainer bc_;                 ///< Bodies
-PointSourceContainer psc_;         ///< Point Sources
-std::vector<LinkContainer> scs_;   ///< Dynamic attachment links
-std::unique_ptr<Periphery> shell_; ///< Periphery
-std::vector<PointSource> points_;  ///< External point sources
+Params params_;                              ///< Simulation input parameters
+FiberContainer fc_;                          ///< Fibers
+BodyContainer bc_;                           ///< Bodies
+PointSourceContainer psc_;                   ///< Point Sources
+std::vector<BodyFiberLinkContainer> bflcs_;  ///< Body-Fiber connectors
+std::vector<PointFiberLinkContainer> pflcs_; ///< Point-Fiber connectors
+std::unique_ptr<Periphery> shell_;           ///< Periphery
+std::vector<PointSource> points_;            ///< External point sources
 
 Eigen::VectorXd curr_solution_;
 std::ofstream ofs_;    ///< Trajectory output file stream. Opened at initialization
@@ -943,7 +944,7 @@ void restore() {
 void run() {
     Params &params = params_;
 
-    for (auto &sc : scs_) {
+    for (auto &sc : pflcs_) {
         sc.kmc_step(params_.dt_initial);
         fc_.capture_links(sc);
     }
@@ -1117,10 +1118,13 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
     if (param_table_.contains("point_sources"))
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
 
-    if (param_table_.contains("link_groups")) {
-        for (auto &group_table : param_table_.at("link_groups").as_array())
-            scs_.push_back(LinkContainer(group_table));
-    }
+    if (param_table_.contains("point_fiber_link_groups"))
+        for (auto &group_table : param_table_.at("point_fiber_link_groups").as_array())
+            pflcs_.push_back(PointFiberLinkContainer(group_table));
+
+    if (param_table_.contains("body_fiber_link_groups"))
+        for (auto &group_table : param_table_.at("body_fiber_link_groups").as_array())
+            bflcs_.push_back(BodyFiberLinkContainer(group_table));
 
     curr_solution_.resize(get_local_solution_size());
     std::string filename = "skelly_sim.out";
