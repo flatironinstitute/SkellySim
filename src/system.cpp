@@ -1,3 +1,4 @@
+#include <numeric>
 #include <skelly_sim.hpp>
 
 #include <rng.hpp>
@@ -746,13 +747,11 @@ void dynamic_instability() {
     if (params_.dynamic_instability.n_nodes == 0)
         return;
 
-    size_t n_sites = 0;
     std::vector<int> body_offsets(bc.bodies.size() + 1);
     int i_body = 0;
     // Build basically a cumulative distribution function of the number of binding sites over all the bodies
     // This allows for fast mapping of (body_index, site_index) <-> site_index_flat
     for (const auto &body : bc.bodies) {
-        n_sites += body->nucleation_sites_.cols();
         body_offsets[i_body + 1] = body_offsets[i_body] + body->nucleation_sites_.cols();
         i_body++;
     }
@@ -775,6 +774,8 @@ void dynamic_instability() {
 
     // Array of occupied sites across all bodies
     std::vector<uint8_t> occupied_flat(bc.get_global_site_count(), 0);
+
+    int n_fib_old = fc_.get_global_count();
     auto fib = fc.fibers.begin();
     while (fib != fc.fibers.end()) {
         fib->v_growth_ = params.dynamic_instability.v_growth;
@@ -800,59 +801,29 @@ void dynamic_instability() {
     MPI_Reduce(rank_ == 0 ? MPI_IN_PLACE : occupied_flat.data(), occupied_flat.data(), occupied_flat.size(), MPI_BYTE,
                MPI_LOR, 0, MPI_COMM_WORLD);
 
-    // Map of filled sites. active_sites[flat_index] = true. Could easily be a list
-    std::unordered_map<int, bool> active_sites;
     // Map of empty sites. inactive_sites[flat_index] = true. Use map for fast deletion when site is filled
     std::unordered_map<int, bool> inactive_sites;
     // Vector of (body_index, site_index) pairs that will have a new fiber attached to them
     std::vector<std::pair<int, int>> to_nucleate;
     if (rank_ == 0) {
         for (size_t i = 0; i < occupied_flat.size(); ++i) {
-            if (occupied_flat[i])
-                active_sites[i] = true;
-            else
+            if (!occupied_flat[i])
                 inactive_sites[i] = true;
         }
 
-        // FIXME: Is this right? I feel like the nucleation rate should be proportional to the
-        // sites, or the area, or something rather than a global parameter
-
         // Number of sites to nucleate this timestep
-        int n_to_nucleate = std::min(RNG::poisson_int(dt * params.dynamic_instability.nucleation_rate),
-                                     static_cast<int>(inactive_sites.size()));
-        int n_trials = 100;
-        while (n_to_nucleate && n_trials) {
+        int n_to_nucleate =
+            std::min(RNG::poisson_int(dt * params.dynamic_instability.nucleation_rate * inactive_sites.size()),
+                     static_cast<int>(inactive_sites.size()));
+
+        while (n_to_nucleate) {
             int passive_site_index =
                 std::next(inactive_sites.begin(), RNG::uniform_int(0, inactive_sites.size()))->first;
 
             auto [i_body, i_site] = binding_site_from_index(passive_site_index);
-            Eigen::Vector3d site_pos_i = bc.at(i_body).nucleation_sites_.col(i_site);
-            bool valid_site = true;
-            const double min_ds2 = pow(params.dynamic_instability.min_separation, 2);
-            // Reject if two sites are too close to one another on same body
-            for (auto &[active_site_index, dum] : active_sites) {
-                auto [j_body, j_site] = binding_site_from_index(active_site_index);
-                if (j_body != i_body)
-                    continue;
-                Eigen::Vector3d site_pos_j = bc.at(j_body).nucleation_sites_.col(j_site);
-
-                if ((site_pos_j - site_pos_i).squaredNorm() < min_ds2) {
-                    valid_site = false;
-                    break;
-                }
-            }
-
-            if (valid_site) {
-                // Found valid site. Update data structures
-                n_trials = 100;
-                active_sites[passive_site_index] = true;
-                inactive_sites.erase(passive_site_index);
-                to_nucleate.push_back({i_body, i_site});
-                n_to_nucleate--;
-            } else {
-                // Try again
-                n_trials--;
-            }
+            inactive_sites.erase(passive_site_index);
+            to_nucleate.push_back({i_body, i_site});
+            n_to_nucleate--;
         }
     }
 
@@ -861,6 +832,7 @@ void dynamic_instability() {
     // Total number of (current) fibers across ranks
     std::vector<int> fiber_counts(rank_ == 0 ? size_ : 0);
     MPI_Gather(&n_fibers, 1, MPI_INT, fiber_counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+    spdlog::info("Deleted {} fibers", n_fib_old - std::accumulate(fiber_counts.begin(), fiber_counts.end(), 0));
 
     // Structure to communicate new fibers to their ranks
     using fiber_struct = struct {
@@ -874,8 +846,6 @@ void dynamic_instability() {
     for (const auto &binding_site : to_nucleate) {
         const int fiber_rank = std::min_element(fiber_counts.begin(), fiber_counts.end()) - fiber_counts.begin();
         new_fibers.push_back({fiber_rank, binding_site});
-        spdlog::info("Queueing fiber insertion to rank {} to site [{}, {}]", fiber_rank, binding_site.first,
-                     binding_site.second);
         fiber_counts[fiber_rank]++;
     }
 
@@ -890,9 +860,8 @@ void dynamic_instability() {
     // Nucleate the fibers
     for (const auto &min_fib : new_fibers) {
         if (min_fib.rank == rank_) {
-            Fiber fib(params.dynamic_instability.n_nodes, params.dynamic_instability.bending_rigidity, params.eta);
-            fib.length_ = params.dynamic_instability.min_length;
-            fib.length_prev_ = params.dynamic_instability.min_length;
+            Fiber fib(params.dynamic_instability.n_nodes, params.dynamic_instability.radius,
+                      params.dynamic_instability.min_length, params.dynamic_instability.bending_rigidity, params.eta);
             fib.v_growth_ = 0.0;
             fib.binding_site_ = min_fib.binding_site;
 
@@ -906,10 +875,11 @@ void dynamic_instability() {
 
             fc.fibers.push_back(fib);
             spdlog::get("SkellySim global")
-                ->info("Inserted fiber on rank {} at site [{}, {}]", rank_, min_fib.binding_site.first,
-                       min_fib.binding_site.second);
+                ->debug("Inserted fiber on rank {} at site [{}, {}]", rank_, min_fib.binding_site.first,
+                        min_fib.binding_site.second);
         }
     }
+    spdlog::info("Nucleated {} fibers", new_fibers.size());
 }
 
 /// @brief Apply and return entire operator on system state vector for fibers/body/shell
@@ -1374,6 +1344,8 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
 
     if (param_table_.contains("fibers"))
         fc_ = FiberContainer(param_table_.at("fibers").as_array(), params_);
+    else
+        fc_ = FiberContainer(params_);
 
     if (param_table_.contains("periphery")) {
         const toml::value &periphery_table = param_table_.at("periphery");

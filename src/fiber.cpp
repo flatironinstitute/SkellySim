@@ -34,10 +34,6 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     std::vector<double> x_array = toml::find<std::vector<double>>(fiber_table, "x");
     n_nodes_ = x_array.size() / 3;
 
-    x_ = Eigen::Map<Eigen::ArrayXd>(x_array.data(), x_array.size());
-    x_.resize(3, n_nodes_);
-    tension_ = Eigen::VectorXd::Zero(n_nodes_);
-
     init(eta);
 
     bending_rigidity_ = toml::find<double>(fiber_table, "bending_rigidity");
@@ -807,7 +803,7 @@ void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
     }
 }
 
-FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
+FiberContainer::FiberContainer(Params &params) {
     spdlog::info("Initializing FiberContainer");
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
@@ -820,6 +816,10 @@ FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
                                                            stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
+}
+
+FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
+    *this = FiberContainer(params);
 
     const int n_fibs_tot = fiber_tables.size();
     const int n_fibs_extra = n_fibs_tot % world_size_;

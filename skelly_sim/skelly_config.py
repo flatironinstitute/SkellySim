@@ -319,6 +319,8 @@ class DynamicInstability():
         When a fiber hits a boundary, scale its catastrophe frequency (f_catastrophe) by this
     nucleation_rate : float, default: :obj:`0.0`, units: :obj:`s⁻¹`
         Fiber nucleation rate in units of MT nucleations / second
+    radius: float, default: :obj:`0.025`, units: :obj:`μm`
+        New fiber radius in microns
     min_length: float, default: :obj:`0.5`, units: :obj:`μm`
         New fiber initial length in microns
     bending_rigidity : float, default: :obj:`2.5E-3`, units: :obj:`pN·μm²`
@@ -332,6 +334,7 @@ class DynamicInstability():
     v_grow_collision_scale: float = 0.5
     f_catastrophe_collision_scale: float = 2.0
     nucleation_rate: float = 0.0
+    radius: float = 0.025
     min_length: float = 0.5
     bending_rigidity: float = 2.5E-3
     min_separation: float = 0.1
@@ -707,8 +710,6 @@ class Body():
 
     Attributes
     ----------
-    nucleation_type : str, default: :obj:`'auto'`
-        How nucleation sites are made (just leave as 'auto', which will place the nucleation site at the fiber minus end automatically)
     n_nucleation_sites : int, default: :obj:`0`
         Number of available Fiber sites on the body. Don't add more fibers than this to body
     position : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
@@ -728,7 +729,6 @@ class Body():
     external_force : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`pN`
         Lab frame external force applied to body - useful for testing things like stokes flow
     """
-    nucleation_type: str = 'auto'
     n_nucleation_sites: int = 0
     position: List[float] = field(default_factory=_default_vector)
     orientation: List[float] = field(default_factory=_default_quaternion)
@@ -737,8 +737,9 @@ class Body():
     n_nodes: int = 600
     precompute_file: str = 'body_precompute.npz'
     external_force: List[float] = field(default_factory=_default_vector)
-
-    def find_binding_site(self, fibers: List[Fiber], ds_min) -> Tuple[np.array, np.array]:
+    nucleation_sites: List[float] = field(default_factory=list)
+    
+    def find_binding_site(self, ds_min) -> Tuple[np.array, np.array]:
         """
         Find an open binding site given a list of Fibers that could interfere with binding
         Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
@@ -772,6 +773,46 @@ class Body():
             if accept:
                 return (x0, u0)
 
+
+    def generate_nucleation_sites(self, ds_min: float, verbose: bool = True):
+        """
+        Find an open binding site given a list of Fibers that could interfere with binding
+        Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
+        interacting with the periphery directly. The binding site is guaranteed to be further than the Euclidean distance ds_min from any
+        other Fiber minus end
+
+        Arguments
+        ---------
+        ds_min : float
+            Minimum allowable separation between a binding site and any fiber minus end
+
+        Returns
+        -------
+        tuple(np.array, np.array)
+            position vector and its normalized version
+        """
+        com = np.array(self.position)
+        ds_min2 = ds_min * ds_min
+
+        sites = np.empty((self.n_nucleation_sites, 3))
+        for isite in range(self.n_nucleation_sites):
+            while (True):
+                x0 = _get_random_point_on_sphere() * self.radius + com
+                accept = True
+                for jsite in range(isite):
+                    dx = x0 - sites[isite, :]
+                    if np.dot(dx, dx) < ds_min2:
+                        accept = False
+                        break
+                if accept:
+                    sites[isite, :] = x0
+                    if verbose:
+                        print("Inserting site {} at {}".format(isite, x0))
+                    break
+                
+        self.nucleation_sites = sites.flatten().tolist()
+
+            
     def move_fibers_to_surface(self, fibers: List[Fiber], ds_min: float, verbose: bool = True) -> None:
         """
         Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.

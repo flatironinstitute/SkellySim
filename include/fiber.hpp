@@ -101,9 +101,11 @@ class Fiber {
     ///
     /// @deprecated Initializing with a toml::table structure is the preferred initialization. This is only around for
     /// testing.
-    Fiber(int n_nodes, double bending_rigidity, double eta) : n_nodes_(n_nodes), bending_rigidity_(bending_rigidity) {
+    Fiber(int n_nodes, double radius, double length, double bending_rigidity, double eta)
+        : n_nodes_(n_nodes), radius_(radius), length_(length), bending_rigidity_(bending_rigidity) {
         init(eta);
         length_prev_ = length_;
+        update_constants(eta);
     };
 
     Fiber(const Fiber &old_fib, const double eta) {
@@ -122,6 +124,8 @@ class Fiber {
             x_ = Eigen::MatrixXd::Zero(3, n_nodes_);
             x_.row(0) = Eigen::ArrayXd::LinSpaced(n_nodes_, 0, 1.0).transpose();
         }
+        tension_ = Eigen::VectorXd::Zero(n_nodes_);
+
         xs_.resize(3, n_nodes_);
         xss_.resize(3, n_nodes_);
         xsss_.resize(3, n_nodes_);
@@ -145,11 +149,11 @@ class Fiber {
     bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
 #ifndef SKELLY_DEBUG
     MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
-                       beta_tstep_, binding_site_, tension_, x_);
+                       beta_tstep_, binding_site_, tension_, x_, minus_clamped_);
 #else
     MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
-                       beta_tstep_, binding_site_, tension_, x_, A_, RHS_, force_operator_, bc_minus_, bc_plus_, xs_,
-                       xss_, xsss_, xssss_, stokeslet_);
+                       beta_tstep_, binding_site_, tension_, x_, minus_clamped_, A_, RHS_, force_operator_, bc_minus_,
+                       bc_plus_, xs_, xss_, xsss_, xssss_, stokeslet_);
 #endif
 };
 
@@ -175,6 +179,7 @@ class FiberContainer {
     /// Empty container constructor to avoid initialization list complications. No way to
     /// initialize after using this constructor, so overwrite objects with full constructor.
     FiberContainer() = default;
+    FiberContainer(Params &params);
     FiberContainer(toml::array &fiber_tables, Params &params);
 
     void update_derivatives();

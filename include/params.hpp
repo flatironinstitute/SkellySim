@@ -29,6 +29,7 @@ class Params {
         double f_catastrophe_collision_scale;
         double nucleation_rate;
         double min_length;
+        double radius;
         double bending_rigidity;
         double min_separation;
     } dynamic_instability;

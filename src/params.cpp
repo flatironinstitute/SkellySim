@@ -30,6 +30,7 @@ Params::Params(toml::value &pt) {
             dynamic_instability.f_catastrophe_collision_scale =
                 toml::find(di, "f_catastrophe_collision_scale").as_floating();
             dynamic_instability.nucleation_rate = toml::find(di, "nucleation_rate").as_floating();
+            dynamic_instability.radius = toml::find(di, "radius").as_floating();
             dynamic_instability.min_length = toml::find(di, "min_length").as_floating();
             dynamic_instability.bending_rigidity = toml::find(di, "bending_rigidity").as_floating();
             dynamic_instability.min_separation = toml::find(di, "min_separation").as_floating();
