@@ -43,6 +43,7 @@ BodyContainer bc_bak_;    ///< Copy of bodies for timestep reversion
 int rank_;                ///< MPI rank
 int size_;                ///< MPI size
 toml::value param_table_; ///< Parsed input table
+bool resume_flag_;        ///< FIXME: Hack check if resuming or post-processing/initial run
 
 /// @brief Time varying system properties that are extrinsic to the physical objects
 struct {
@@ -280,7 +281,7 @@ class TrajectoryReader {
         for (const auto &min_fib : min_state.fibers.fibers) {
             if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1]) {
                 fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
-                fc_.fibers.back().minus_clamped_ = is_minus_clamped[i_fib];
+                fc_.fibers.back().minus_clamped_ = is_minus_clamped[i_fib - displs[rank_]];
             }
             i_fib++;
         }
@@ -292,16 +293,23 @@ class TrajectoryReader {
         for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
             bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
         output_map.rng_state = min_state.rng_state;
-        if (size_ > min_state.rng_state.size()) {
+        if (size_ > min_state.rng_state.size() && resume_flag_) {
             spdlog::error(
                 "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
             MPI_Finalize();
             exit(1);
-        } else if (size_ < min_state.rng_state.size() && !silence_output) {
+        } else if (size_ < min_state.rng_state.size() && !silence_output && resume_flag_) {
             spdlog::warn(
                 "Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
-                "the RNG. This isn't really a problem, but runs will not be exactly reproducable.");
+                "the RNG.");
         }
+        if (size_ != min_state.rng_state.size() && resume_flag_) {
+            spdlog::error(
+                "Different number MPI ranks provided than previous run for resume. This is currently broken.");
+            MPI_Finalize();
+            exit(1);
+        }
+
         RNG::init(output_map.rng_state[rank_]);
 
         int rank;
@@ -1342,6 +1350,7 @@ toml::value *get_param_table() { return &param_table_; }
 /// @param[in] input_file String of toml config file specifying system parameters and initial conditions
 /// @param[in] resume_flag true if simulation is resuming from prior execution state, false otherwise.
 void init(const std::string &input_file, bool resume_flag, bool post_process_flag) {
+    resume_flag_ = resume_flag;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
     signal(SIGINT, interrupt_handler);
