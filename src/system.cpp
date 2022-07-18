@@ -2,6 +2,7 @@
 
 #include <rng.hpp>
 
+#include <csignal>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -114,7 +115,7 @@ std::size_t get_local_solution_size() {
 }
 
 /// @brief Flush current simulation state to trajectory file(s)
-void write() {
+void write(std::ofstream &ofs = ofs_) {
     FiberContainer fc_global;
     BodyContainer bc_empty;
     BodyContainer &bc_global = (rank_ == 0) ? bc_ : bc_empty;
@@ -156,16 +157,31 @@ void write() {
                 fc_global.fibers.emplace_back(Fiber(min_fib, params_.eta));
 
             // FIXME: WRANGLE IN THAT SHELL.SOLUTION now
-            shell_global.solution_vec_.segment(shell_offset, min_state.shell.solution_vec_.size()) = min_state.shell.solution_vec_;
+            shell_global.solution_vec_.segment(shell_offset, min_state.shell.solution_vec_.size()) =
+                min_state.shell.solution_vec_;
             shell_offset += min_state.shell.solution_vec_.size();
 
             to_write.rng_state.push_back(min_state.rng_state[0]);
         }
 
-        msgpack::pack(ofs_, to_write);
-        ofs_.flush();
+        msgpack::pack(ofs, to_write);
+        ofs.flush();
     }
 }
+
+void write_initial() {
+    auto trajectory_open_mode = std::ofstream::binary | std::ofstream::out;
+    auto ofs = std::ofstream("skelly_sim.initial_config", trajectory_open_mode);
+    write(ofs);
+}
+
+void write_final() {
+    auto trajectory_open_mode = std::ofstream::binary | std::ofstream::out;
+    auto ofs = std::ofstream("skelly_sim.final_config", trajectory_open_mode);
+    write(ofs);
+}
+
+void interrupt_handler(int signum) { write_final(); }
 
 /// @brief Class representing a velocity field
 /// This allows for trivial dumping of the VF 'trajectory'
@@ -250,11 +266,22 @@ class TrajectoryReader {
 
         properties.time = min_state.time;
         properties.dt = min_state.dt;
+        std::vector<bool> is_minus_clamped;
+        // FIXME: Hack to work around not saving clamp state
+        if (!params_.dynamic_instability.n_nodes) {
+            for (auto &fib : fc_.fibers)
+                is_minus_clamped.push_back(fib.is_minus_clamped());
+        } else {
+            throw std::runtime_error("Resume is broken in this version of SkellySim with dynamic instability. :()");
+        }
+
         fc_.fibers.clear();
         int i_fib = 0;
         for (const auto &min_fib : min_state.fibers.fibers) {
-            if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1])
+            if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1]) {
                 fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
+                fc_.fibers.back().minus_clamped_ = is_minus_clamped[i_fib];
+            }
             i_fib++;
         }
 
@@ -1233,7 +1260,7 @@ void run() {
             properties.time += properties.dt;
             double &dt_write = params_.dt_write;
             if ((int)(properties.time / dt_write) > (int)((properties.time - properties.dt) / dt_write))
-                System::write();
+                write(ofs_);
         } else {
             spdlog::info("Rejecting timestep");
             System::restore();
@@ -1241,6 +1268,8 @@ void run() {
 
         spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
     }
+
+    write_final();
 }
 
 /// @brief Run the post processing step
@@ -1315,6 +1344,7 @@ toml::value *get_param_table() { return &param_table_; }
 void init(const std::string &input_file, bool resume_flag, bool post_process_flag) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
+    signal(SIGINT, interrupt_handler);
     spdlog::logger sink = rank_ == 0
                               ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
                               : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
@@ -1367,5 +1397,6 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
     if (post_process_flag && rank_ == 0)
         ofs_vf_ = std::ofstream("skelly_sim.vf", std::ofstream::binary | std::ofstream::out);
 
+    write_initial();
 }
 } // namespace System
