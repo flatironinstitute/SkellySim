@@ -780,6 +780,7 @@ void dynamic_instability() {
 
     int n_fib_old = fc_.get_global_count();
     auto fib = fc.fibers.begin();
+    int n_active_old_local = 0;
     while (fib != fc.fibers.end()) {
         fib->v_growth_ = params.dynamic_instability.v_growth;
         double f_cat = params.dynamic_instability.f_catastrophe;
@@ -787,6 +788,8 @@ void dynamic_instability() {
             fib->v_growth_ *= params.dynamic_instability.v_grow_collision_scale;
             f_cat *= params.dynamic_instability.f_catastrophe_collision_scale;
         }
+        if (fib->attached_to_body())
+            n_active_old_local++;
 
         // Remove fiber if catastrophe event
         if (RNG::uniform() > exp(-dt * f_cat)) {
@@ -799,6 +802,8 @@ void dynamic_instability() {
             fib++;
         }
     }
+    int n_active_old = 0;
+    MPI_Reduce(&n_active_old_local, &n_active_old, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
     // Let rank 0 know which sites are occupied
     MPI_Reduce(rank_ == 0 ? MPI_IN_PLACE : occupied_flat.data(), occupied_flat.data(), occupied_flat.size(), MPI_BYTE,
@@ -809,15 +814,13 @@ void dynamic_instability() {
     // Vector of (body_index, site_index) pairs that will have a new fiber attached to them
     std::vector<std::pair<int, int>> to_nucleate;
     if (rank_ == 0) {
-        for (size_t i = 0; i < occupied_flat.size(); ++i) {
+        for (size_t i = 0; i < occupied_flat.size(); ++i)
             if (!occupied_flat[i])
                 inactive_sites[i] = true;
-        }
 
-        // Number of sites to nucleate this timestep
-        int n_to_nucleate =
-            std::min(RNG::poisson_int(dt * params.dynamic_instability.nucleation_rate * inactive_sites.size()),
-                     static_cast<int>(inactive_sites.size()));
+        int n_inactive_old = occupied_flat.size() - n_active_old;
+        int n_to_nucleate = std::min(RNG::poisson_int(dt * params.dynamic_instability.nucleation_rate * n_inactive_old),
+                                     static_cast<int>(inactive_sites.size()));
 
         while (n_to_nucleate) {
             int passive_site_index =
