@@ -94,6 +94,8 @@ add_subdirectory(extern/trng4 EXCLUDE_FROM_ALL)
 
 add_executable(skelly_sim src/skelly_sim.cpp)
 
+add_subdirectory(tests)
+
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 

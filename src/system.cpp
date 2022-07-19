@@ -34,6 +34,13 @@ BodyContainer bc_;                 ///< Bodies
 PointSourceContainer psc_;         ///< Point Sources
 std::unique_ptr<Periphery> shell_; ///< Periphery
 std::vector<PointSource> points_;  ///< External point sources
+struct properties_t properties {
+    .dt = 0.0, .time = 0.0,
+};
+
+struct properties_t &get_properties() {
+    return properties;
+};
 
 Eigen::VectorXd curr_solution_;
 std::ofstream ofs_;    ///< Trajectory output file stream. Opened at initialization
@@ -45,12 +52,6 @@ int rank_;                ///< MPI rank
 int size_;                ///< MPI size
 toml::value param_table_; ///< Parsed input table
 bool resume_flag_;        ///< FIXME: Hack check if resuming or post-processing/initial run
-
-/// @brief Time varying system properties that are extrinsic to the physical objects
-struct {
-    double dt;         ///< Current timestep size
-    double time = 0.0; ///< Current system time
-} properties;
 
 /// @brief Structure for trajectory output via msgpack
 ///
@@ -117,7 +118,7 @@ std::size_t get_local_solution_size() {
 }
 
 /// @brief Flush current simulation state to trajectory file(s)
-void write(std::ofstream &ofs = ofs_) {
+void write(std::ofstream &ofs) {
     FiberContainer fc_global;
     BodyContainer bc_empty;
     BodyContainer &bc_global = (rank_ == 0) ? bc_ : bc_empty;
@@ -170,6 +171,8 @@ void write(std::ofstream &ofs = ofs_) {
         ofs.flush();
     }
 }
+
+void write() { write(ofs_); }
 
 void write_initial() {
     auto trajectory_open_mode = std::ofstream::binary | std::ofstream::out;
