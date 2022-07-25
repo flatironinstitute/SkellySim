@@ -1,23 +1,25 @@
 #include <skelly_sim.hpp>
 
+#include <filesystem>
+#include <numeric>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+
 #include <fiber.hpp>
 #include <params.hpp>
-#include <string>
 #include <system.hpp>
 
-#include <filesystem>
-#include <spdlog/spdlog.h>
-#include <stdexcept>
-
 #include <Teuchos_CommandLineProcessor.hpp>
-#include <mpi.h>
-
 #include <cnpy.hpp>
-#include <unordered_map>
+#include <mpi.h>
+#include <spdlog/spdlog.h>
 
 int main(int argc, char *argv[]) {
     int thread_level;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     std::string config_file = "skelly_config.toml";
     Teuchos::CommandLineProcessor cmdp(false, true);
@@ -34,21 +36,29 @@ int main(int argc, char *argv[]) {
         double t_final = params->t_final;
         auto &fc = *System::get_fiber_container();
 
-
         std::vector<float> times;
         std::vector<int> n_fibers;
+        std::vector<double> lengths;
 
         double t = 0.0;
         while (t < t_final) {
             times.push_back(t);
             n_fibers.push_back(fc.get_global_count());
+            double length = std::accumulate(fc.fibers.begin(), fc.fibers.end(), 0.0,
+                                            [](const double &a, const Fiber &b) { return a + b.length_; });
+            double length_tot;
+            MPI_Reduce(&length, &length_tot, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+            lengths.push_back(length_tot / n_fibers.back());
             System::dynamic_instability();
             t += properties.dt;
         }
 
-        cnpy::npz_save("di_traj.npz", "t", times.data(), {times.size()}, "w");
-        cnpy::npz_save("di_traj.npz", "n_fibers", n_fibers.data(), {n_fibers.size()}, "a");
-
+        if (rank == 0) {
+            cnpy::npz_save("di_traj.npz", "t", times.data(), {times.size()}, "w");
+            cnpy::npz_save("di_traj.npz", "n_fibers", n_fibers.data(), {n_fibers.size()}, "a");
+            cnpy::npz_save("di_traj.npz", "lengths", lengths.data(), {lengths.size()}, "a");
+        }
     } catch (const std::runtime_error &e) {
         // Warning: Critical only catches things on rank 0, so this may or may not print, if
         // some random rank throws an error. This is the same reason we use MPI_Abort: all
