@@ -33,4 +33,11 @@ typedef struct  {
     double l_0; ///< characteristic length of interaction
 } fiber_periphery_interaction_t;
 
+typedef struct {
+    bool active;              ///< If periphery binding enabled
+    double polar_angle_start; ///< Angle from z axis where binding starts
+    double polar_angle_end;   ///< Angle from z axis where binding ends
+    double threshold;         ///< Minimum distance from cortex where binding will begin
+} periphery_binding_t;
+
 #endif

@@ -1,6 +1,7 @@
 #include <params.hpp>
 
 #include <mpi.h>
+#include <stdexcept>
 
 Params::Params(toml::value &pt) {
     eta = toml::find_or(pt, "eta", 1.0);
@@ -16,7 +17,6 @@ Params::Params(toml::value &pt) {
     dt_write = toml::find_or(pt, "dt_write", 0.25);
     implicit_motor_activation_delay = toml::find_or(pt, "implicit_motor_activation_delay", 0.0);
     seed = toml::find_or(pt, "seed", 1);
-    periphery_binding_flag = toml::find_or(pt, "periphery_binding_flag", false);
     periphery_interaction_flag = toml::find_or(pt, "periphery_interaction_flag", false);
     adaptive_timestep_flag = toml::find_or(pt, "adaptive_timestep_flag", true);
 
@@ -34,6 +34,20 @@ Params::Params(toml::value &pt) {
             dynamic_instability.min_length = toml::find(di, "min_length").as_floating();
             dynamic_instability.bending_rigidity = toml::find(di, "bending_rigidity").as_floating();
             dynamic_instability.min_separation = toml::find(di, "min_separation").as_floating();
+        } catch (std::runtime_error &e) {
+            MPI_Finalize();
+            exit(1);
+        }
+    }
+
+    if (pt.contains("periphery_binding")) {
+        const auto &pb = pt.at("periphery_binding");
+        try {
+            periphery_binding.active = toml::find(pb, "active").as_boolean();
+            periphery_binding.polar_angle_start = toml::find(pb, "polar_angle_start").as_floating();
+            periphery_binding.polar_angle_end = toml::find(pb, "polar_angle_end").as_floating();
+            periphery_binding.threshold = toml::find(pb, "threshold").as_floating();
+
         } catch (std::runtime_error &e) {
             MPI_Finalize();
             exit(1);

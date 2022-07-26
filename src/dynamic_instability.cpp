@@ -66,7 +66,7 @@ void dynamic_instability() {
     while (fib != fc.fibers.end()) {
         fib->v_growth_ = params.dynamic_instability.v_growth;
         double f_cat = params.dynamic_instability.f_catastrophe;
-        if (fib->near_periphery) {
+        if (fib->is_plus_pinned()) {
             fib->v_growth_ *= params.dynamic_instability.v_grow_collision_scale;
             f_cat *= params.dynamic_instability.f_catastrophe_collision_scale;
         }

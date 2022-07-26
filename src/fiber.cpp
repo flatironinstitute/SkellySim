@@ -1,5 +1,5 @@
-#include <skelly_sim.hpp>
 #include <body.hpp>
+#include <skelly_sim.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -33,6 +33,7 @@ const std::string Fiber::BC_name[] = {"Force", "Torque", "Velocity", "AngularVel
 Fiber::Fiber(toml::value &fiber_table, double eta) {
     std::vector<double> x_array = toml::find<std::vector<double>>(fiber_table, "x");
     n_nodes_ = x_array.size() / 3;
+    x_ = Eigen::Map<Eigen::MatrixXd>(x_array.data(), 3, n_nodes_);
 
     init(eta);
 
@@ -52,17 +53,19 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 ///
 /// Updates: Fiber::bc_minus, Fiber::bc_plus, Fiber::near_periphery
 /// @param[in] Periphery object
-void FiberContainer::update_boundary_conditions(Periphery &shell, bool periphery_binding_flag) {
+void FiberContainer::update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
     /// FIXME: magic number in cortex interaction
-    const double threshold = 0.75;
     for (auto &fib : fibers) {
         fib.bc_minus_ = fib.is_minus_clamped()
                             ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
                             : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
-        fib.near_periphery = shell.check_collision(fib.x_, threshold);
-        fib.bc_plus_ = (fib.near_periphery && periphery_binding_flag)
-                           ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
-                           : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
+
+        double angle = std::acos(fib.x_.col(fib.x_.cols() - 1).normalized()[2]);
+        bool near_periphery = (periphery_binding.active) && (angle >= periphery_binding.polar_angle_start) &&
+                              (angle <= periphery_binding.polar_angle_end) &&
+                              shell.check_collision(fib.x_, periphery_binding.threshold);
+        fib.bc_plus_ = near_periphery ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
+                                      : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
         spdlog::get("SkellySim global")
             ->debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)&fib, fib.BC_name[fib.bc_minus_.first],
                     fib.BC_name[fib.bc_minus_.second], fib.BC_name[fib.bc_plus_.first],

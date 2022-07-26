@@ -274,6 +274,7 @@ class Fiber():
     """
     n_nodes: int = 32
     parent_body: int = -1
+    parent_site: int = -1
     force_scale: float = 0.0
     bending_rigidity: float = 2.5E-3
     radius: float = 0.0125
@@ -339,6 +340,27 @@ class DynamicInstability():
     bending_rigidity: float = 2.5E-3
     min_separation: float = 0.1
 
+@dataclass
+class PeripheryBinding():
+    """
+    dataclass for periphery binding parameters
+
+    Attributes
+    ----------
+    active : bool, default: :obj:`False`
+        Have plus ends of fibers hinge at periphery if set
+    polar_angle_start : float, default: :obj:`0.0`, units: :obj:`radians`
+        Minimum angle where cortex binding happens
+    polar_angle_end : float, default: :obj:`pi/2`, units: :obj:`radians`
+        Maximum angle where cortex binding happens
+    threshold : float, default: :obj:`0.75`, units: :obj:`μm`
+        Minimum distance between Fiber plus ends and cortex in microns when binding happens
+    """
+    active: bool = False
+    polar_angle_start: float = 0.0
+    polar_angle_end: float = 0.5 * np.pi
+    threshold: float = 0.75
+    
 
 @dataclass
 class VelocityField():
@@ -414,6 +436,7 @@ class Params():
     seed: int = 130319
     dynamic_instability: DynamicInstability = field(default_factory=DynamicInstability)
     velocity_field: VelocityField = field(default_factory=VelocityField)
+    periphery_binding: PeripheryBinding = field(default_factory=PeripheryBinding)
     periphery_interaction_flag: bool = False
     adaptive_timestep_flag: bool = True
 
@@ -739,7 +762,7 @@ class Body():
     external_force: List[float] = field(default_factory=_default_vector)
     nucleation_sites: List[float] = field(default_factory=list)
     
-    def find_binding_site(self, ds_min) -> Tuple[np.array, np.array]:
+    def find_binding_site(self, fibers: List[Fiber], ds_min: float) -> Tuple[np.array, np.array]:
         """
         Find an open binding site given a list of Fibers that could interfere with binding
         Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
@@ -748,8 +771,7 @@ class Body():
 
         Arguments
         ---------
-        fibers : list[Fiber]
-            Fibers that could potentially block a binding site
+
         ds_min : float
             Minimum allowable separation between a binding site and any fiber minus end
 

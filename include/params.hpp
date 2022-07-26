@@ -17,9 +17,14 @@ class Params {
     double dt_max;
     double dt_write;
     double implicit_motor_activation_delay;
-    bool periphery_binding_flag;
     bool periphery_interaction_flag;
     bool adaptive_timestep_flag;
+
+    periphery_binding_t periphery_binding{
+        .polar_angle_start = 0.0,
+        .polar_angle_end = M_PI,
+        .threshold = 0.75,
+    };
 
     struct {
         int n_nodes = 0;

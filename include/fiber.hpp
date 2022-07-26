@@ -41,7 +41,6 @@ class Fiber {
     std::pair<int, int> binding_site_{-1, -1};
 
     double v_growth_ = 0.0;      ///< instantaneous fiber growth velocity
-    bool near_periphery = false; ///< flag if interacting with periphery
 
     /// @brief Coefficient for SBT @see Fiber::init
     /// \f[ c_0 = -\frac{log(e \epsilon^\ell)}{8 \pi \eta}\f]
@@ -147,6 +146,7 @@ class Fiber {
     void update_stokeslet(double);
     bool attached_to_body() { return binding_site_.first >= 0; };
     bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
+    bool is_plus_pinned() { return bc_plus_.first == BC::Velocity; };
 #ifndef SKELLY_DEBUG
     MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
                        beta_tstep_, binding_site_, tension_, x_, minus_clamped_);
@@ -220,7 +220,7 @@ class FiberContainer {
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
 
-    void update_boundary_conditions(Periphery &shell, bool periphery_binding_flag);
+    void update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding);
 
   private:
     int world_size_ = -1;
