@@ -219,7 +219,6 @@ if (config_orig != config):
         "Config changed dynamically. This is not a problem, and is an expected output of peripheries like surface_of_revolution "
         "which dynamically figure out the number of nodes. Backing up and updating input config.")
     import shutil
-    input_file = sys.argv[1]
-    shutil.copy(input_file, input_file + '.bak')
+    shutil.copy(config_file, config_file + '.bak')
     with open(sys.argv[1], 'w') as fh:
         toml.dump(config, fh)
