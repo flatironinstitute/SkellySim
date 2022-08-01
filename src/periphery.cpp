@@ -353,8 +353,8 @@ Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
         node_counts_[i] = ((i < n_nodes_big) ? node_size_big : node_size_small);
         node_displs_[i + 1] = node_displs_[i] + node_counts_[i];
     }
-    row_counts_ = n_cols * node_counts_;
-    row_displs_ = n_cols * node_displs_;
+    row_counts_ = node_counts_;
+    row_displs_ = node_displs_;
     quad_counts_ = node_counts_ / 3;
     quad_displs_ = node_displs_ / 3;
 
@@ -365,15 +365,19 @@ Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
     const double *nodes_raw = (world_rank_ == 0) ? precomp["nodes"].data<double>() : NULL;
     const double *quadrature_weights_raw = (world_rank_ == 0) ? precomp["quadrature_weights"].data<double>() : NULL;
 
+    MPI_Datatype mpi_matrix_row_t;
+    MPI_Type_contiguous(n_cols, MPI_DOUBLE, &mpi_matrix_row_t);
+    MPI_Type_commit(&mpi_matrix_row_t);
+
     // Numpy data is row-major, while eigen is column-major. Easiest way to rectify this is to
     // load in matrix as its transpose, then transpose back
     M_inv_.resize(n_cols, nrows_local);
-    MPI_Scatterv(M_inv_raw, row_counts_.data(), row_displs_.data(), MPI_DOUBLE, M_inv_.data(), row_counts_[world_rank_],
-                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(M_inv_raw, row_counts_.data(), row_displs_.data(), mpi_matrix_row_t, M_inv_.data(),
+                 row_counts_[world_rank_], mpi_matrix_row_t, 0, MPI_COMM_WORLD);
 
     stresslet_plus_complementary_.resize(n_cols, nrows_local);
-    MPI_Scatterv(stresslet_plus_complementary_raw, row_counts_.data(), row_displs_.data(), MPI_DOUBLE,
-                 stresslet_plus_complementary_.data(), row_counts_[world_rank_], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(stresslet_plus_complementary_raw, row_counts_.data(), row_displs_.data(), mpi_matrix_row_t,
+                 stresslet_plus_complementary_.data(), row_counts_[world_rank_], mpi_matrix_row_t, 0, MPI_COMM_WORLD);
 
     M_inv_.transposeInPlace();
     stresslet_plus_complementary_.transposeInPlace();
@@ -391,6 +395,8 @@ Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
                  quadrature_weights_.data(), quad_counts_[world_rank_], MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     n_nodes_global_ = n_nodes;
+
+    MPI_Type_free(&mpi_matrix_row_t);
 
     spdlog::info("Done initializing base periphery");
 }
