@@ -9,6 +9,8 @@
 #include <kernels.hpp>
 #include <params.hpp>
 
+#include <mpi.h>
+
 class SphericalBody;
 class DeformableBody;
 class Fiber;
@@ -155,9 +157,12 @@ class GenericPeriphery : public Periphery {
     double c_;
     GenericPeriphery(const toml::value &periphery_table, const Params &params)
         : Periphery(periphery_table, params) {
-        a_ = node_pos_.row(0).array().abs().maxCoeff();
-        b_ = node_pos_.row(1).array().abs().maxCoeff();
-        c_ = node_pos_.row(2).array().abs().maxCoeff();
+        double a = node_pos_.row(0).array().abs().maxCoeff();
+        double b = node_pos_.row(1).array().abs().maxCoeff();
+        double c = node_pos_.row(2).array().abs().maxCoeff();
+        MPI_Allreduce(&a, &a_, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+        MPI_Allreduce(&b, &b_, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+        MPI_Allreduce(&c, &c_, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;

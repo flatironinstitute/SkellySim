@@ -255,27 +255,27 @@ bool GenericPeriphery::check_collision(const SphericalBody &body, double thresho
 
 /// @brief STUB Check for collision between GenericPeriphery and SphericalBody
 ///
-/// @param[in] body SphericalBody to check collision
+/// @param[in] body DeformableBody to check collision
 /// @param[in] threshold signed threshold to check collision
 /// @return always false
 bool GenericPeriphery::check_collision(const DeformableBody &body, double threshold) const {
     static bool first_call = true;
     if (!world_rank_ && first_call) {
-        spdlog::warn("check_collision not implemented for GenericPeriphery->SphericalBody");
+        spdlog::warn("check_collision not implemented for GenericPeriphery->DeformableBody");
         first_call = false;
     }
     return false;
 }
 
-/// @brief STUB Check for collision between GenericPeriphery and SphericalBody
+/// @brief STUB Check for collision between GenericPeriphery and point_cloud
 ///
-/// @param[in] body SphericalBody to check collision
+/// @param[in] body MatrixRef (point cloud) to check collision
 /// @param[in] threshold signed threshold to check collision
 /// @return always false
 bool GenericPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {
     static bool first_call = true;
     if (!world_rank_ && first_call) {
-        spdlog::warn("check_collision not implemented for GenericPeriphery->SphericalBody");
+        spdlog::warn("check_collision not implemented for point clouds");
         first_call = false;
     }
     return false;
