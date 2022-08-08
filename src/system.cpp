@@ -172,20 +172,15 @@ void write(std::ofstream &ofs) {
 
 void write() { write(ofs_); }
 
-void write_initial() {
+void write_config(const std::string &config_file) {
     auto trajectory_open_mode = std::ofstream::binary | std::ofstream::out;
-    auto ofs = std::ofstream("skelly_sim.initial_config", trajectory_open_mode);
-    write(ofs);
-}
-
-void write_final() {
-    auto trajectory_open_mode = std::ofstream::binary | std::ofstream::out;
-    auto ofs = std::ofstream("skelly_sim.final_config", trajectory_open_mode);
+    auto ofs = std::ofstream(config_file, trajectory_open_mode);
     write(ofs);
 }
 
 void interrupt_handler(int signum) {
-    write_final();
+    restore();
+    write_config("skelly_sim.final_config");
     throw std::runtime_error("Manual interrupt");
 }
 
@@ -868,7 +863,7 @@ void run() {
         spdlog::info("System time, dt, fiber_error: {}, {}, {}", properties.time, dt_new, fiber_error);
     }
 
-    write_final();
+    write_config("skelly_sim.final_config");
 }
 
 /// @brief Run the post processing step
@@ -998,6 +993,6 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
     if (post_process_flag && rank_ == 0)
         ofs_vf_ = std::ofstream("skelly_sim.vf", std::ofstream::binary | std::ofstream::out);
 
-    write_initial();
+    write_config("skelly_sim.initial_config");
 }
 } // namespace System
