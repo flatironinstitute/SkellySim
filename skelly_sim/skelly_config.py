@@ -423,6 +423,9 @@ class Params():
     adaptive_timestep_flag : bool, default: :obj:`True`
         If set, use adaptive timestepping, which attempts to control simulation error by reducing the timestep
         when the solution has convergence issues
+    pair_evaluator : str, default: :obj:`"FMM"`
+        Type of evaluator to use for kernels (stokeslet, stokes double layer, etc)
+        Valid values: "CPU", "FMM"
     """
     eta: float = 1.0
     dt_initial: float = 0.025
@@ -439,6 +442,7 @@ class Params():
     periphery_binding: PeripheryBinding = field(default_factory=PeripheryBinding)
     periphery_interaction_flag: bool = False
     adaptive_timestep_flag: bool = True
+    pair_evaluator: str = "FMM"
 
 
 @dataclass

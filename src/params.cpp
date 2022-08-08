@@ -19,6 +19,7 @@ Params::Params(toml::value &pt) {
     seed = toml::find_or(pt, "seed", 1);
     periphery_interaction_flag = toml::find_or(pt, "periphery_interaction_flag", false);
     adaptive_timestep_flag = toml::find_or(pt, "adaptive_timestep_flag", true);
+    pair_evaluator = toml::find_or(pt, "pair_evaluator", "FMM");
 
     if (pt.contains("dynamic_instability")) {
         const auto &di = pt.at("dynamic_instability");

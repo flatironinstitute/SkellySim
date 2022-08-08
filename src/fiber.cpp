@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <stdexcept>
 #include <unordered_map>
 
 #include <fiber.hpp>
@@ -811,7 +812,7 @@ FiberContainer::FiberContainer(Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
 
-    {
+    if (params.pair_evaluator == "FMM") {
         utils::LoggerRedirect redirect(std::cout);
         const int mult_order = params.stkfmm.fiber_stokeslet_multipole_order;
         const int max_pts = params.stkfmm.fiber_stokeslet_max_points;
@@ -819,6 +820,10 @@ FiberContainer::FiberContainer(Params &params) {
                                                            stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
     }
+    else if (params.pair_evaluator == "CPU")
+        stokeslet_kernel_ = kernels::stokeslet_direct_cpu;
+    else
+        std::runtime_error("Invalid pair evaluator for Fiber interaction: " + params.pair_evaluator);
 }
 
 FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {

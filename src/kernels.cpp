@@ -2,6 +2,16 @@
 
 #include <STKFMM/STKFMM.hpp>
 
+Eigen::MatrixXd kernels::stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
+                                              MatrixRef &f_dl, double eta) {
+    auto memmgr = pvfmm::mem::MemoryManager(8192);
+    Eigen::MatrixXd u_trg = Eigen::MatrixXd::Zero(3, r_trg.cols());
+
+    pvfmm::stokes_vel(const_cast<double *>(r_sl.data()), r_sl.cols(), const_cast<double *>(f_sl.data()), 1,
+                      const_cast<double *>(r_trg.data()), r_trg.cols(), u_trg.data(), &memmgr);
+    return u_trg / eta;
+}
+
 Eigen::MatrixXd kernels::oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density,
                                                       double eta, double reg, double epsilon_distance) {
     using namespace Eigen;

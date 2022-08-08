@@ -13,6 +13,9 @@ typedef Eigen::MatrixXd (*fmm_kernel_func_t)(const int n_trg, MatrixRef &f_sl, M
 using Evaluator = std::function<Eigen::MatrixXd(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
                                                 MatrixRef &f_dl, double eta)>;
 
+Eigen::MatrixXd stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
+                                     MatrixRef &f_dl, double eta);
+
 Eigen::MatrixXd oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta,
                                              double reg = 5E-3, double epsilon_distance = 1E-5);
 

@@ -26,6 +26,7 @@ config.params.dt_write = 1E-3
 config.params.t_final = 1E-2
 config.params.gmres_tol = 1E-10
 config.params.seed = 130319
+config.params.pair_evaluator = "CPU"
 
 length = 0.75
 config.fibers = [Fiber(

@@ -19,6 +19,7 @@ class Params {
     double implicit_motor_activation_delay;
     bool periphery_interaction_flag;
     bool adaptive_timestep_flag;
+    std::string pair_evaluator;
 
     periphery_binding_t periphery_binding{
         .polar_angle_start = 0.0,
