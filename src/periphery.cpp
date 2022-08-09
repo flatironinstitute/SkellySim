@@ -299,7 +299,8 @@ Eigen::MatrixXd GenericPeriphery::fiber_interaction(const Fiber &fiber,
 /// @param[in] periphery_table parsed toml object representing periphery config
 /// @param[in] params system Params struct
 Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
-    {
+
+    if (params.pair_evaluator == "FMM") {
         using namespace kernels;
         using namespace stkfmm;
         const int mult_order = params.stkfmm.periphery_stresslet_multipole_order;
@@ -307,7 +308,8 @@ Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
         utils::LoggerRedirect redirect(std::cout);
         stresslet_kernel_ = FMM<Stk3DFMM>(mult_order, max_pts, PAXIS::NONE, KERNEL::PVel, stokes_pvel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
-    }
+    } else if (params.pair_evaluator == "CPU")
+        stresslet_kernel_ = kernels::stresslet_direct_cpu;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
