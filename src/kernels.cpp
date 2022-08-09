@@ -2,13 +2,58 @@
 
 #include <STKFMM/STKFMM.hpp>
 
+/*********************************************************
+ *                                                        *
+ *   Stokes Double Vel kernel, source: 9, target: 3       *
+ *                                                        *
+ **********************************************************/
+struct stokes_doublevel : public pvfmm::GenericKernel<stokes_doublevel> {
+    static const int FLOPS = 20;
+    template <class Real>
+    static Real ScaleFactor() {
+        return 1.0 / (8.0 * sctl::const_pi<Real>());
+    }
+    template <class VecType, int digits>
+    static void uKerEval(VecType (&u)[3], const VecType (&r)[3], const VecType (&f)[9], const void *ctx_ptr) {
+        VecType r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+        VecType rinv = sctl::approx_rsqrt<digits>(r2, r2 > VecType::Zero());
+        VecType rinv3 = rinv * rinv * rinv;
+        VecType rinv5 = rinv3 * rinv * rinv;
+
+        const VecType sxx = f[0], sxy = f[1], sxz = f[2];
+        const VecType syx = f[3], syy = f[4], syz = f[5];
+        const VecType szx = f[6], szy = f[7], szz = f[8];
+        const VecType dx = r[0], dy = r[1], dz = r[2];
+
+        VecType commonCoeff = sxx * dx * dx + syy * dy * dy + szz * dz * dz;
+        commonCoeff += (sxy + syx) * dx * dy;
+        commonCoeff += (sxz + szx) * dx * dz;
+        commonCoeff += (syz + szy) * dy * dz;
+        commonCoeff *= (typename VecType::ScalarType)(-3.0) * rinv5;
+
+        const VecType trace = sxx + syy + szz;
+        u[0] += dx * commonCoeff;
+        u[1] += dy * commonCoeff;
+        u[2] += dz * commonCoeff;
+    }
+};
+
+static auto g_memmgr = pvfmm::mem::MemoryManager(0);
 Eigen::MatrixXd kernels::stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
                                               MatrixRef &f_dl, double eta) {
-    auto memmgr = pvfmm::mem::MemoryManager(8192);
     Eigen::MatrixXd u_trg = Eigen::MatrixXd::Zero(3, r_trg.cols());
 
     pvfmm::stokes_vel::Eval(const_cast<double *>(r_sl.data()), r_sl.cols(), const_cast<double *>(f_sl.data()), 1,
-                            const_cast<double *>(r_trg.data()), r_trg.cols(), u_trg.data(), &memmgr);
+                            const_cast<double *>(r_trg.data()), r_trg.cols(), u_trg.data(), &g_memmgr);
+    return u_trg / eta;
+}
+
+Eigen::MatrixXd kernels::stresslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
+                                              MatrixRef &f_dl, double eta) {
+    Eigen::MatrixXd u_trg = Eigen::MatrixXd::Zero(3, r_trg.cols());
+    stokes_doublevel::Eval(const_cast<double *>(r_dl.data()), r_dl.cols(), const_cast<double *>(f_dl.data()), 1,
+                           const_cast<double *>(r_trg.data()), r_trg.cols(), u_trg.data(), &g_memmgr);
+
     return u_trg / eta;
 }
 
@@ -277,5 +322,5 @@ Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, MatrixRef &f_sl, Matri
     fmmPtr->clearFMM(stkfmm::KERNEL::PVel);
     fmmPtr->evaluateFMM(stkfmm::KERNEL::PVel, f_sl.size() / 4, f_sl.data(), n_trg, res.data(), f_dl.size() / 9,
                         f_dl.data());
-    return res;
+    return res.block(1, 0, 3, n_trg);
 }

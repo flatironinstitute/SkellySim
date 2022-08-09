@@ -26,6 +26,7 @@ config.params.dt_write = 1E-1
 config.params.t_final = 10.0
 config.params.gmres_tol = 1E-10
 config.params.seed = 130319
+config.params.pair_evaluator = "CPU"
 
 config.bodies = [
     Body(n_nucleation_sites=0,

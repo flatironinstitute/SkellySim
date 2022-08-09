@@ -55,7 +55,6 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
         return Eigen::MatrixXd::Zero(3, r_trg.cols());
     utils::LoggerRedirect redirect(std::cout);
     const int n_dl = density.size() / 3;
-    const int n_trg = r_trg.size() / 3;
     Eigen::MatrixXd f_dl(9, n_dl);
 
     CMatrixMap density_reshaped(density.data(), 3, n_dl);
@@ -69,10 +68,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
                 f_dl(i * 3 + j, node) = 2.0 * eta * node_normal_(i, node) * density_reshaped(j, node);
 
     Eigen::MatrixXd r_sl, f_sl; // dummy SL positions/values
-    Eigen::MatrixXd pvel = stresslet_kernel_(r_sl, node_pos_, r_trg, f_sl, f_dl, eta);
-    // Workaround for the STKFMM stokes DL kernel returning pressure+velocity rather than just velocity
-    // Other kernels should just return vel, ideally
-    Eigen::MatrixXd vel = pvel.rows() == 3 ? pvel : pvel.block(1, 0, 3, n_trg);
+    Eigen::MatrixXd vel = stresslet_kernel_(r_sl, node_pos_, r_trg, f_sl, f_dl, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     spdlog::debug("Finished shell flow");

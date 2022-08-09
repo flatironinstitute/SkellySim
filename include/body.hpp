@@ -77,10 +77,10 @@ class BodyContainer {
     std::unordered_map<std::shared_ptr<Body>, int> solution_offsets_;
     std::unordered_map<std::shared_ptr<Body>, int> node_offsets_;
 
-    /// Pointer to FMM stresslet kernel (Stokes)
+    /// Pointer to FMM stresslet kernel (StokesDoubleLayer)
     kernels::Evaluator stresslet_kernel_;
-    /// Pointer to FMM oseen kernel (PVel)
-    kernels::Evaluator oseen_kernel_;
+    /// Pointer to FMM stokeslet kernel (Stokes)
+    kernels::Evaluator stokeslet_kernel_;
 
     /// @brief Empty container constructor to avoid initialization list complications.
     BodyContainer() = default;

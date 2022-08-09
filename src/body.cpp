@@ -201,7 +201,6 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
             node_offset += body->n_nodes_;
         }
     }
-    const int n_trg = r_trg.cols();
     const MatrixXd null_matrix; //< Empty matrix for dummy arguments to kernels
 
     // Section: Stresslet kernel
@@ -215,7 +214,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
                 f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node) * eta;
 
     spdlog::debug("body_stresslet");
-    MatrixXd v_bdy2all = stresslet_kernel_(null_matrix, r_dl, r_trg, null_matrix, f_dl, eta).block(1, 0, 3, n_trg);
+    MatrixXd v_bdy2all = stresslet_kernel_(null_matrix, r_dl, r_trg, null_matrix, f_dl, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Section: Oseen kernel
@@ -228,7 +227,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
     // We actually only need the summed forces on the first rank
     if (world_rank_)
         forces.resize(3, 0);
-    v_bdy2all += oseen_kernel_(center_positions, null_matrix, r_trg, forces, null_matrix, eta);
+    v_bdy2all += stokeslet_kernel_(center_positions, null_matrix, r_trg, forces, null_matrix, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
@@ -346,7 +345,7 @@ BodyContainer::BodyContainer(const BodyContainer &orig) {
     world_rank_ = orig.world_rank_;
     world_size_ = orig.world_size_;
     stresslet_kernel_ = orig.stresslet_kernel_;
-    oseen_kernel_ = orig.oseen_kernel_;
+    stokeslet_kernel_ = orig.stokeslet_kernel_;
     populate_sublists();
 };
 
@@ -359,7 +358,7 @@ BodyContainer &BodyContainer::operator=(const BodyContainer orig) {
     world_rank_ = orig.world_rank_;
     world_size_ = orig.world_size_;
     stresslet_kernel_ = orig.stresslet_kernel_;
-    oseen_kernel_ = orig.oseen_kernel_;
+    stokeslet_kernel_ = orig.stokeslet_kernel_;
     populate_sublists();
     return *this;
 }
@@ -372,22 +371,24 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
 
-    {
+    if (params.pair_evaluator == "FMM") {
         auto &sp = params.stkfmm;
         utils::LoggerRedirect redirect(std::cout);
         stresslet_kernel_ =
             kernels::FMM<stkfmm::Stk3DFMM>(sp.body_stresslet_multipole_order, sp.body_stresslet_max_points,
                                            stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
-        oseen_kernel_ =
+        stokeslet_kernel_ =
             kernels::FMM<stkfmm::Stk3DFMM>(sp.body_oseen_multipole_order, sp.body_oseen_max_points, stkfmm::PAXIS::NONE,
                                            stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
+    } else if (params.pair_evaluator == "CPU") {
+        stresslet_kernel_ = kernels::stresslet_direct_cpu;
+        stokeslet_kernel_ = kernels::stokeslet_direct_cpu;
     }
 
     const int n_bodies_tot = body_tables.size();
     spdlog::info("Reading in {} bodies", n_bodies_tot);
-
     for (int i_body = 0; i_body < n_bodies_tot; ++i_body) {
         toml::value &body_table = body_tables.at(i_body);
         const std::string shape = toml::find_or(body_table, "shape", "");
