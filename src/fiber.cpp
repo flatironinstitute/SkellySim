@@ -1,4 +1,3 @@
-#include <body.hpp>
 #include <skelly_sim.hpp>
 
 #include <algorithm>
@@ -6,6 +5,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
+#include <body.hpp>
 #include <fiber.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>

@@ -7,8 +7,8 @@ Eigen::MatrixXd kernels::stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, 
     auto memmgr = pvfmm::mem::MemoryManager(8192);
     Eigen::MatrixXd u_trg = Eigen::MatrixXd::Zero(3, r_trg.cols());
 
-    pvfmm::stokes_vel(const_cast<double *>(r_sl.data()), r_sl.cols(), const_cast<double *>(f_sl.data()), 1,
-                      const_cast<double *>(r_trg.data()), r_trg.cols(), u_trg.data(), &memmgr);
+    pvfmm::stokes_vel::Eval(const_cast<double *>(r_sl.data()), r_sl.cols(), const_cast<double *>(f_sl.data()), 1,
+                            const_cast<double *>(r_trg.data()), r_trg.cols(), u_trg.data(), &memmgr);
     return u_trg / eta;
 }
 
