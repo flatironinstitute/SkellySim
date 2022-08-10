@@ -22,7 +22,7 @@ message("SkellySim version: v${GIT_TAG} (${GIT_COMMIT})")
 project(
   skelly_sim
   VERSION ${GIT_TAG}
-  LANGUAGES CXX)
+  LANGUAGES CXX CUDA)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 option(EIGEN_USE_BLAS "Use BLAS as the backend for various Eigen calls" ON)
@@ -87,17 +87,19 @@ set(SKELLY_INCLUDES_SYSTEM
 add_library(skelly OBJECT
   src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
   src/dynamic_instability.cpp src/system.cpp src/body.cpp src/solver_hydro.cpp src/rng.cpp
-  src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp
+  src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp src/kernels.cu
 )
 
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES} SYSTEM ${SKELLY_INCLUDES_SYSTEM})
 target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
+set_property(TARGET skelly PROPERTY CUDA_ARCHITECTURES "70;75;80")
 
 add_subdirectory(extern/spdlog EXCLUDE_FROM_ALL)
 add_subdirectory(extern/trng4 EXCLUDE_FROM_ALL)
 
 add_executable(skelly_sim src/skelly_sim.cpp)
-
+set_property(TARGET skelly_sim PROPERTY CUDA_ARCHITECTURES "70;75;80")
+  
 add_subdirectory(tests)
 
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static

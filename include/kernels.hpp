@@ -13,10 +13,21 @@ typedef Eigen::MatrixXd (*fmm_kernel_func_t)(const int n_trg, MatrixRef &f_sl, M
 using Evaluator = std::function<Eigen::MatrixXd(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
                                                 MatrixRef &f_dl, double eta)>;
 
+void stokeslet_direct_gpu_impl(const double *r_src, const double *f_src, int n_src, const double *r_trg, double *u_trg,
+                               int n_trg);
+void stresslet_direct_gpu_impl(const double *r_src, const double *f_src, int n_src, const double *r_trg, double *u_trg,
+                               int n_trg);
+
 Eigen::MatrixXd stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
                                      MatrixRef &f_dl, double eta);
 
 Eigen::MatrixXd stresslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
+                                     MatrixRef &f_dl, double eta);
+
+Eigen::MatrixXd stokeslet_direct_gpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
+                                     MatrixRef &f_dl, double eta);
+
+Eigen::MatrixXd stresslet_direct_gpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
                                      MatrixRef &f_dl, double eta);
 
 Eigen::MatrixXd oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta,
@@ -38,6 +49,7 @@ Eigen::MatrixXd stresslet_times_normal(MatrixRef &r_src, MatrixRef &normals, dou
 Eigen::MatrixXd stresslet_times_normal_times_density(MatrixRef &r_src, MatrixRef &normals, MatrixRef &density,
                                                      double eta, double reg = 5E-3, double epsilon_distance = 1E-5);
 
+    
 /// Convenience class to represent an FMM interaction, which stores the STKFMM pointer. This
 /// setup allows for a direct call to the FMM object which returns the relevant target kernel
 /// evaluation matrix to each MPI rank.

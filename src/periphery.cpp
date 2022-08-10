@@ -310,6 +310,8 @@ Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
         redirect.flush(spdlog::level::debug, "STKFMM");
     } else if (params.pair_evaluator == "CPU")
         stresslet_kernel_ = kernels::stresslet_direct_cpu;
+    else if (params.pair_evaluator == "GPU")
+        stresslet_kernel_ = kernels::stresslet_direct_gpu;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);

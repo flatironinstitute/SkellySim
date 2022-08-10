@@ -822,8 +822,8 @@ FiberContainer::FiberContainer(Params &params) {
     }
     else if (params.pair_evaluator == "CPU")
         stokeslet_kernel_ = kernels::stokeslet_direct_cpu;
-    else
-        std::runtime_error("Invalid pair evaluator for Fiber interaction: " + params.pair_evaluator);
+    else if (params.pair_evaluator == "GPU")
+        stokeslet_kernel_ = kernels::stokeslet_direct_gpu;
 }
 
 FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {

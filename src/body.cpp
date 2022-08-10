@@ -386,6 +386,10 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
         stresslet_kernel_ = kernels::stresslet_direct_cpu;
         stokeslet_kernel_ = kernels::stokeslet_direct_cpu;
     }
+    else if (params.pair_evaluator == "GPU") {
+        stresslet_kernel_ = kernels::stresslet_direct_gpu;
+        stokeslet_kernel_ = kernels::stokeslet_direct_gpu;
+    }
 
     const int n_bodies_tot = body_tables.size();
     spdlog::info("Reading in {} bodies", n_bodies_tot);

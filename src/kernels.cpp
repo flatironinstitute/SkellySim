@@ -342,3 +342,17 @@ Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, MatrixRef &f_sl, Matri
                         f_dl.data());
     return res.block(1, 0, 3, n_trg);
 }
+
+Eigen::MatrixXd kernels::stresslet_direct_gpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
+                                              MatrixRef &f_dl, double eta) {
+    Eigen::MatrixXd u = Eigen::MatrixXd::Zero(3, r_trg.cols());
+    kernels::stresslet_direct_gpu_impl(r_sl.data(), f_sl.data(), r_sl.cols(), r_trg.data(), u.data(), r_trg.cols());
+    return u / eta;
+}
+
+Eigen::MatrixXd kernels::stokeslet_direct_gpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
+                                              MatrixRef &f_dl, double eta) {
+    Eigen::MatrixXd u = Eigen::MatrixXd::Zero(3, r_trg.cols());
+    kernels::stokeslet_direct_gpu_impl(r_sl.data(), f_sl.data(), r_sl.cols(), r_trg.data(), u.data(), r_trg.cols());
+    return u / eta;
+}
