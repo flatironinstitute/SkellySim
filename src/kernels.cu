@@ -77,16 +77,12 @@ struct StokesCuda : GenericCudaKernel<T, 3, 3> {
 };
 
 template <typename kernel>
-__global__ void tiled_driver(const typename kernel::floattype *r_trg, const typename kernel::floattype *r_src, typename kernel::floattype *__restrict__ u_trg,
-                             const typename kernel::floattype *f_src, int n_src, int n_trg, int n_tiles) {
+__global__ void tiled_driver(const typename kernel::floattype *r_src, const typename kernel::floattype *r_trg,
+                             typename kernel::floattype *__restrict__ u_trg, const typename kernel::floattype *f_src,
+                             int n_src, int n_trg, int n_tiles) {
+
     using T = typename kernel::floattype;
     int i_trg = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (i_trg >= n_trg)
-        return;
-
-    for (int i = 0; i < kernel::trgdim; ++i)
-        u_trg[i_trg * kernel::trgdim + i] = 0.0;
 
     extern __shared__ char shared_char[];
     T *shared = (T *)shared_char;
@@ -94,7 +90,10 @@ __global__ void tiled_driver(const typename kernel::floattype *r_trg, const type
     const int toffset = shared_row_size * threadIdx.x;
     T *r_shared = (T *)(&shared[toffset]);
     T *f_shared = (T *)(&shared[toffset] + 3);
-
+    if (i_trg < n_trg) {
+        for (int i = 0; i < kernel::trgdim; ++i)
+            u_trg[i_trg * kernel::trgdim + i] = 0.0;
+    }
     for (int tile = 0; tile < n_tiles; tile++) {
         const int i_src = (tile * blockDim.x + threadIdx.x);
         for (int i = 0; i < 3; ++i)
@@ -107,19 +106,24 @@ __global__ void tiled_driver(const typename kernel::floattype *r_trg, const type
 
         // Loop over particles in our tile. But if tile contains i_src >= n_src, don't include those
         const int n_local_max = ((tile + 1) * (blockDim.x) > n_src) ? n_src - tile * blockDim.x : blockDim.x;
-        for (int i_local = 0; i_local < n_local_max; i_local++)
-            kernel::uKernel(&shared[shared_row_size * i_local], &r_trg[i_trg * 3],
-                            &shared[shared_row_size * i_local + 3], &u_trg[i_trg * kernel::trgdim]);
-
+        if (i_trg < n_trg) {
+            for (int i_local = 0; i_local < n_local_max; i_local++) {
+                kernel::uKernel(&shared[shared_row_size * i_local], &r_trg[i_trg * 3],
+                                &shared[shared_row_size * i_local + 3], &u_trg[i_trg * kernel::trgdim]);
+            }
+        }
         __syncthreads();
     }
+
+    if (i_trg >= n_trg)
+        return;
 
     for (int i = 0; i < kernel::trgdim; ++i)
         u_trg[i_trg * kernel::trgdim + i] *= kernel::scale_factor;
 }
 
 template <typename kernel>
-__global__ void untiled_driver(const typename kernel::floattype *r_trg, const typename kernel::floattype *r_src,
+__global__ void untiled_driver(const typename kernel::floattype *r_src, const typename kernel::floattype *r_trg,
                                typename kernel::floattype *__restrict__ u_trg, const typename kernel::floattype *f_src,
                                int n_src, int n_trg) {
     const int threadId = threadIdx.x;
@@ -158,11 +162,12 @@ void kernel_direct_gpu(const double *r_src, const double *f_src, int n_src, cons
     checkCudaErrors(cudaMemcpy(r_trg_device, r_trg, 3 * n_trg * sizeof(double), cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemcpy(f_src_device, f_src, kernel::srcdim * n_src * sizeof(double), cudaMemcpyHostToDevice));
 
-    // int n_tiles = (n_src + block_size - 1) / block_size;
-    // int shared_mem_size = block_size * (3 + kernel::srcdim) * sizeof(double);
-    // tiled_driver<kernel><<<n_blocks, block_size, shared_mem_size>>>(r_trg_device, r_src_device, u_trg_device,
-    //                                                                 f_src_device, n_src, n_trg, n_tiles);
-    untiled_driver<kernel><<<n_blocks, block_size>>>(r_trg_device, r_src_device, u_trg_device, f_src_device, n_src, n_trg);
+    int n_tiles = (n_src + block_size - 1) / block_size;
+    int shared_mem_size = block_size * (3 + kernel::srcdim) * sizeof(double);
+    tiled_driver<kernel><<<n_blocks, block_size, shared_mem_size>>>(r_src_device, r_trg_device, u_trg_device,
+                                                                    f_src_device, n_src, n_trg, n_tiles);
+    // untiled_driver<kernel><<<n_blocks, block_size>>>(r_src_device, r_trg_device, u_trg_device, f_src_device, n_src,
+    // n_trg);
 
     checkCudaErrors(cudaMemcpy(u_trg, u_trg_device, sizeof(double) * n_trg * kernel::trgdim, cudaMemcpyDeviceToHost));
 
@@ -181,4 +186,4 @@ void stresslet_direct_gpu_impl(const double *r_src, const double *f_src, int n_s
                                int n_trg) {
     kernel_direct_gpu<StokesDoubleLayerCuda<double>>(r_src, f_src, n_src, r_trg, u_trg, n_trg);
 }
-}
+} // namespace kernels
