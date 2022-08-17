@@ -17,6 +17,8 @@
 #include <solver_hydro.hpp>
 #include <system.hpp>
 
+#include <cnpy.hpp>
+
 #include <mpi.h>
 #include <sys/mman.h>
 
@@ -759,6 +761,22 @@ void prep_state_for_solver() {
     fc_.apply_bc_rectangular(properties.dt, v_all.block(0, 0, 3, fib_node_count), external_force_fibers);
 
     shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
+}
+
+void dump_get_system_matvec(const std::string &matfile = "system_matrix.mat") {
+    int n_cols = get_local_solution_size();
+    Eigen::MatrixXd mat(n_cols, n_cols);
+
+    for (int i = 0; i < n_cols; ++i) {
+        Eigen::VectorXd b = Eigen::VectorXd::Zero(n_cols);
+        b[i] = 1.0;
+
+        // Grab row because numpy is row-major and eigen column-major, so we avoid the
+        // necessary transpose
+        mat.row(i) = apply_matvec(b);
+    }
+
+    cnpy::npy_save(matfile, mat.data(), {(unsigned long)mat.rows(), (unsigned long)mat.cols()}, "w");
 }
 
 /// @brief Generate next trial system state for the current System::properties::dt
