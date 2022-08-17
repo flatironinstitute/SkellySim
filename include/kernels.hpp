@@ -1,6 +1,7 @@
 #ifndef KERNELS_HPP
 #define KERNELS_HPP
 
+#include <functional>
 #include <skelly_sim.hpp>
 
 #include <Eigen/Dense>
@@ -49,7 +50,6 @@ Eigen::MatrixXd stresslet_times_normal(MatrixRef &r_src, MatrixRef &normals, dou
 Eigen::MatrixXd stresslet_times_normal_times_density(MatrixRef &r_src, MatrixRef &normals, MatrixRef &density,
                                                      double eta, double reg = 5E-3, double epsilon_distance = 1E-5);
 
-    
 /// Convenience class to represent an FMM interaction, which stores the STKFMM pointer. This
 /// setup allows for a direct call to the FMM object which returns the relevant target kernel
 /// evaluation matrix to each MPI rank.
@@ -131,6 +131,63 @@ class FMM {
     stkfmm::KERNEL k_;             ///< Kernel enum from STKFMM that this interaction calls
     fmm_kernel_func_t
         kernel_func_; ///< Kernel function pointer from our own kernels namespace for the kernel this object will call
+};
+
+/// Convenience class to represent GPU all-pairs interaction.
+class GPUEvaluator {
+  public:
+    GPUEvaluator(const Evaluator &kernel_func) : kernel_func_(kernel_func){};
+
+    /// @brief Set flag to force next call to set up tree, regardless of cache variables
+    void force_device_sync() { force_device_sync_ = true; };
+
+    /// @brief Evaluate the kernel given the given sources/targets
+    ///
+    /// @param[in] r_sl [ 3 x n_src ] matrix of 'single-layer' source coordinates
+    /// @param[in] r_dl [ 3 x n_src ] matrix of 'double-layer' source coordinates
+    /// @param[in] r_trg [ 3 x n_trg ] matrix of target coordinates
+    /// @param[in] f_sl [ k_dim_sl x n_src ] matrix of 'single-layer' source strengths
+    /// @param[in] f_dl [ k_dim_dl x n_src ] matrix of 'double-layer' source strengths
+    /// @param[in] eta fluid viscosity
+    /// @returns [ k_dim_trg x n_trg ] matrix of kernel evaluated at target positions given the sources
+    Eigen::MatrixXd operator()(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl, MatrixRef &f_dl,
+                               double eta) {
+        // Check if source/target points have changed
+        bool setup_flag =
+            (force_device_sync_ || r_sl_old_.size() != r_sl.size() || r_dl_old_.size() != r_dl.size() ||
+             r_trg_old_.size() != r_trg.size() || r_sl_old_ != r_sl || r_dl_old_ != r_dl || r_trg_old_ != r_trg);
+
+        if (setup_flag) {
+            // Update FMM tree and cache coordinates
+            r_sl_old_ = r_sl;
+            r_dl_old_ = r_dl;
+            r_trg_old_ = r_trg;
+            sync_device_positions();
+            force_device_sync_ = false;
+        }
+
+        sync_device_forces(f_sl.data(), f_sl.size(), f_dl.data(), f_dl.size());
+        return kernel_func_(r_sl, r_dl, r_trg, f_sl, f_dl, eta);
+    }
+
+    ~GPUEvaluator() { free_device_memory(); }
+
+  private:
+    void sync_device_positions();
+    void sync_device_forces(const double *f_sl, size_t sl_size, const double *f_dl, size_t dl_size);
+    void free_device_memory();
+
+    bool force_device_sync_ = true; ///< When set, forces device re-transfer, then is cleared
+    Eigen::MatrixXd r_sl_old_;      ///< cached 'single-layer' source positions to check for FMM tree invalidation
+    Eigen::MatrixXd r_dl_old_;      ///< cache 'double-layer' source positions to check for FMM tree invalidation
+    Eigen::MatrixXd r_trg_old_;     ///< cache target positions to check for FMM tree invalidation
+
+    double *r_sl_device_;
+    double *r_dl_device_;
+    double *r_trg_device_;
+    double *f_sl_device_;
+    double *f_dl_device_;
+    Evaluator kernel_func_; ///< Pointer to gpu pair evaluator
 };
 }; // namespace kernels
 

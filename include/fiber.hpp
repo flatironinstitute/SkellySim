@@ -188,6 +188,7 @@ class FiberContainer {
     void update_stokeslets(double eta);
     void update_linear_operators(double dt, double eta);
     void update_cache_variables(double dt, double eta);
+    void update_local_node_positions();
     void update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
     void apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
     void step(VectorRef &fiber_sol);
@@ -215,7 +216,7 @@ class FiberContainer {
     int get_global_count() const;
 
     Eigen::MatrixXd generate_constant_force() const;
-    Eigen::MatrixXd get_local_node_positions() const;
+    const Eigen::MatrixXd &get_local_node_positions() const { return r_fib_local_; };
     Eigen::VectorXd get_RHS() const;
     Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta, bool subtract_self = true) const;
     Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;
@@ -235,6 +236,7 @@ class FiberContainer {
   private:
     int world_size_ = -1;
     int world_rank_;
+    Eigen::MatrixXd r_fib_local_;
 
   public:
     MSGPACK_DEFINE(fibers);

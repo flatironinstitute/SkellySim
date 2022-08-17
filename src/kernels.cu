@@ -186,4 +186,5 @@ void stresslet_direct_gpu_impl(const double *r_src, const double *f_src, int n_s
                                int n_trg) {
     kernel_direct_gpu<StokesDoubleLayerCuda<double>>(r_src, f_src, n_src, r_trg, u_trg, n_trg);
 }
+
 } // namespace kernels

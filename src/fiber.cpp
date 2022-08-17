@@ -660,23 +660,6 @@ VectorXd FiberContainer::get_RHS() const {
     return RHS;
 }
 
-MatrixXd FiberContainer::get_local_node_positions() const {
-    const int n_pts_tot = get_local_node_count();
-    MatrixXd r(3, n_pts_tot);
-    size_t offset = 0;
-
-    for (const auto &fib : *this) {
-        for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt) {
-            for (int i = 0; i < 3; ++i) {
-                r(i, i_pt + offset) = fib.x_(i, i_pt);
-            }
-        }
-        offset += fib.n_nodes_;
-    }
-
-    return r;
-}
-
 MatrixXd FiberContainer::flow(const MatrixRef &r_trg, const MatrixRef &fib_forces, double eta,
                               bool subtract_self) const {
     spdlog::debug("Starting fiber flow");
@@ -748,6 +731,19 @@ MatrixXd FiberContainer::apply_fiber_force(VectorRef &x_all) const {
     return fw;
 }
 
+void FiberContainer::update_local_node_positions() {
+    r_fib_local_.resize(3, get_local_node_count());
+    size_t offset = 0;
+    for (const auto &fib : *this) {
+        for (int i_pt = 0; i_pt < fib.n_nodes_; ++i_pt) {
+            for (int i = 0; i < 3; ++i) {
+                r_fib_local_(i, i_pt + offset) = fib.x_(i, i_pt);
+            }
+        }
+        offset += fib.n_nodes_;
+    }
+}
+
 void FiberContainer::update_cache_variables(double dt, double eta) {
     for (auto &fib : *this) {
         fib.update_constants(eta);
@@ -756,6 +752,8 @@ void FiberContainer::update_cache_variables(double dt, double eta) {
         fib.update_linear_operator(dt, eta);
         fib.update_force_operator();
     }
+
+    update_local_node_positions();
 }
 
 void FiberContainer::update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
@@ -819,8 +817,7 @@ FiberContainer::FiberContainer(Params &params) {
         stokeslet_kernel_ = kernels::FMM<stkfmm::Stk3DFMM>(mult_order, max_pts, stkfmm::PAXIS::NONE,
                                                            stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
-    }
-    else if (params.pair_evaluator == "CPU")
+    } else if (params.pair_evaluator == "CPU")
         stokeslet_kernel_ = kernels::stokeslet_direct_cpu;
     else if (params.pair_evaluator == "GPU")
         stokeslet_kernel_ = kernels::stokeslet_direct_gpu;
@@ -853,4 +850,6 @@ FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
                 ->debug("Fiber {}: {} {} {}", i_fib, fib.n_nodes_, fib.bending_rigidity_, fib.length_);
         }
     }
+
+    update_local_node_positions();
 }
