@@ -43,6 +43,7 @@ Eigen::VectorXd get_fiber_RHS();
 Eigen::VectorXd get_shell_RHS();
 Eigen::VectorXd get_body_RHS();
 struct properties_t &get_properties();
+Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg);
 
 }; // namespace System
 

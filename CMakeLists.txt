@@ -64,6 +64,7 @@ find_package(Teuchos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(Belos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
 find_package(pvfmm REQUIRED)
 find_package(STKFMM REQUIRED)
+find_package(Boost REQUIRED)
 
 set(SKELLY_INCLUDES_FMM ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
@@ -87,7 +88,8 @@ set(SKELLY_INCLUDES_SYSTEM
 add_library(skelly OBJECT
   src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
   src/dynamic_instability.cpp src/system.cpp src/body.cpp src/solver_hydro.cpp src/rng.cpp
-  src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp src/kernels.cu
+  src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp src/streamline.cpp
+  src/kernels.cu
 )
 
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES} SYSTEM ${SKELLY_INCLUDES_SYSTEM})

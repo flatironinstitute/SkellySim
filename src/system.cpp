@@ -15,6 +15,7 @@
 #include <point_source.hpp>
 #include <rng.hpp>
 #include <solver_hydro.hpp>
+#include <streamline.hpp>
 #include <system.hpp>
 
 #include <cnpy.hpp>
@@ -275,7 +276,7 @@ class TrajectoryReader {
             for (auto &fib : fc_.fibers)
                 is_minus_clamped.push_back(fib.is_minus_clamped());
         } else {
-            throw std::runtime_error("Resume is broken in this version of SkellySim with dynamic instability. :()");
+            throw std::runtime_error("Resume is broken in this version of SkellySim with dynamic instability. :(");
         }
 
         fc_.fibers.clear();
@@ -643,14 +644,12 @@ Eigen::MatrixXd VelocityField::make_grid() {
     return grid;
 }
 
-void VelocityField::compute() {
-    time = properties.time;
+Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
+    Eigen::MatrixXd u_trg(r_trg.rows(), r_trg.cols());
 
     const double eta = params_.eta;
     const auto [sol_fibers, sol_shell, sol_bodies] = get_solution_maps(curr_solution_.data());
     const auto &fp = params_.fiber_periphery_interaction;
-
-    x_grid = make_grid();
 
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
     if (params_.periphery_interaction_flag) {
@@ -671,22 +670,30 @@ void VelocityField::compute() {
     for (auto &body : bc_.spherical_bodies)
         body->force_torque_.segment(0, 3) += body->external_force_;
 
-    Eigen::MatrixXd v_grid_fibers = fc_.flow(x_grid, f_on_fibers, eta, false);
-    Eigen::MatrixXd v_grid_bodies = bc_.flow(x_grid, sol_bodies, eta);
-    Eigen::MatrixXd v_grid_shell = shell_->flow(x_grid, sol_shell, eta);
-    Eigen::MatrixXd v_grid_points = psc_.flow(x_grid, eta, properties.time);
-
-    v_grid = v_grid_fibers + v_grid_bodies + v_grid_shell + v_grid_points;
+    // clang-format off
+    u_trg = fc_.flow(r_trg, f_on_fibers, eta, false) + \
+        bc_.flow(r_trg, sol_bodies, eta) + \
+        shell_->flow(r_trg, sol_shell, eta) + \
+        psc_.flow(r_trg, eta, properties.time);
+    // clang-format on
 
     // FIXME: move this to body logic with overloading
     // Replace points inside a body to have velocity v_body + w_body x r
-    for (int i = 0; i < x_grid.cols(); ++i) {
+    for (int i = 0; i < r_trg.cols(); ++i) {
         for (auto &body : bc_.spherical_bodies) {
-            Eigen::Vector3d dx = x_grid.col(i) - body->position_;
+            Eigen::Vector3d dx = r_trg.col(i) - body->position_;
             if (dx.norm() < body->radius_)
-                v_grid.col(i) = body->velocity_ + body->angular_velocity_.cross(dx);
+                u_trg.col(i) = body->velocity_ + body->angular_velocity_.cross(dx);
         }
     }
+
+    return u_trg;
+}
+
+void VelocityField::compute() {
+    time = properties.time;
+    x_grid = make_grid();
+    v_grid = velocity_at_targets(x_grid);
 }
 
 /// @brief Calculate all initial velocities/forces/RHS/BCs
