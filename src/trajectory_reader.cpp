@@ -9,11 +9,12 @@
 
 #include <fstream>
 
-#include <sys/mman.h>
-#include <spdlog/spdlog.h>
 #include <mpi.h>
+#include <spdlog/spdlog.h>
+#include <sys/mman.h>
 
-TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_flag) : offset_(0), resume_flag_(resume_flag) {
+TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_flag)
+    : offset_(0), resume_flag_(resume_flag) {
     fd_ = open(input_file.c_str(), O_RDONLY);
     if (fd_ == -1)
         throw std::runtime_error("Unable to open trajectory file " + input_file + " for resume.");
@@ -27,6 +28,8 @@ TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_fl
     addr_ = static_cast<char *>(mmap(NULL, buflen_, PROT_READ, MAP_PRIVATE, fd_, 0u));
     if (addr_ == MAP_FAILED)
         throw std::runtime_error("Error mapping " + input_file + " for resume.");
+
+    build_index();
 }
 
 std::size_t TrajectoryReader::TrajectoryReader::read_next_frame() {
@@ -38,6 +41,27 @@ std::size_t TrajectoryReader::TrajectoryReader::read_next_frame() {
     return offset_ - old_offset;
 }
 
+void TrajectoryReader::build_index() {
+    offset_ = 0;
+    offsets_.push_back(offset_);
+    while (read_next_frame()) {
+        offsets_.push_back(offset_);
+    }
+    spdlog::info("Built trajectory index with {} frames", offsets_.size());
+}
+
+bool TrajectoryReader::load_frame(std::size_t frameno) {
+    if (frameno >= offsets_.size()) {
+        spdlog::error("Error loading frame: {}", frameno);
+        return true;
+    }
+    offset_ = offsets_[frameno];
+    read_next_frame();
+    unpack_current_frame();
+    spdlog::info("Loaded frame: {}", frameno);
+
+    return false;
+}
 
 void TrajectoryReader::unpack_current_frame(bool silence_output) {
     int size, rank;

@@ -1,12 +1,16 @@
+#include <cstdint>
 #include <skelly_sim.hpp>
 
 #include <listener.hpp>
-#include <system.hpp>
 #include <streamline.hpp>
+#include <system.hpp>
+#include <trajectory_reader.hpp>
 
 #include <spdlog/spdlog.h>
 
 #include <iostream>
+
+namespace listener {
 
 typedef struct listener_command_t {
     std::size_t frame_no = 0;
@@ -27,10 +31,9 @@ typedef struct listener_response_t {
     MSGPACK_DEFINE_MAP(streamlines);
 } listener_response_t;
 
-
-namespace listener {
 void run() {
     spdlog::info("Entering listener mode...");
+    TrajectoryReader traj("skelly_sim.out", false);
     uint64_t msgsize = 0;
     while (read(STDIN_FILENO, &msgsize, sizeof(msgsize)) > 0) {
         if (msgsize == 0)
@@ -40,12 +43,19 @@ void run() {
 
         auto obj = msgpack::unpack(data.data(), msgsize).get().as<listener_command_t>();
 
+        if (traj.load_frame(obj.frame_no)) {
+            uint64_t msgsize = 0;
+            fwrite(&msgsize, sizeof(msgsize), 1, stdout);
+            fflush(stdout);
+            continue;
+        }
+
         msgpack::sbuffer sbuf;
         msgpack::pack(sbuf, listener_response_t{.streamlines = {StreamLine(), StreamLine()}});
 
         uint64_t ressize = sbuf.size();
         spdlog::info("Returning buffer of size: {}", ressize);
-        fwrite(&ressize, sizeof(uint64_t), 1, stdout);
+        fwrite(&ressize, sizeof(ressize), 1, stdout);
         fwrite(sbuf.data(), 1, sbuf.size(), stdout);
         fflush(stdout);
     }
