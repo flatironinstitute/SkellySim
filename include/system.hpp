@@ -18,7 +18,8 @@ struct properties_t {
     double time = 0.0; ///< Current system time
 };
 
-void init(const std::string &input_file, bool resume_flag = false, bool post_process_flag = false);
+void init(const std::string &input_file, bool resume_flag = false, bool post_process_flag = false,
+          bool listen_flag = false);
 Params *get_params();
 BodyContainer *get_body_container();
 FiberContainer *get_fiber_container();
@@ -43,6 +44,9 @@ Eigen::VectorXd get_fiber_RHS();
 Eigen::VectorXd get_shell_RHS();
 Eigen::VectorXd get_body_RHS();
 struct properties_t &get_properties();
+Eigen::VectorXd &get_curr_solution();
+std::tuple<VectorMap, VectorMap, VectorMap> get_solution_maps(double *x);
+std::tuple<CVectorMap, CVectorMap, CVectorMap> get_solution_maps(const double *x);
 Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg);
 
 }; // namespace System

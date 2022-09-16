@@ -1,14 +1,18 @@
 #include <skelly_sim.hpp>
 
 #include <csignal>
+#include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unistd.h>
 #include <unordered_map>
 
 #include <body.hpp>
 #include <fiber.hpp>
+#include <io_maps.hpp>
+#include <listener.hpp>
 #include <params.hpp>
 #include <parse_util.hpp>
 #include <periphery.hpp>
@@ -17,6 +21,7 @@
 #include <solver_hydro.hpp>
 #include <streamline.hpp>
 #include <system.hpp>
+#include <trajectory_reader.hpp>
 
 #include <cnpy.hpp>
 
@@ -44,6 +49,9 @@ struct properties_t &get_properties() {
 };
 
 Eigen::VectorXd curr_solution_;
+
+Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
+
 std::ofstream ofs_;    ///< Trajectory output file stream. Opened at initialization
 std::ofstream ofs_vf_; ///< Velocity field output file stream. Opened at initialization
 
@@ -54,37 +62,9 @@ int size_;                ///< MPI size
 toml::value param_table_; ///< Parsed input table
 bool resume_flag_;        ///< FIXME: Hack check if resuming or post-processing/initial run
 
-/// @brief Structure for trajectory output via msgpack
-///
-/// This can be extended easily, so long as you update the corresponding input_map_t and potentially the System::write()
-/// function if you can't use a reference in the output_map for some reason.
-typedef struct output_map_t {
-    double &time = properties.time;                             ///< System::properties
-    double &dt = properties.dt;                                 ///< System::properties
-    FiberContainer &fibers = fc_;                               ///< System::fc_
-    BodyContainer &bodies = bc_;                                ///< System::bc_
-    Periphery &shell = *shell_;                                 ///< System::shell_
-    std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
-} output_map_t;
-output_map_t output_map; ///< Output data for msgpack dump
-
-/// @brief Structure for importing frame of trajectory into the simulation
-///
-/// We can't use output_map_t here, but rather a similar struct which uses copies of the member
-/// variables (rather than references) which are then used to update the System variables.
-typedef struct input_map_t {
-    double time;                                                ///< System::properties
-    double dt;                                                  ///< System::properties
-    FiberContainer fibers;                                      ///< System::fc_
-    BodyContainer bodies;                                       ///< System::bc_
-    Periphery shell;                                            ///< System::bc_
-    std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
-} input_map_t;
-
 /// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
-std::tuple<int, int, int> get_local_node_counts() {
+std::tuple<int, int, int>
+get_local_node_counts() {
     return std::make_tuple(fc_.get_local_node_count(), shell_->get_local_node_count(), bc_.get_local_node_count());
 }
 
@@ -224,141 +204,11 @@ class VelocityField {
     std::vector<int> displs_;
 };
 
-class TrajectoryReader {
-  public:
-    TrajectoryReader(const std::string &input_file) : offset_(0) {
-        fd_ = open(input_file.c_str(), O_RDONLY);
-        if (fd_ == -1)
-            throw std::runtime_error("Unable to open trajectory file " + input_file + " for resume.");
-
-        struct stat sb;
-        if (fstat(fd_, &sb) == -1)
-            throw std::runtime_error("Error statting " + input_file + " for resume.");
-
-        buflen_ = sb.st_size;
-
-        addr_ = static_cast<char *>(mmap(NULL, buflen_, PROT_READ, MAP_PRIVATE, fd_, 0u));
-        if (addr_ == MAP_FAILED)
-            throw std::runtime_error("Error mapping " + input_file + " for resume.");
-    }
-
-    std::size_t read_next_frame() {
-        if (offset_ >= buflen_)
-            return 0;
-
-        std::size_t old_offset = offset_;
-        msgpack::unpack(oh_, addr_, buflen_, offset_);
-        return offset_ - old_offset;
-    }
-
-    void unpack_current_frame(bool silence_output = false) {
-        msgpack::object obj = oh_.get();
-
-        input_map_t const &min_state = obj.as<input_map_t>();
-
-        const int n_fib_tot = min_state.fibers.fibers.size();
-        const int fib_count_big = n_fib_tot / size_ + 1;
-        const int fib_count_small = n_fib_tot / size_;
-        const int n_fib_big = n_fib_tot % size_;
-
-        std::vector<int> counts(size_);
-        std::vector<int> displs(size_ + 1);
-        for (int i = 0; i < size_; ++i) {
-            counts[i] = ((i < n_fib_big) ? fib_count_big : fib_count_small);
-            displs[i + 1] = displs[i] + counts[i];
-        }
-
-        properties.time = min_state.time;
-        properties.dt = min_state.dt;
-        std::vector<bool> is_minus_clamped;
-        // FIXME: Hack to work around not saving clamp state
-        if (!params_.dynamic_instability.n_nodes) {
-            for (auto &fib : fc_.fibers)
-                is_minus_clamped.push_back(fib.is_minus_clamped());
-        } else {
-            throw std::runtime_error("Resume is broken in this version of SkellySim with dynamic instability. :(");
-        }
-
-        fc_.fibers.clear();
-        int i_fib = 0;
-        for (const auto &min_fib : min_state.fibers.fibers) {
-            if (i_fib >= displs[rank_] && i_fib < displs[rank_ + 1]) {
-                fc_.fibers.emplace_back(Fiber(min_fib, params_.eta));
-                fc_.fibers.back().minus_clamped_ = is_minus_clamped[i_fib - displs[rank_]];
-            }
-            i_fib++;
-        }
-
-        // make sure sublist pointers are initialized, and then fill them in
-        bc_.populate_sublists();
-        for (int i = 0; i < bc_.spherical_bodies.size(); ++i)
-            bc_.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
-        for (int i = 0; i < bc_.deformable_bodies.size(); ++i)
-            bc_.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
-        output_map.rng_state = min_state.rng_state;
-        if (size_ > min_state.rng_state.size() && resume_flag_) {
-            spdlog::error(
-                "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
-            MPI_Finalize();
-            exit(1);
-        } else if (size_ < min_state.rng_state.size() && !silence_output && resume_flag_) {
-            spdlog::warn(
-                "Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
-                "the RNG.");
-        }
-        if (size_ != min_state.rng_state.size() && resume_flag_) {
-            spdlog::error(
-                "Different number MPI ranks provided than previous run for resume. This is currently broken.");
-            MPI_Finalize();
-            exit(1);
-        }
-
-        RNG::init(output_map.rng_state[rank_]);
-
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        if (shell_->is_active())
-            shell_->solution_vec_ =
-                min_state.shell.solution_vec_.segment(shell_->node_displs_[rank], shell_->node_counts_[rank]);
-
-        auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
-        shell_sol = shell_->solution_vec_;
-
-        if (rank == 0) {
-            std::size_t body_offset = 0;
-            for (auto &body : bc_.bodies) {
-                body_sol.segment(body_offset, body->solution_vec_.size()) = body->solution_vec_;
-                body_offset += body->solution_vec_.size();
-            }
-        }
-
-        std::size_t fiber_offset = 0;
-        for (auto &fib : fc_.fibers) {
-            for (int i = 0; i < 3; ++i) {
-                fiber_sol.segment(fiber_offset, fib.n_nodes_) = fib.x_.row(i);
-                fiber_offset += fib.n_nodes_;
-            }
-            fiber_sol.segment(fiber_offset, fib.n_nodes_) = fib.tension_;
-            fiber_offset += fib.n_nodes_;
-        }
-
-        fc_.update_cache_variables(properties.dt, params_.eta);
-        bc_.update_cache_variables(params_.eta);
-    }
-
-  private:
-    int fd_;                    ///< File descriptor
-    std::size_t buflen_;        ///< size of our file
-    char *addr_;                ///< mmap address
-    std::size_t offset_;        ///< current byte location in trajectory
-    msgpack::object_handle oh_; ///< handle to last read frame
-};
-
 /// @brief Set system state to last state found in trajectory files
 ///
 /// @param[in] input_file input file name of trajectory file for this rank
 void resume_from_trajectory(std::string input_file) {
-    TrajectoryReader trajectory(input_file);
+    TrajectoryReader trajectory(input_file, true);
     while (trajectory.read_next_frame()) {
     }
     trajectory.unpack_current_frame();
@@ -893,7 +743,7 @@ void run() {
 
 /// @brief Run the post processing step
 void run_post_process() {
-    TrajectoryReader trajectory("skelly_sim.out");
+    TrajectoryReader trajectory("skelly_sim.out", resume_flag_);
 
     double dt_write_field = params_.velocity_field.dt_write_field;
     double t_last = -dt_write_field;
@@ -960,18 +810,28 @@ toml::value *get_param_table() { return &param_table_; }
 /// @brief Initialize entire system. Needs to be called once at the beginning of the program execution
 /// @param[in] input_file String of toml config file specifying system parameters and initial conditions
 /// @param[in] resume_flag true if simulation is resuming from prior execution state, false otherwise.
-void init(const std::string &input_file, bool resume_flag, bool post_process_flag) {
+void init(const std::string &input_file, bool resume_flag, bool post_process_flag, bool listen_flag) {
     resume_flag_ = resume_flag;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
     signal(SIGINT, interrupt_handler);
-    spdlog::logger sink = rank_ == 0
-                              ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
-                              : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
-    spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
-    spdlog::stdout_color_mt("STKFMM");
-    spdlog::stdout_color_mt("Belos");
-    spdlog::stdout_color_mt("SkellySim global");
+    if (listen_flag) {
+        spdlog::logger sink =
+            rank_ == 0 ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stderr_sink_st>())
+                       : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
+        spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
+        spdlog::stderr_color_mt("STKFMM");
+        spdlog::stderr_color_mt("Belos");
+        spdlog::stderr_color_mt("SkellySim global");
+    } else {
+        spdlog::logger sink =
+            rank_ == 0 ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
+                       : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
+        spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
+        spdlog::stdout_color_mt("STKFMM");
+        spdlog::stdout_color_mt("Belos");
+        spdlog::stdout_color_mt("SkellySim global");
+    }
     spdlog::cfg::load_env_levels();
 
     spdlog::info("****** SkellySim {} ({}) ******", GIT_TAG, GIT_COMMIT);
@@ -1007,7 +867,8 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
 
     curr_solution_.resize(get_local_solution_size());
     std::string filename = "skelly_sim.out";
-    auto trajectory_open_mode = std::ofstream::binary | (post_process_flag ? std::ofstream::in : std::ofstream::out);
+    auto trajectory_open_mode =
+        std::ofstream::binary | ((post_process_flag || listen_flag) ? std::ofstream::in : std::ofstream::out);
     if (resume_flag) {
         resume_from_trajectory(filename);
         trajectory_open_mode = trajectory_open_mode | std::ofstream::app;

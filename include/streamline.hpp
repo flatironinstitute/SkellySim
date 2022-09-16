@@ -11,6 +11,8 @@ class StreamLine {
     Eigen::MatrixXd x; ///< Coordinates of streamline
     void compute();    ///< Compute streamline
 
+    StreamLine() = default;
+
     StreamLine(VectorRef &x0_, double tmax_, double precision_) : x(x0_), tmax(tmax_), precision(precision_){};
 
     void write(std::ofstream &ofs) {
