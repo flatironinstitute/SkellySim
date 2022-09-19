@@ -12,7 +12,6 @@
 #include <body.hpp>
 #include <fiber.hpp>
 #include <io_maps.hpp>
-#include <listener.hpp>
 #include <params.hpp>
 #include <parse_util.hpp>
 #include <periphery.hpp>

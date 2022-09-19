@@ -3,7 +3,13 @@ import msgpack
 import pickle
 import toml
 import os
+import struct
+from typing import List
+from dataclasses import dataclass, field, asdict
+from dataclass_utils import check_type
+from subprocess import Popen, PIPE
 
+from skelly_sim.skelly_config import _check_invalid_attributes
 
 def _eigen_to_numpy(d):
     """
@@ -41,6 +47,107 @@ def _eigen_to_numpy(d):
             d[k] = _eigen_to_numpy(v)
 
     return d
+
+@dataclass
+class StreamlinesRequest:
+    """Dataclass for requesting multiple streamlines
+
+    Attributes
+    ----------
+    dt_init : float, default: :obj:`0.1`
+        Initial timestep for streamline integrator (adaptive timestepper).
+        Output points in streamline will be roughly dt_init separated in time
+    t_final : float, default: :obj:`1.0`
+        Final time to integrate to for streamline
+    abs_err : float, default: :obj:`1E-10`
+        Absolute tolerance in integrator. Lower will be more accurate, but take longer to evaluate
+    rel_err : float, default: :obj:`1E-6`
+        Relative tolerance in integrator. Lower will be more accurate, but take longer to evaluate
+    x0 : List[float], default: :obj:`[]`, units: :obj:`μm`
+        Position of the initial streamline seeds (x0,y0,z0,x1,y1,z1,...)
+    """
+    dt_init: float = 0.1
+    t_final: float = 1.0
+    abs_err: float = 1E-10
+    rel_err: float = 1E-6
+    x0: List[float] = field(default_factory=list)
+
+    def isvalid(self):
+        if len(self.x0) % 3:
+            print("Length of x0 in StreamlineRequest must be multiple of 3")
+            return False
+        return True
+
+
+@dataclass
+class Request:
+    """Dataclass for a request to skelly_sim's listener functionality
+
+    Attributes
+    ----------
+    frame_no : int, default: :obj:`0`
+        Frame index of interest in trajectory
+    streamlines : StreamlinesRequest, default: :obj:`StreamlinesRequest()`
+        Streamlines to build
+    """
+    frame_no: int = 0
+    streamlines: StreamlinesRequest = field(default_factory=StreamlinesRequest)
+
+
+class Listener:
+    """
+    Utility wrapper for interacting with the SkellySim binary directly for various post-processing tasks.
+    Rather than interacting with stored binary data, this allows you to generate analysis data
+    (such as streamlines and velocity fields) on the fly.
+
+    Attributes
+    ----------
+    config_data : dict
+        Global toml data associated with the simulation
+    """
+
+    def __init__(self, toml_file: str = 'skelly_config.toml', binary: str = 'skelly_sim'):
+        """
+        Initialize our TrajectoryReader object
+
+        Arguments
+        ---------
+        toml_file : str
+            Configuration file for the simulation. Usually 'skelly_config.toml', which is the default.
+        """
+
+        self.config_data: dict = {}
+
+        with open(toml_file, 'r') as f:
+            self.config_data = toml.load(f)
+
+        self._proc = Popen([binary, '--listen'], stdin=PIPE, stdout=PIPE)
+
+
+    def request(self, command: Request):
+        check_type(command)
+        if _check_invalid_attributes(self):
+            print("Invalid request to Listener. Please fix listed attributes and try again")
+            return None
+        if not command.streamlines.isvalid():
+            return None
+
+        msg = msgpack.packb(asdict(command))
+
+        self._proc.stdin.write(np.uint64(len(msg)))
+        self._proc.stdin.write(msg)
+        self._proc.stdin.flush()
+        ressize = struct.unpack('<Q', self._proc.stdout.read(8))[0]
+        if ressize:
+            res = msgpack.unpackb(self._proc.stdout.read(ressize), object_hook=_eigen_to_numpy)
+        else:
+            res = None
+        return res
+
+
+    def __del__(self):
+        self._proc.terminate()
+
 
 
 class TrajectoryReader:

@@ -11,6 +11,7 @@ class TrajectoryReader {
     std::size_t read_next_frame();
     bool load_frame(std::size_t frameno);
     void unpack_current_frame(bool silence_output = false);
+    std::size_t get_n_frames() const { return offsets_.size(); }
 
   private:
     int fd_;                           ///< File descriptor

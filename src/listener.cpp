@@ -27,8 +27,11 @@ typedef struct listener_command_t {
 } listener_command_t;
 
 typedef struct listener_response_t {
+    double time;
+    std::size_t i_frame;
+    std::size_t n_frames;
     std::vector<StreamLine> streamlines;
-    MSGPACK_DEFINE_MAP(streamlines);
+    MSGPACK_DEFINE_MAP(time, i_frame, n_frames, streamlines);
 } listener_response_t;
 
 std::vector<StreamLine> process_streamlines(struct listener_command_t::streamlines &request) {
@@ -49,6 +52,7 @@ std::vector<StreamLine> process_streamlines(struct listener_command_t::streamlin
 void run() {
     spdlog::info("Entering listener mode...");
     TrajectoryReader traj("skelly_sim.out", false);
+
     uint64_t msgsize = 0;
     while (read(STDIN_FILENO, &msgsize, sizeof(msgsize)) > 0) {
         if (msgsize == 0)
@@ -66,7 +70,10 @@ void run() {
             continue;
         }
 
-        listener_response_t response{.streamlines = process_streamlines(cmd.streamlines)};
+        listener_response_t response{.time = System::get_properties().time,
+                                     .i_frame = cmd.frame_no,
+                                     .n_frames = traj.get_n_frames(),
+                                     .streamlines = process_streamlines(cmd.streamlines)};
         msgpack::sbuffer sbuf;
         msgpack::pack(sbuf, response);
 
