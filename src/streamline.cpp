@@ -28,7 +28,7 @@ struct push_back_points_and_time {
 
 void StreamLine::compute() {
     using namespace boost::numeric::odeint;
-    double abs_err = 1.0e-11, rel_err = 1.0e-9, a_x = 1.0, a_dxdt = 1.0, t_max = 10.0, dt_init = 0.01;
+    double a_x = 1.0, a_dxdt = 1.0;
     typedef runge_kutta_cash_karp54<point_type> error_stepper_type;
     typedef controlled_runge_kutta<error_stepper_type> controlled_stepper_type;
     controlled_stepper_type controlled_stepper(
@@ -38,7 +38,7 @@ void StreamLine::compute() {
     std::vector<point_type> xvec;
     std::vector<double> times;
 
-    integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, t_max, dt_init,
+    integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, t_final, dt_init,
                        push_back_points_and_time(xvec, times));
 
     x = MatrixMap((double *)xvec.data(), 3, xvec.size());

@@ -19,7 +19,6 @@
 #include <point_source.hpp>
 #include <rng.hpp>
 #include <solver_hydro.hpp>
-#include <streamline.hpp>
 #include <system.hpp>
 #include <trajectory_reader.hpp>
 

@@ -13,7 +13,10 @@ class StreamLine {
 
     StreamLine() = default;
 
-    StreamLine(VectorRef &x0_, double tmax_, double precision_) : x(x0_), tmax(tmax_), precision(precision_){};
+    StreamLine(VectorRef &x0_, double dt_init_, double t_final_, double abs_err_, double rel_err_)
+        : x(x0_), dt_init(dt_init_), t_final(t_final_), abs_err(abs_err_), rel_err(rel_err_){
+        compute();
+    };
 
     void write(std::ofstream &ofs) {
         msgpack::pack(ofs, *this);
@@ -22,8 +25,10 @@ class StreamLine {
     MSGPACK_DEFINE_MAP(x);
 
   private:
-    double tmax;
-    double precision;
+    double dt_init;
+    double t_final;
+    double abs_err;
+    double rel_err;
 };
 
 #endif
