@@ -34,7 +34,7 @@ void StreamLine::compute() {
     controlled_stepper_type controlled_stepper(
         default_error_checker<double, range_algebra, default_operations>(abs_err, rel_err, a_x, a_dxdt));
 
-    point_type x0 = {x(0), x(1), x(2)};
+    point_type x0(x.data());
     std::vector<point_type> xvec;
     std::vector<double> times;
 
@@ -42,4 +42,9 @@ void StreamLine::compute() {
                        push_back_points_and_time(xvec, times));
 
     x = MatrixMap((double *)xvec.data(), 3, xvec.size());
+
+    v.resize(x.rows(), x.cols());
+
+    for (int i = 0; i < v.cols(); ++i)
+        v.col(i) = System::velocity_at_targets(x.col(i));
 }

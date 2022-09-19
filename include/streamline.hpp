@@ -9,6 +9,7 @@
 class StreamLine {
   public:
     Eigen::MatrixXd x; ///< Coordinates of streamline
+    Eigen::MatrixXd v; ///< Velocities of streamline
     void compute();    ///< Compute streamline
 
     StreamLine() = default;
@@ -22,7 +23,7 @@ class StreamLine {
         msgpack::pack(ofs, *this);
         ofs.flush();
     };
-    MSGPACK_DEFINE_MAP(x);
+    MSGPACK_DEFINE_MAP(x, v);
 
   private:
     double dt_init;
