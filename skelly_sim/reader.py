@@ -8,8 +8,21 @@ from typing import List
 from dataclasses import dataclass, field, asdict
 from dataclass_utils import check_type
 from subprocess import Popen, PIPE
+from nptyping import NDArray, Shape, Float64
 
 from skelly_sim.skelly_config import _check_invalid_attributes
+
+def _ndencode(obj):
+    if isinstance(obj, np.ndarray):
+        return ['__eigen__', obj.shape[1], obj.shape[0]] + obj.ravel().tolist()
+    else:
+        return obj
+
+def _default_3d_matrix():
+    """
+    A default matrix factory for dataclass 'field' objects: :obj:`[]`
+    """
+    return np.zeros(shape=(0, 3), dtype=np.float64)
 
 def _eigen_to_numpy(d):
     """
@@ -63,21 +76,25 @@ class StreamlinesRequest:
         Absolute tolerance in integrator. Lower will be more accurate, but take longer to evaluate
     rel_err : float, default: :obj:`1E-6`
         Relative tolerance in integrator. Lower will be more accurate, but take longer to evaluate
-    x0 : List[float], default: :obj:`[]`, units: :obj:`μm`
-        Position of the initial streamline seeds (x0,y0,z0,x1,y1,z1,...)
+    x0 : NDArray[Shape["Any, 3"], Float64], default: :obj:`[]`, units: :obj:`μm`
+        Position of the initial streamline seeds [[x0,y0,z0],[x1,y1,z1],...]
     """
     dt_init: float = 0.1
     t_final: float = 1.0
     abs_err: float = 1E-10
     rel_err: float = 1E-6
-    x0: List[float] = field(default_factory=list)
+    x0: NDArray[Shape["Any, 3"], Float64] = field(default_factory=_default_3d_matrix)
 
-    def isvalid(self):
-        if len(self.x0) % 3:
-            print("Length of x0 in StreamlineRequest must be multiple of 3")
-            return False
-        return True
+@dataclass
+class VelocityFieldRequest:
+    """Dataclass for requesting a VelocityField
 
+    Attributes
+    ----------
+    x0 : List[float], default: :obj:`[]`, units: :obj:`μm`
+        Position of the field points [[x0,y0,z0],[x1,y1,z1],...]
+    """
+    x: NDArray[Shape["Any, 3"], Float64] = field(default_factory=_default_3d_matrix)
 
 @dataclass
 class Request:
@@ -92,7 +109,7 @@ class Request:
     """
     frame_no: int = 0
     streamlines: StreamlinesRequest = field(default_factory=StreamlinesRequest)
-
+    velocity_field: VelocityFieldRequest = field(default_factory=VelocityFieldRequest)
 
 class Listener:
     """
@@ -129,10 +146,8 @@ class Listener:
         if _check_invalid_attributes(self):
             print("Invalid request to Listener. Please fix listed attributes and try again")
             return None
-        if not command.streamlines.isvalid():
-            return None
 
-        msg = msgpack.packb(asdict(command))
+        msg = msgpack.packb(asdict(command), default=_ndencode)
 
         self._proc.stdin.write(np.uint64(len(msg)))
         self._proc.stdin.write(msg)

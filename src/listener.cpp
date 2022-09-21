@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <skelly_sim.hpp>
 
 #include <listener.hpp>
@@ -8,6 +7,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstdint>
 #include <iostream>
 
 namespace listener {
@@ -19,11 +19,16 @@ typedef struct listener_command_t {
         double t_final = 1.0;
         double abs_err = 1E-10;
         double rel_err = 1E-6;
-        std::vector<double> x0;
+        Eigen::MatrixXd x0;
         MSGPACK_DEFINE_MAP(dt_init, t_final, abs_err, rel_err, x0);
     } streamlines;
 
-    MSGPACK_DEFINE_MAP(frame_no, streamlines);
+    struct velocity_field {
+        Eigen::MatrixXd x;
+        MSGPACK_DEFINE_MAP(x);
+    } velocity_field;
+
+    MSGPACK_DEFINE_MAP(frame_no, streamlines, velocity_field);
 } listener_command_t;
 
 typedef struct listener_response_t {
@@ -31,22 +36,23 @@ typedef struct listener_response_t {
     std::size_t i_frame;
     std::size_t n_frames;
     std::vector<StreamLine> streamlines;
-    MSGPACK_DEFINE_MAP(time, i_frame, n_frames, streamlines);
+    Eigen::MatrixXd velocity_field;
+    MSGPACK_DEFINE_MAP(time, i_frame, n_frames, streamlines, velocity_field);
 } listener_response_t;
 
 std::vector<StreamLine> process_streamlines(struct listener_command_t::streamlines &request) {
     std::vector<StreamLine> streamlines;
-    if (request.x0.size() % 3) {
-        spdlog::error("Streamline initial positions are malformed (length must be multiple of 3)");
-        return streamlines;
-    }
 
-    for (int i = 0; i < request.x0.size(); i += 3) {
-        Eigen::Vector3d x0(request.x0.data() + i);
-        streamlines.push_back(StreamLine(x0, request.dt_init, request.t_final, request.abs_err, request.rel_err));
-    }
+    for (int i = 0; i < request.x0.cols(); i++)
+        streamlines.push_back(StreamLine(request.x0.col(i), request.dt_init, request.t_final, request.abs_err, request.rel_err));
 
     return streamlines;
+}
+
+Eigen::MatrixXd process_velocity_field(struct listener_command_t::velocity_field &request) {
+    if (!request.x.size())
+        return Eigen::MatrixXd();
+    return System::velocity_at_targets(request.x);
 }
 
 void run() {
@@ -70,10 +76,13 @@ void run() {
             continue;
         }
 
-        listener_response_t response{.time = System::get_properties().time,
-                                     .i_frame = cmd.frame_no,
-                                     .n_frames = traj.get_n_frames(),
-                                     .streamlines = process_streamlines(cmd.streamlines)};
+        listener_response_t response{
+            .time = System::get_properties().time,
+            .i_frame = cmd.frame_no,
+            .n_frames = traj.get_n_frames(),
+            .streamlines = process_streamlines(cmd.streamlines),
+            .velocity_field = process_velocity_field(cmd.velocity_field),
+        };
         msgpack::sbuffer sbuf;
         msgpack::pack(sbuf, response);
 
