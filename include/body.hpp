@@ -149,6 +149,7 @@ class BodyContainer {
     Eigen::MatrixXd flow_spherical(MatrixRef &r_trg, VectorRef &body_solution, double eta) const;
     Eigen::MatrixXd flow_deformable(MatrixRef &r_trg, VectorRef &body_solution, double eta) const;
     void step(VectorRef &body_sol, double dt) const;
+    void set_evaluator(const std::string &evaluator);
 
     /// @brief Update cache variables for each Body. @see Body::update_cache_variables
     void update_cache_variables(double eta) {

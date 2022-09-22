@@ -40,6 +40,8 @@ void write(std::ofstream &);
 bool check_collision();
 void backup();
 void restore();
+void set_evaluator(const std::string &evaluator);
+
 Eigen::VectorXd get_fiber_RHS();
 Eigen::VectorXd get_shell_RHS();
 Eigen::VectorXd get_body_RHS();

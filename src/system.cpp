@@ -538,6 +538,12 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     return u_trg;
 }
 
+void set_evaluator(const std::string &evaluator) {
+    fc_.set_evaluator(evaluator);
+    bc_.set_evaluator(evaluator);
+    shell_->set_evaluator(evaluator);
+}
+
 void VelocityField::compute() {
     time = properties.time;
     x_grid = make_grid();

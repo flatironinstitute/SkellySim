@@ -193,6 +193,7 @@ class FiberContainer {
     void apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
     void step(VectorRef &fiber_sol);
     void repin_to_bodies(BodyContainer &bodies);
+    void set_evaluator(const std::string &evaluator);
 
     /// @brief get total number of nodes across fibers in the container
     /// Usually you need this to form arrays used as input later

@@ -14,6 +14,8 @@ namespace listener {
 
 typedef struct listener_command_t {
     std::size_t frame_no = 0;
+    std::string evaluator = "CPU";
+
     struct streamlines {
         double dt_init = 0.1;
         double t_final = 1.0;
@@ -75,6 +77,7 @@ void run() {
             fflush(stdout);
             continue;
         }
+        System::set_evaluator(cmd.evaluator);
 
         listener_response_t response{
             .time = System::get_properties().time,

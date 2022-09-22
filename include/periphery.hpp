@@ -68,6 +68,7 @@ class Periphery {
     Eigen::VectorXi row_displs_;
 
     void step(VectorRef &solution) { solution_vec_ = solution; }
+    void set_evaluator(const std::string &evaluator);
 
     bool is_active() const { return n_nodes_global_; }
 

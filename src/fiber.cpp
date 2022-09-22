@@ -9,6 +9,7 @@
 #include <fiber.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
+#include <system.hpp>
 #include <utils.hpp>
 
 #include <spdlog/spdlog.h>
@@ -805,22 +806,29 @@ void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
     }
 }
 
-FiberContainer::FiberContainer(Params &params) {
-    spdlog::info("Initializing FiberContainer");
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
+void FiberContainer::set_evaluator(const std::string &evaluator) {
+    auto &params = *System::get_params();
 
-    if (params.pair_evaluator == "FMM") {
+    if (evaluator == "FMM") {
         utils::LoggerRedirect redirect(std::cout);
         const int mult_order = params.stkfmm.fiber_stokeslet_multipole_order;
         const int max_pts = params.stkfmm.fiber_stokeslet_max_points;
         stokeslet_kernel_ = kernels::FMM<stkfmm::Stk3DFMM>(mult_order, max_pts, stkfmm::PAXIS::NONE,
                                                            stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
         redirect.flush(spdlog::level::debug, "STKFMM");
-    } else if (params.pair_evaluator == "CPU")
+    } else if (evaluator == "CPU")
         stokeslet_kernel_ = kernels::stokeslet_direct_cpu;
-    else if (params.pair_evaluator == "GPU")
+    else if (evaluator == "GPU")
         stokeslet_kernel_ = kernels::stokeslet_direct_gpu;
+}
+
+
+FiberContainer::FiberContainer(Params &params) {
+    spdlog::info("Initializing FiberContainer");
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
+
+    set_evaluator(params.pair_evaluator);
 }
 
 FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {

@@ -6,6 +6,7 @@
 #include <kernels.hpp>
 #include <parse_util.hpp>
 #include <periphery.hpp>
+#include <system.hpp>
 #include <utils.hpp>
 
 #include <typeindex>
@@ -336,6 +337,29 @@ void BodyContainer::populate_sublists() {
     }
 }
 
+void BodyContainer::set_evaluator(const std::string &evaluator) {
+    auto &params = *System::get_params();
+
+    if (evaluator == "FMM") {
+        auto &sp = params.stkfmm;
+        utils::LoggerRedirect redirect(std::cout);
+        stresslet_kernel_ =
+            kernels::FMM<stkfmm::Stk3DFMM>(sp.body_stresslet_multipole_order, sp.body_stresslet_max_points,
+                                           stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm);
+        redirect.flush(spdlog::level::debug, "STKFMM");
+        stokeslet_kernel_ =
+            kernels::FMM<stkfmm::Stk3DFMM>(sp.body_oseen_multipole_order, sp.body_oseen_max_points, stkfmm::PAXIS::NONE,
+                                           stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
+        redirect.flush(spdlog::level::debug, "STKFMM");
+    } else if (evaluator == "CPU") {
+        stresslet_kernel_ = kernels::stresslet_direct_cpu;
+        stokeslet_kernel_ = kernels::stokeslet_direct_cpu;
+    } else if (evaluator == "GPU") {
+        stresslet_kernel_ = kernels::stresslet_direct_gpu;
+        stokeslet_kernel_ = kernels::stokeslet_direct_gpu;
+    }
+}
+
 // FIXME: remove redundant code in =/copy
 /// @brief Copy constructor...
 BodyContainer::BodyContainer(const BodyContainer &orig) {
@@ -371,25 +395,7 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
 
-    if (params.pair_evaluator == "FMM") {
-        auto &sp = params.stkfmm;
-        utils::LoggerRedirect redirect(std::cout);
-        stresslet_kernel_ =
-            kernels::FMM<stkfmm::Stk3DFMM>(sp.body_stresslet_multipole_order, sp.body_stresslet_max_points,
-                                           stkfmm::PAXIS::NONE, stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm);
-        redirect.flush(spdlog::level::debug, "STKFMM");
-        stokeslet_kernel_ =
-            kernels::FMM<stkfmm::Stk3DFMM>(sp.body_oseen_multipole_order, sp.body_oseen_max_points, stkfmm::PAXIS::NONE,
-                                           stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
-        redirect.flush(spdlog::level::debug, "STKFMM");
-    } else if (params.pair_evaluator == "CPU") {
-        stresslet_kernel_ = kernels::stresslet_direct_cpu;
-        stokeslet_kernel_ = kernels::stokeslet_direct_cpu;
-    }
-    else if (params.pair_evaluator == "GPU") {
-        stresslet_kernel_ = kernels::stresslet_direct_gpu;
-        stokeslet_kernel_ = kernels::stokeslet_direct_gpu;
-    }
+    set_evaluator(params.pair_evaluator);
 
     const int n_bodies_tot = body_tables.size();
     spdlog::info("Reading in {} bodies", n_bodies_tot);

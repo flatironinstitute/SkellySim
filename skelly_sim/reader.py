@@ -104,10 +104,14 @@ class Request:
     ----------
     frame_no : int, default: :obj:`0`
         Frame index of interest in trajectory
+    evaluator : str, default: :obj:`CPU`
+        Pair evaluator: "FMM", "CPU", or "GPU".
+        CPU and GPU are typically fastest for smaller systems
     streamlines : StreamlinesRequest, default: :obj:`StreamlinesRequest()`
         Streamlines to build
     """
     frame_no: int = 0
+    evaluator: str = "CPU"
     streamlines: StreamlinesRequest = field(default_factory=StreamlinesRequest)
     velocity_field: VelocityFieldRequest = field(default_factory=VelocityFieldRequest)
 
