@@ -25,12 +25,21 @@ typedef struct listener_command_t {
         MSGPACK_DEFINE_MAP(dt_init, t_final, abs_err, rel_err, x0);
     } streamlines;
 
+    struct vortexlines {
+        double dt_init = 0.1;
+        double t_final = 1.0;
+        double abs_err = 1E-10;
+        double rel_err = 1E-6;
+        Eigen::MatrixXd x0;
+        MSGPACK_DEFINE_MAP(dt_init, t_final, abs_err, rel_err, x0);
+    } vortexlines;
+
     struct velocity_field {
         Eigen::MatrixXd x;
         MSGPACK_DEFINE_MAP(x);
     } velocity_field;
 
-    MSGPACK_DEFINE_MAP(frame_no, streamlines, velocity_field);
+    MSGPACK_DEFINE_MAP(frame_no, streamlines, vortexlines, velocity_field);
 } listener_command_t;
 
 typedef struct listener_response_t {
@@ -38,8 +47,9 @@ typedef struct listener_response_t {
     std::size_t i_frame;
     std::size_t n_frames;
     std::vector<StreamLine> streamlines;
+    std::vector<VortexLine> vortexlines;
     Eigen::MatrixXd velocity_field;
-    MSGPACK_DEFINE_MAP(time, i_frame, n_frames, streamlines, velocity_field);
+    MSGPACK_DEFINE_MAP(time, i_frame, n_frames, streamlines, vortexlines, velocity_field);
 } listener_response_t;
 
 std::vector<StreamLine> process_streamlines(struct listener_command_t::streamlines &request) {
@@ -51,6 +61,17 @@ std::vector<StreamLine> process_streamlines(struct listener_command_t::streamlin
     return streamlines;
 }
 
+std::vector<VortexLine> process_vortexlines(struct listener_command_t::vortexlines &request) {
+    std::vector<VortexLine> vortexlines;
+
+    for (int i = 0; i < request.x0.cols(); i++)
+        vortexlines.push_back(
+            VortexLine(request.x0.col(i), request.dt_init, request.t_final, request.abs_err, request.rel_err));
+
+    return vortexlines;
+}
+
+    
 Eigen::MatrixXd process_velocity_field(struct listener_command_t::velocity_field &request) {
     if (!request.x.size())
         return Eigen::MatrixXd();
@@ -84,6 +105,7 @@ void run() {
             .i_frame = cmd.frame_no,
             .n_frames = traj.get_n_frames(),
             .streamlines = process_streamlines(cmd.streamlines),
+            .vortexlines = process_vortexlines(cmd.vortexlines),
             .velocity_field = process_velocity_field(cmd.velocity_field),
         };
         msgpack::sbuffer sbuf;

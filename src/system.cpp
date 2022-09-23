@@ -493,6 +493,8 @@ Eigen::MatrixXd VelocityField::make_grid() {
 }
 
 Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
+    if (!r_trg.size())
+        return Eigen::MatrixXd(3, 0);
     Eigen::MatrixXd u_trg(r_trg.rows(), r_trg.cols());
 
     const double eta = params_.eta;

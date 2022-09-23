@@ -113,6 +113,7 @@ class Request:
     frame_no: int = 0
     evaluator: str = "CPU"
     streamlines: StreamlinesRequest = field(default_factory=StreamlinesRequest)
+    vortexlines: StreamlinesRequest = field(default_factory=StreamlinesRequest)
     velocity_field: VelocityFieldRequest = field(default_factory=VelocityFieldRequest)
 
 class Listener:
