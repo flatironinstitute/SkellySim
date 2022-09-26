@@ -29,6 +29,19 @@ convenience wrapper class for in :obj:`Python`. There is some example usage of t
 <https://github.com/flatironinstitute/SkellySim/blob/main/examples/analysis_example.py>`_.
 
 
+Interactive mode
+----------------
+
+SkellySim also supports an "interactive" mode where it runs inside a containing python process
+in :code:`listener` mode. This allows you to exploit the SkellySim machinery on demand to
+calculate various quantities without needless intermediate storage. This is extremely useful to
+generate your own velocity fields, stream lines, and vortex lines at any given simulation
+point. Eventually this will be the dominant post-processing mode, as more facilities are
+added. Please see the following to get started:
+`examples/listener_mode/listener_example.py
+<https://github.com/flatironinstitute/SkellySim/blob/main/examples/listener_mode/listener_example.py>`_.
+
+
 Python TrajectoryReader class
 -----------------------------
 

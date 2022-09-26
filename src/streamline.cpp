@@ -56,7 +56,6 @@ Eigen::MatrixXd join_back_and_forward(MatrixRef &back, MatrixRef &forward) {
     for (int i_col = 0; i_col < back.cols() - 1; ++i_col)
         x.col(i_col) = back.col(back.cols() - i_col - 1);
 
-    // x.block(0, 0, back.rows(), back.cols() - 1) = back.block(0, 0, back.rows(), back.cols() - 1);
     x.block(0, back.cols() - 1, back.rows(), forward.cols()) = forward;
 
     return x;
