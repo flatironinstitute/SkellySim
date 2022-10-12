@@ -15,8 +15,9 @@ class StreamLine {
 
     StreamLine() = default;
 
-    StreamLine(VectorRef &x0_, double dt_init_, double t_final_, double abs_err_, double rel_err_)
-        : x(x0_), dt_init(dt_init_), t_final(t_final_), abs_err(abs_err_), rel_err(rel_err_){
+    StreamLine(VectorRef &x0_, double dt_init_, double t_final_, double abs_err_, double rel_err_, bool back_integrate_)
+        : x(x0_), dt_init(dt_init_), t_final(t_final_), abs_err(abs_err_), rel_err(rel_err_),
+          back_integrate(back_integrate_) {
         compute();
     };
 
@@ -31,19 +32,21 @@ class StreamLine {
     double t_final;
     double abs_err;
     double rel_err;
+    bool back_integrate;
 };
 
 class VortexLine : public StreamLine {
 public:
     VortexLine() = default;
 
-    VortexLine(VectorRef &x0_, double dt_init_, double t_final_, double abs_err_, double rel_err_) {
+    VortexLine(VectorRef &x0_, double dt_init_, double t_final_, double abs_err_, double rel_err_,
+               bool back_integrate_) {
         x = x0_;
         dt_init = dt_init_;
         t_final = t_final_;
         abs_err = abs_err_;
         rel_err = rel_err_;
-
+        back_integrate = back_integrate_;
         compute();
     };
 

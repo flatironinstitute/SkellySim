@@ -76,9 +76,11 @@ void StreamLine::compute() {
     std::vector<point_type> xvecneg;
     std::vector<double> timesneg;
 
-    integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, -t_final, -dt_init,
-                       push_back_points_and_time(xvecneg, timesneg));
-    x0 = x0_orig;
+    if (back_integrate) {
+        integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, -t_final, -dt_init,
+                           push_back_points_and_time(xvecneg, timesneg));
+        x0 = x0_orig;
+    }
     integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, t_final, dt_init,
                        push_back_points_and_time(xvec, times));
 
@@ -87,8 +89,14 @@ void StreamLine::compute() {
     VectorMap tn((double *)timesneg.data(), timesneg.size());
     VectorMap tp((double *)times.data(), times.size());
 
-    x = join_back_and_forward(xn, xp);
-    time = join_back_and_forward(tn.transpose(), tp.transpose()).transpose();
+    if (back_integrate) {
+        x = join_back_and_forward(xn, xp);
+        time = join_back_and_forward(tn.transpose(), tp.transpose()).transpose();
+    }
+    else {
+        x = xp;
+        time = tp;
+    }
 
     val = System::velocity_at_targets(x);
 }
@@ -108,9 +116,11 @@ void VortexLine::compute() {
     std::vector<point_type> xvecneg;
     std::vector<double> timesneg;
 
-    integrate_adaptive(controlled_stepper, get_vorticity_at_point_integrand, x0, 0.0, -t_final, -dt_init,
-                       push_back_points_and_time(xvecneg, timesneg));
-    x0 = x0_orig;
+    if (back_integrate) {
+        integrate_adaptive(controlled_stepper, get_vorticity_at_point_integrand, x0, 0.0, -t_final, -dt_init,
+                           push_back_points_and_time(xvecneg, timesneg));
+        x0 = x0_orig;
+    }
     integrate_adaptive(controlled_stepper, get_vorticity_at_point_integrand, x0, 0.0, t_final, dt_init,
                        push_back_points_and_time(xvec, times));
 
@@ -119,8 +129,16 @@ void VortexLine::compute() {
     VectorMap tn((double *)timesneg.data(), timesneg.size());
     VectorMap tp((double *)times.data(), times.size());
 
-    x = join_back_and_forward(xn, xp);
-    time = join_back_and_forward(tn.transpose(), tp.transpose()).transpose();
+
+    if (back_integrate) {
+        x = join_back_and_forward(xn, xp);
+        time = join_back_and_forward(tn.transpose(), tp.transpose()).transpose();
+    }
+    else {
+        x = xp;
+        time = tp;
+    }
+    
     val.resize(x.rows(), x.cols());
 
     for (int i = 0; i < val.cols(); ++i)

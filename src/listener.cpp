@@ -21,8 +21,9 @@ typedef struct listener_command_t {
         double t_final = 1.0;
         double abs_err = 1E-10;
         double rel_err = 1E-6;
+        bool back_integrate = true;
         Eigen::MatrixXd x0;
-        MSGPACK_DEFINE_MAP(dt_init, t_final, abs_err, rel_err, x0);
+        MSGPACK_DEFINE_MAP(dt_init, t_final, abs_err, rel_err, back_integrate, x0);
     } streamlines;
 
     struct vortexlines {
@@ -30,8 +31,9 @@ typedef struct listener_command_t {
         double t_final = 1.0;
         double abs_err = 1E-10;
         double rel_err = 1E-6;
+        bool back_integrate = true;
         Eigen::MatrixXd x0;
-        MSGPACK_DEFINE_MAP(dt_init, t_final, abs_err, rel_err, x0);
+        MSGPACK_DEFINE_MAP(dt_init, t_final, abs_err, rel_err, back_integrate, x0);
     } vortexlines;
 
     struct velocity_field {
@@ -53,26 +55,35 @@ typedef struct listener_response_t {
 } listener_response_t;
 
 std::vector<StreamLine> process_streamlines(struct listener_command_t::streamlines &request) {
+    if (request.x0.cols())
+        spdlog::info("Processing {} streamlines", request.x0.cols());
+
     std::vector<StreamLine> streamlines;
 
     for (int i = 0; i < request.x0.cols(); i++)
-        streamlines.push_back(StreamLine(request.x0.col(i), request.dt_init, request.t_final, request.abs_err, request.rel_err));
+        streamlines.push_back(StreamLine(request.x0.col(i), request.dt_init, request.t_final, request.abs_err,
+                                         request.rel_err, request.back_integrate));
 
     return streamlines;
 }
 
 std::vector<VortexLine> process_vortexlines(struct listener_command_t::vortexlines &request) {
+    if (request.x0.cols())
+        spdlog::info("Processing {} vortex lines", request.x0.cols());
+
     std::vector<VortexLine> vortexlines;
 
     for (int i = 0; i < request.x0.cols(); i++)
-        vortexlines.push_back(
-            VortexLine(request.x0.col(i), request.dt_init, request.t_final, request.abs_err, request.rel_err));
+        vortexlines.push_back(VortexLine(request.x0.col(i), request.dt_init, request.t_final, request.abs_err,
+                                         request.rel_err, request.back_integrate));
 
     return vortexlines;
 }
 
-    
 Eigen::MatrixXd process_velocity_field(struct listener_command_t::velocity_field &request) {
+    if (request.x.cols())
+        spdlog::info("Processing {} velocity field points", request.x.cols());
+
     if (!request.x.size())
         return Eigen::MatrixXd();
     return System::velocity_at_targets(request.x);

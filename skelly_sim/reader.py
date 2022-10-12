@@ -76,6 +76,8 @@ class StreamlinesRequest:
         Absolute tolerance in integrator. Lower will be more accurate, but take longer to evaluate
     rel_err : float, default: :obj:`1E-6`
         Relative tolerance in integrator. Lower will be more accurate, but take longer to evaluate
+    back_integrate : bool, default: :obj:`True`
+        Additionally integrate from [0, -t_final]
     x0 : NDArray[Shape["Any, 3"], Float64], default: :obj:`[]`, units: :obj:`μm`
         Position of the initial streamline seeds [[x0,y0,z0],[x1,y1,z1],...]
     """
@@ -83,6 +85,7 @@ class StreamlinesRequest:
     t_final: float = 1.0
     abs_err: float = 1E-10
     rel_err: float = 1E-6
+    back_integrate: bool = True
     x0: NDArray[Shape["Any, 3"], Float64] = field(default_factory=_default_3d_matrix)
 
 @dataclass
