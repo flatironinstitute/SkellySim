@@ -39,7 +39,7 @@ typedef struct listener_command_t {
         MSGPACK_DEFINE_MAP(x);
     } velocity_field;
 
-    MSGPACK_DEFINE_MAP(frame_no, streamlines, vortexlines, velocity_field);
+    MSGPACK_DEFINE_MAP(frame_no, evaluator, streamlines, vortexlines, velocity_field);
 } listener_command_t;
 
 typedef struct listener_response_t {
