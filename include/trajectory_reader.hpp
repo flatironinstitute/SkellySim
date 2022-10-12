@@ -11,7 +11,7 @@ class TrajectoryReader {
     std::size_t read_next_frame();
     bool load_frame(std::size_t frameno);
     void unpack_current_frame(bool silence_output = false);
-    std::size_t get_n_frames() const { return offsets_.size(); }
+    std::size_t get_n_frames() const { return index.offsets.size(); }
 
   private:
     int fd_;                           ///< File descriptor
@@ -20,9 +20,16 @@ class TrajectoryReader {
     std::size_t offset_;               ///< current byte location in trajectory
     msgpack::object_handle oh_;        ///< handle to last read frame
     bool resume_flag_;                 ///< Reader being used to load resume data
-    std::vector<std::size_t> offsets_; ///< Vector of offsets for each frame
+    long int mtime;
 
-    void build_index();
+    struct {
+        long int mtime;
+        std::vector<std::size_t> offsets; ///< Vector of offsets for each frame
+        MSGPACK_DEFINE_MAP(mtime, offsets);
+    } index;
+
+    void load_index(const std::string &traj_file);
+    void build_index(const std::string &index_file);
 };
 
 #endif

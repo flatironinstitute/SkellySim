@@ -12,6 +12,7 @@
 #include <mpi.h>
 #include <spdlog/spdlog.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_flag)
     : offset_(0), resume_flag_(resume_flag) {
@@ -29,7 +30,29 @@ TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_fl
     if (addr_ == MAP_FAILED)
         throw std::runtime_error("Error mapping " + input_file + " for resume.");
 
-    build_index();
+    struct stat s;
+    lstat(input_file.c_str(), &s);
+    mtime = s.st_mtime;
+
+    load_index(input_file);
+}
+
+void TrajectoryReader::load_index(const std::string &traj_file) {
+  const std::string index_file = traj_file + ".cindex";
+  try {
+      std::fstream f(index_file, std::ios::binary | std::ios::in);
+      std::stringstream buf;
+      buf << f.rdbuf();
+      index = msgpack::unpack(buf.str().data(), buf.str().size()).get().as<decltype(index)>();
+
+      if (index.mtime != mtime) {
+          spdlog::warn("Stale index file: {} {} {}", index_file, index.mtime, mtime);
+          build_index(index_file);
+      }
+      spdlog::info("Loaded trajectory index");
+  } catch (...) {
+      build_index(index_file);
+  }
 }
 
 std::size_t TrajectoryReader::TrajectoryReader::read_next_frame() {
@@ -41,21 +64,28 @@ std::size_t TrajectoryReader::TrajectoryReader::read_next_frame() {
     return offset_ - old_offset;
 }
 
-void TrajectoryReader::build_index() {
+void TrajectoryReader::build_index(const std::string &index_file) {
+    spdlog::info("Building trajectory index");
+    index.mtime = mtime;
+
     offset_ = 0;
-    offsets_.push_back(offset_);
+    index.offsets.clear();
+    index.offsets.push_back(offset_);
     while (read_next_frame()) {
-        offsets_.push_back(offset_);
+        index.offsets.push_back(offset_);
     }
-    spdlog::info("Built trajectory index with {} frames", offsets_.size());
+    spdlog::info("Built trajectory index with {} frames", index.offsets.size());
+
+    std::ofstream f(index_file, std::ios::binary | std::ios::out);
+    msgpack::pack(f, index);
 }
 
 bool TrajectoryReader::load_frame(std::size_t frameno) {
-    if (frameno >= offsets_.size()) {
+    if (frameno >= index.offsets.size()) {
         spdlog::error("Error loading frame: {}", frameno);
         return true;
     }
-    offset_ = offsets_[frameno];
+    offset_ = index.offsets[frameno];
     read_next_frame();
     unpack_current_frame();
     spdlog::info("Loaded frame: {}", frameno);
