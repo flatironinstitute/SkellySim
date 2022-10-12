@@ -39,6 +39,17 @@ struct stokes_doublevel : public pvfmm::GenericKernel<stokes_doublevel> {
     }
 };
 
+inline std::pair<int, int> get_chunk_start_and_size(int i_thr, int n_thr, int prob_size) {
+    const int chunk_small = prob_size / n_thr;
+    const int chunk_big = chunk_small + 1;
+    const int remainder = prob_size % n_thr;
+
+    if (i_thr < remainder)
+        return {chunk_big * i_thr, chunk_big};
+    else
+        return {remainder * chunk_big + (i_thr - remainder) * chunk_small, chunk_small};
+}
+
 static auto g_memmgr = pvfmm::mem::MemoryManager(0);
 Eigen::MatrixXd kernels::stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
                                               MatrixRef &f_dl, double eta) {
@@ -46,9 +57,7 @@ Eigen::MatrixXd kernels::stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, 
 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < omp_get_num_threads(); ++i) {
-        auto n_trg = r_trg.cols() / omp_get_num_threads();
-        auto i_trg_0 = n_trg * i;
-        n_trg = std::min(n_trg, r_trg.cols() - i_trg_0);
+        auto [i_trg_0, n_trg] = get_chunk_start_and_size(i, omp_get_num_threads(), r_trg.cols());
 
         pvfmm::stokes_vel::Eval(const_cast<double *>(r_sl.data()), r_sl.cols(), const_cast<double *>(f_sl.data()), 1,
                                 const_cast<double *>(r_trg.data() + i_trg_0 * 3), n_trg, u_trg.data() + i_trg_0 * 3,
@@ -63,9 +72,7 @@ Eigen::MatrixXd kernels::stresslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, 
 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < omp_get_num_threads(); ++i) {
-        auto n_trg = r_trg.cols() / omp_get_num_threads();
-        auto i_trg_0 = n_trg * i;
-        n_trg = std::min(n_trg, r_trg.cols() - i_trg_0);
+        auto [i_trg_0, n_trg] = get_chunk_start_and_size(i, omp_get_num_threads(), r_trg.cols());
 
         stokes_doublevel::Eval(const_cast<double *>(r_dl.data()), r_dl.cols(), const_cast<double *>(f_dl.data()), 1,
                                const_cast<double *>(r_trg.data() + i_trg_0 * 3), n_trg, u_trg.data() + i_trg_0 * 3,
