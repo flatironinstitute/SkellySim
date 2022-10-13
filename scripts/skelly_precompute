@@ -220,5 +220,5 @@ if (config_orig != config):
         "which dynamically figure out the number of nodes. Backing up and updating input config.")
     import shutil
     shutil.copy(config_file, config_file + '.bak')
-    with open(sys.argv[1], 'w') as fh:
+    with open(config_file, 'w') as fh:
         toml.dump(config, fh)
