@@ -17,11 +17,13 @@ int main(int argc, char *argv[]) {
                                                                stkfmm::KERNEL::PVel, kernels::stokes_pvel_fmm);
     auto stokeslet_kernel_fmm = kernels::FMM<stkfmm::Stk3DFMM>(mult_order, max_pts, stkfmm::PAXIS::NONE,
                                                                stkfmm::KERNEL::Stokes, kernels::stokes_vel_fmm);
+
+    MatrixXd r_src = MatrixXd::Random(3, n_src);
+    MatrixXd r_trg = MatrixXd::Random(3, n_trg);
+    MatrixXd nullmat;
     {
-        MatrixXd r_src = MatrixXd::Random(3, n_src);
         MatrixXd f_src = MatrixXd::Random(3, n_src);
-        MatrixXd r_trg = MatrixXd::Random(3, n_trg);
-        MatrixXd nullmat;
+
         omp_set_num_threads(1);
         MatrixXd res_single = kernels::stokeslet_direct_cpu(r_src, nullmat, r_trg, f_src, nullmat, eta);
         omp_set_num_threads(6);
@@ -34,10 +36,7 @@ int main(int argc, char *argv[]) {
         std::cout << (res_single - res_fmm).mean() << std::endl;
     }
     {
-        MatrixXd r_src = MatrixXd::Random(3, n_src);
         MatrixXd f_src = MatrixXd::Random(9, n_src);
-        MatrixXd r_trg = MatrixXd::Random(3, n_trg);
-        MatrixXd nullmat;
 
         omp_set_num_threads(1);
         MatrixXd res_single = kernels::stresslet_direct_cpu(nullmat, r_src, r_trg, nullmat, f_src, eta);
