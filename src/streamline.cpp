@@ -1,9 +1,12 @@
+#include <stdexcept>
 #include <streamline.hpp>
 #include <system.hpp>
 
 #include <boost/numeric/odeint/integrate/integrate_adaptive.hpp>
 #include <boost/numeric/odeint/stepper/controlled_runge_kutta.hpp>
 #include <boost/numeric/odeint/stepper/runge_kutta_cash_karp54.hpp>
+
+#include <spdlog/spdlog.h>
 
 typedef Eigen::Vector3d point_type;
 
@@ -47,6 +50,8 @@ struct push_back_points_and_time {
     void operator()(const point_type &x, double t) {
         m_points.push_back(x);
         m_times.push_back(t);
+        if (System::velocity_at_targets(x).norm() > 1E3)
+            throw std::runtime_error("Possible singularity detected");
     }
 };
 
@@ -77,12 +82,21 @@ void StreamLine::compute() {
     std::vector<double> timesneg;
 
     if (back_integrate) {
-        integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, -t_final, -dt_init,
-                           push_back_points_and_time(xvecneg, timesneg));
+        try {
+            integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, -t_final, -dt_init,
+                               push_back_points_and_time(xvecneg, timesneg));
+        } catch (std::runtime_error &e) {
+            spdlog::warn("Streamline early exit: {}", e.what());
+        }
+
         x0 = x0_orig;
     }
-    integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, t_final, dt_init,
-                       push_back_points_and_time(xvec, times));
+    try {
+        integrate_adaptive(controlled_stepper, get_velocity_at_point, x0, 0.0, t_final, dt_init,
+                           push_back_points_and_time(xvec, times));
+    } catch (std::runtime_error &e) {
+        spdlog::warn("Streamline early exit: {}", e.what());
+    }
 
     MatrixMap xn((double *)xvecneg.data(), 3, xvecneg.size());
     MatrixMap xp((double *)xvec.data(), 3, xvec.size());
@@ -92,8 +106,7 @@ void StreamLine::compute() {
     if (back_integrate) {
         x = join_back_and_forward(xn, xp);
         time = join_back_and_forward(tn.transpose(), tp.transpose()).transpose();
-    }
-    else {
+    } else {
         x = xp;
         time = tp;
     }
@@ -117,28 +130,36 @@ void VortexLine::compute() {
     std::vector<double> timesneg;
 
     if (back_integrate) {
-        integrate_adaptive(controlled_stepper, get_vorticity_at_point_integrand, x0, 0.0, -t_final, -dt_init,
-                           push_back_points_and_time(xvecneg, timesneg));
+        try {
+            integrate_adaptive(controlled_stepper, get_vorticity_at_point_integrand, x0, 0.0, -t_final, -dt_init,
+                               push_back_points_and_time(xvecneg, timesneg));
+        } catch (std::runtime_error &e) {
+            spdlog::warn("Streamline early exit: {}", e.what());
+        }
+
         x0 = x0_orig;
     }
-    integrate_adaptive(controlled_stepper, get_vorticity_at_point_integrand, x0, 0.0, t_final, dt_init,
-                       push_back_points_and_time(xvec, times));
+
+    try {
+        integrate_adaptive(controlled_stepper, get_vorticity_at_point_integrand, x0, 0.0, t_final, dt_init,
+                           push_back_points_and_time(xvec, times));
+    } catch (std::runtime_error &e) {
+        spdlog::warn("Streamline early exit: {}", e.what());
+    }
 
     MatrixMap xp((double *)xvec.data(), 3, xvec.size());
     MatrixMap xn((double *)xvecneg.data(), 3, xvecneg.size());
     VectorMap tn((double *)timesneg.data(), timesneg.size());
     VectorMap tp((double *)times.data(), times.size());
 
-
     if (back_integrate) {
         x = join_back_and_forward(xn, xp);
         time = join_back_and_forward(tn.transpose(), tp.transpose()).transpose();
-    }
-    else {
+    } else {
         x = xp;
         time = tp;
     }
-    
+
     val.resize(x.rows(), x.cols());
 
     for (int i = 0; i < val.cols(); ++i)
