@@ -102,14 +102,13 @@ class Fiber {
     /// testing.
     Fiber(int n_nodes, double radius, double length, double bending_rigidity, double eta)
         : n_nodes_(n_nodes), radius_(radius), length_(length), bending_rigidity_(bending_rigidity) {
-        init(eta);
+        init();
         length_prev_ = length_;
         update_constants(eta);
     };
 
     Fiber(const Fiber &old_fib, const double eta) {
         *this = old_fib;
-        init(eta);
         update_constants(eta);
     };
 
@@ -120,12 +119,11 @@ class Fiber {
     ///< _MUST_ be called from constructors.
     ///
     /// Initializes: Fiber::x_, Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_, Fiber::c_0_, Fiber::c_1_
-    void init(double eta) {
+    void init() {
         if (x_.size() != 3 * n_nodes_) {
             x_ = Eigen::MatrixXd::Zero(3, n_nodes_);
             x_.row(0) = Eigen::ArrayXd::LinSpaced(n_nodes_, 0, 1.0).transpose();
         }
-        tension_ = Eigen::VectorXd::Zero(n_nodes_);
 
         xs_.resize(3, n_nodes_);
         xss_.resize(3, n_nodes_);

@@ -37,7 +37,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     n_nodes_ = x_array.size() / 3;
     x_ = Eigen::Map<Eigen::MatrixXd>(x_array.data(), 3, n_nodes_);
 
-    init(eta);
+    init();
 
     bending_rigidity_ = toml::find<double>(fiber_table, "bending_rigidity");
     radius_ = toml::find_or<double>(fiber_table, "radius", 0.0125);
