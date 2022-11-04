@@ -20,7 +20,7 @@ class Envelope(FunctionGenerator):
 
         height_environ = locals()
         height_environ['np'] = np
-        self.raw_height_func = eval("lambda x: " + config['height'], height_environ)
+        self.raw_height_func = eval("lambda x: " + config['height'])
 
         delta = 1E-10
         lb = self.lower_bound_target
@@ -37,7 +37,7 @@ class Envelope(FunctionGenerator):
 
         try:
             self.a
-        except NameError:
+        except AttributeError:
             raise RuntimeError("Unable to fit height function")
         print("Height fit succeeded with bounds", (lb, ub))
 
