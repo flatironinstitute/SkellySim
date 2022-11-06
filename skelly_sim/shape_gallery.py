@@ -20,7 +20,7 @@ class Envelope(FunctionGenerator):
 
         height_environ = locals()
         height_environ['np'] = np
-        self.raw_height_func = eval("lambda x: " + config['height'])
+        self.raw_height_func = eval("lambda x: " + config['height'], height_environ)
 
         delta = 1E-10
         lb = self.lower_bound_target
