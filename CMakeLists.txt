@@ -92,7 +92,8 @@ add_library(skelly OBJECT
   src/listener.cpp src/trajectory_reader.cpp src/kernels.cu
 )
 
-target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES} SYSTEM ${SKELLY_INCLUDES_SYSTEM})
+target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
+target_include_directories(skelly SYSTEM PUBLIC ${SKELLY_INCLUDES_SYSTEM})
 target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
 set_property(TARGET skelly PROPERTY CUDA_ARCHITECTURES "70;75;80")
 
