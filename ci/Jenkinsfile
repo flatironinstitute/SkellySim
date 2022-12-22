@@ -14,12 +14,11 @@ pipeline {
         }
       }
       environment {
-         HOME = "$WORKSPACE/build"
-         LC_ALL = C
-         PATH = /usr/local/bin:$PATH
-         MKL_THREADING_LAYER = GNU
-         pvfmm_DIR = $HOME/.cache/pvfmm
-         LD_LIBRARY_PATH = /opt/intel/oneapi/mkl/latest/lib/intel64:/usr/local/lib:$LD_LIBRARY_PATH
+         LC_ALL = "C"
+         PATH = "/usr/local/bin:${env.PATH}"
+         MKL_THREADING_LAYER = "GNU"
+         pvfmm_DIR = "${env.HOME}/.cache/pvfmm"
+         LD_LIBRARY_PATH = "/opt/intel/oneapi/mkl/latest/lib/intel64:/usr/local/lib:${env.LD_LIBRARY_PATH}"
       }
       steps {
         sh 'python3 -m pip install --user .'
