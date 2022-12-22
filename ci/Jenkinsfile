@@ -8,7 +8,6 @@ pipeline {
     stages {
         stage('main') {
             agent {
-                label 'v100'
                 dockerfile {
                     dir 'ci'
                     args '--gpus 1'
