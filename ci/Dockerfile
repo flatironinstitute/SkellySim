@@ -21,6 +21,7 @@ RUN cd build && \
     git clone https://github.com/dmalhotra/pvfmm && \
     cd pvfmm && \
     git checkout v1.3.0 && \
+    git submodule update --recursive && \
     mkdir build && \
     cd build && \
     cmake ../pvfmm-1.3.0 -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=Release \
