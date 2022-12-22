@@ -22,8 +22,8 @@ pipeline {
                 LD_LIBRARY_PATH = "/opt/intel/oneapi/mkl/latest/lib/intel64:/usr/local/lib:${env.LD_LIBRARY_PATH}"
             }
             steps {
+                sh 'printenv | egrep "(^HOME|^PATH|^LD_LIBRARY_PATH|^pvfmm_DIR|^MKL_THREADING_LAYER|^LC_ALL)"'
                 sh 'python3 -m pip install --user .'
-                // sh 'python3 -m pytest -v tests/jax_test.py'
             }
         }
     }
