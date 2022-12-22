@@ -14,11 +14,10 @@ pipeline {
                 }
             }
             environment {
-                HOME = "${env.WORKSPACE}/build"
+                HOME = "${WORKSPACE}"
                 LC_ALL = "C"
-                PATH = "/usr/local/bin:${env.WORKSPACE}/build/.local/bin:${env.PATH}"
                 MKL_THREADING_LAYER = "GNU"
-                pvfmm_DIR = "${env.HOME}/.cache/pvfmm"
+                pvfmm_DIR = "${HOME}/.cache/pvfmm"
                 LD_LIBRARY_PATH = "/opt/intel/oneapi/mkl/latest/lib/intel64:/usr/local/lib"
             }
             steps {
