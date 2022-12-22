@@ -11,7 +11,8 @@ RUN apt -y update && \
     apt-add-repository multiverse && \
     apt-add-repository universe && \
     apt -y update && \
-    apt -y install intel-oneapi-mkl-devel build-essential libopenmpi-dev cmake libeigen3-dev ninja-build git python3-pip && \
+    apt -y install libboost-dev intel-oneapi-mkl-devel build-essential libopenmpi-dev \
+                   cmake libeigen3-dev ninja-build git python3-pip && \
     apt -y autoclean && \
     rm -rf /var/cache/apt/* /var/lib/apt/lists/*
 
