@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Get the current git tag
-execute_process(
-  COMMAND git describe --tags --abbrev=0
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_TAG
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-string(REPLACE "v" "" GIT_TAG ${GIT_TAG})
+# execute_process(
+#   COMMAND git describe --tags --abbrev=0
+#   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+#   OUTPUT_VARIABLE GIT_TAG
+#   OUTPUT_STRIP_TRAILING_WHITESPACE
+# )
+# string(REPLACE "v" "" GIT_TAG ${GIT_TAG})
+set(GIT_TAG "0.9.11")
 
 # Get the current git commit
 execute_process(
