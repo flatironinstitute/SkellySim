@@ -1,11 +1,11 @@
 #%Module1.0#####################################################################
 #
-# Module: skelly_sim ${GIT_TAG}
+# Module: skelly_sim ${SKELLYSIM_VERSION}
 #
 
 set pkg skelly_sim
 set root ${CMAKE_INSTALL_PREFIX}
-set version ${GIT_TAG}
+set version ${SKELLYSIM_VERSION}
 
 proc ModulesHelp { } {
     puts stderr "Sets the environment for $pkg-$version"

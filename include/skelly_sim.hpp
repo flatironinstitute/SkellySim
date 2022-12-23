@@ -1,12 +1,12 @@
 #ifndef SKELLYSIM_HPP
 #define SKELLYSIM_HPP
 
-#ifndef GIT_TAG
-#define GIT_TAG "<undefined tag>"
+#ifndef SKELLYSIM_VERSION
+#define SKELLYSIM_VERSION "<undefined tag>"
 #endif
 
-#ifndef GIT_COMMIT
-#define GIT_COMMIT "<undefined commit>"
+#ifndef SKELLYSIM_COMMIT
+#define SKELLYSIM_COMMIT "<undefined commit>"
 #endif
 
 #include <vector>

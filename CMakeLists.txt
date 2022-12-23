@@ -1,28 +1,20 @@
 cmake_minimum_required(VERSION 3.10)
 
-# Get the current git tag
-# execute_process(
-#   COMMAND git describe --tags --abbrev=0
-#   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-#   OUTPUT_VARIABLE GIT_TAG
-#   OUTPUT_STRIP_TRAILING_WHITESPACE
-# )
-# string(REPLACE "v" "" GIT_TAG ${GIT_TAG})
-set(GIT_TAG "0.9.11")
 
 # Get the current git commit
 execute_process(
   COMMAND git describe --abbrev=8 --dirty --always
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_COMMIT
+  OUTPUT_VARIABLE SKELLYSIM_COMMIT
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-message("SkellySim version: v${GIT_TAG} (${GIT_COMMIT})")
+set(SKELLYSIM_VERSION "0.9.11")
+message("SkellySim version: v${SKELLYSIM_VERSION} (${SKELLYSIM_COMMIT})")
 
 project(
   skelly_sim
-  VERSION ${GIT_TAG}
+  VERSION ${SKELLYSIM_VERSION}
   LANGUAGES CXX CUDA)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
@@ -50,8 +42,8 @@ endif()
 
 add_compile_options("$<$<CONFIG:RELEASE>:-g>")
 
-add_definitions("-DGIT_TAG=\"${GIT_TAG}\"")
-add_definitions("-DGIT_COMMIT=\"${GIT_COMMIT}\"")
+add_definitions("-DSKELLYSIM_VERSION=\"${SKELLYSIM_VERSION}\"")
+add_definitions("-DSKELLYSIM_COMMIT=\"${SKELLYSIM_COMMIT}\"")
 
 # required compiler features
 find_package(MPI REQUIRED)
