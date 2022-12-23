@@ -28,7 +28,7 @@ setup(
                       'numpy',
                       'scipy',
                       'msgpack',
-                      'sklearn',
+                      'scikit-learn',
                       'toml',
                       'packaging',
                       'matplotlib',
