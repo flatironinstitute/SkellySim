@@ -2,9 +2,13 @@
 /*.pyc
 *.out
 *.vf
-*.index
 /examples/**/*.npz
 /examples/**/*.toml
+/examples/**/*.*_config
+/examples/**/*.cindex
+/examples/**/*.index
+
+
 /skelly_sim.egg-info
 __pycache__
 *.blend1
