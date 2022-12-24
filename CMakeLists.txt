@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
 
-
 # Get the current git commit
 execute_process(
   COMMAND git describe --abbrev=8 --dirty --always
@@ -79,10 +78,10 @@ set(SKELLY_INCLUDES_SYSTEM
   )
 
 add_library(skelly OBJECT
-  src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
-  src/dynamic_instability.cpp src/system.cpp src/body.cpp src/solver_hydro.cpp src/rng.cpp
-  src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp src/streamline.cpp
-  src/listener.cpp src/trajectory_reader.cpp src/kernels.cu
+  src/core/fiber.cpp src/core/kernels.cpp src/core/utils.cpp src/core/periphery.cpp src/core/cnpy.cpp src/core/params.cpp
+  src/core/dynamic_instability.cpp src/core/system.cpp src/core/body.cpp src/core/solver_hydro.cpp src/core/rng.cpp
+  src/core/spherical_body.cpp src/core/deformable_body.cpp src/core/point_source.cpp src/core/streamline.cpp
+  src/core/listener.cpp src/core/trajectory_reader.cpp src/core/kernels.cu
 )
 
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
@@ -93,10 +92,10 @@ set_property(TARGET skelly PROPERTY CUDA_ARCHITECTURES "70;75;80")
 add_subdirectory(extern/spdlog EXCLUDE_FROM_ALL)
 add_subdirectory(extern/trng4 EXCLUDE_FROM_ALL)
 
-add_executable(skelly_sim src/skelly_sim.cpp)
+add_executable(skelly_sim src/core/skelly_sim.cpp)
 set_property(TARGET skelly_sim PROPERTY CUDA_ARCHITECTURES "70;75;80")
   
-add_subdirectory(tests)
+add_subdirectory(tests/core)
 
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
