@@ -26,7 +26,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-sign-compare")
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # using intel, disable offloading
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qno-offload")
@@ -58,10 +57,6 @@ find_package(pvfmm REQUIRED)
 find_package(STKFMM REQUIRED)
 find_package(Boost REQUIRED)
 
-set(SKELLY_INCLUDES_FMM ${PVFMM_INCLUDE_DIR}/pvfmm
-  ${PVFMM_DEP_INCLUDE_DIR}
-  ${STKFMM_INCLUDE_DIRS}
-) 
 set(SKELLY_INCLUDES ${PROJECT_SOURCE_DIR}/include)
 set(SKELLY_INCLUDES_SYSTEM
   ${PROJECT_SOURCE_DIR}/extern/spdlog/include
@@ -70,7 +65,9 @@ set(SKELLY_INCLUDES_SYSTEM
   ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
   ${MPI_CXX_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
-  ${SKELLY_INCLUDES_FMM}
+  ${PVFMM_INCLUDE_DIR}/pvfmm
+  ${PVFMM_DEP_INCLUDE_DIR}
+  ${STKFMM_INCLUDE_DIRS}
   ${Kokkos_INCLUDE_DIRS}
   ${Tpetra_INCLUDE_DIRS}
   ${Teuchos_INCLUDE_DIRS}
