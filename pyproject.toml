@@ -28,6 +28,11 @@ dependencies = [
     'function_generator@git+https://github.com/blackwer/function_generator@fda8b44b5edf15d1677ca7433139a43778d6659d',
 ]
 
+[project.optional-dependencies]
+tests = [
+    'pytest',
+]
+
 [project.urls]
 homepage = "https//github.com/flatironinstitute/skelly_sim"
 documentation = "https://users.flatironinstitute.org/~rblackwell/py-skellysim"
@@ -39,3 +44,6 @@ skelly_precompute = "skelly_sim.precompute:main"
 [build-system]
 requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
+
+[pytest]
+pythonpath = "src"
