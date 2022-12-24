@@ -1,0 +1,41 @@
+[project]
+name = "skelly_sim"
+version = "0.9.11"
+authors = [
+    { name="Robert Blackwell", email="rblackwell@flatironinstitute.org" }
+]
+description = 'Simulate cytoskeletal systems with full hydrodynamics'
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Scientists/Mathematicians',
+    'License :: Apache 2',
+    'Programming Language :: Python :: 3',
+]
+license = { file="LICENSE" }
+dependencies = [
+    'numba',
+    'numpy',
+    'scipy',
+    'msgpack',
+    'scikit-learn',
+    'toml',
+    'packaging',
+    'matplotlib',
+    'dataclass_utils',
+    'nptyping',
+    'function_generator@git+https://github.com/blackwer/function_generator@fda8b44b5edf15d1677ca7433139a43778d6659d',
+]
+
+[project.urls]
+homepage = "https//github.com/flatironinstitute/skelly_sim"
+documentation = "https://users.flatironinstitute.org/~rblackwell/py-skellysim"
+developer-documentation = "https://users.flatirninstitute.org/~rblackwell/skellysim"
+
+[project.console_scripts]
+skelly-precompute = "scripts/skelly_precompute"
+
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
