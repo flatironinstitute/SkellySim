@@ -103,10 +103,6 @@ target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
 
 configure_file(module_template.in module)
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/paraview
-  DESTINATION share/skelly_sim
-  PATTERN "__pycache__" EXCLUDE)
-
 install(TARGETS skelly_sim
   CONFIGURATIONS Release
   RUNTIME DESTINATION bin)
