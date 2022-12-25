@@ -29,7 +29,7 @@ pipeline {
                     -DCMAKE_CXX_FLAGS="$CXXFLAGS_" -DBLAS_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so \
                     -DLAPACK_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so -GNinja'
                 sh 'ninja -C build'
-                sh 'PATH=$PYPATH:$PWD/build:$PATH python3 -m pytest tests'
+                sh 'PATH=$PYPATH:$PWD/build:$PATH python3 -m pytest tests --verbose'
             }
         }
     }
