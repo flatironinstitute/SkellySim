@@ -517,8 +517,10 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     MPI_Bcast(sol_bodies_global.data(), sol_bodies_global.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
     // This routine zeros out the external force. is that correct?
     calculate_body_fiber_link_conditions(sol_fibers, sol_bodies_global);
-    for (auto &body : bc_.spherical_bodies)
+    for (auto &body : bc_.spherical_bodies) {
         body->force_torque_.segment(0, 3) += body->external_force_;
+        body->force_torque_.segment(3, 3) += body->external_torque_;
+    }
 
     // clang-format off
     u_trg = fc_.flow(r_trg, f_on_fibers, eta, false) + \
@@ -600,7 +602,8 @@ void prep_state_for_solver() {
         body->force_torque_.setZero();
         // Hack so that when you sum global forces, it should sum back to the external force
         body->force_torque_.segment(0, 3) = body->external_force_ / size_;
-        external_force_body = external_force_body | body->external_force_.any();
+        body->force_torque_.segment(3, 3) = body->external_torque_ / size_;
+        external_force_body = external_force_body | body->external_force_.any() | body->external_torque_.any();
     }
 
     if (external_force_body) {

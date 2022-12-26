@@ -235,6 +235,8 @@ SphericalBody::SphericalBody(const toml::value &body_table, const Params &params
 
     if (body_table.contains("external_force"))
         external_force_ = convert_array<>(body_table.at("external_force").as_array());
+    if (body_table.contains("external_torque"))
+        external_torque_ = convert_array<>(body_table.at("external_torque").as_array());
 
     place(position_, orientation_);
 
