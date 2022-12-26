@@ -1,33 +1,16 @@
-import sys
 import numpy as np
-from subprocess import run
+
+from pathlib import Path
+
 from skelly_sim.reader import TrajectoryReader
 from skelly_sim.skelly_config import Config, Fiber
-import pytest
-import contextlib
-from pathlib import Path
-import os
+from skelly_sim.testing import working_directory, sim_path, run_sim
 
 np.random.seed(100)
 n_nodes = 800
 config_file = 'skelly_config.toml'
 
-@contextlib.contextmanager
-def working_directory(path):
-    """Changes working directory and returns to previous on exit."""
-    prev_cwd = Path.cwd()
-    os.chdir(path)
-    try:
-        yield
-    finally:
-        os.chdir(prev_cwd)
-
-@pytest.fixture(scope="session")
-def sim_path(tmp_path_factory):
-    path = tmp_path_factory.mktemp("sims")
-    return path
-
-def gen_config(path):
+def gen_config(path: Path):
     print("Generating config")
     # create a config object and set the system parameters
     config = Config()
@@ -54,14 +37,9 @@ def gen_config(path):
 
     return True
 
-def run_sim(path: Path=Path('.')):
-    print("Running simulation")
-    with working_directory(path):
-        res = run(['skelly_sim', '--overwrite'], shell=False, capture_output=False)
-        return not res.returncode
 
-def analyze(path: Path=Path('.')):
-    print("Running analysis")
+def velocity(path: Path=Path('.')):
+    print("Comparing velocity to analytic result")
     with working_directory(path):
         traj = TrajectoryReader('skelly_config.toml')
 
@@ -96,5 +74,5 @@ def test_gen_config(sim_path):
 def test_run_sim(sim_path):
     assert run_sim(sim_path)
 
-def test_run_analyze(sim_path):
-    assert analyze(sim_path) < 1E-6
+def test_velocity(sim_path):
+    assert velocity(sim_path) < 1E-6
