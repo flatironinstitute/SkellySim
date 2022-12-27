@@ -30,6 +30,7 @@ pipeline {
                     -DLAPACK_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so -GNinja'
                 sh 'ninja -C build'
                 sh 'PATH=$PYPATH:$PWD/build:$PATH python3 -m pytest tests --verbose'
+                sh 'cd build && ctest'
             }
         }
     }
