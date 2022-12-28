@@ -59,3 +59,8 @@ RUN cd build && \
     ninja install
 
 RUN rm -rf build
+
+RUN mkdir -p /usr/local/share/pvfmm && \
+    cd /usr/local/share/pvfmm && \
+    curl -o Precomp_stokes_PVel_m16.data https://users.flatironinstitute.org/~rblackwell/Precomp_stokes_PVel_m16.data && \
+    curl -o Precomp_stokes_vel_m16.data https://users.flatironinstitute.org/~rblackwell/Precomp_stokes_vel_m16.data
