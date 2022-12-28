@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
 
-
 # Get the current git commit
 execute_process(
   COMMAND git describe --abbrev=8 --dirty --always
@@ -27,7 +26,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-sign-compare")
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
   # using intel, disable offloading
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qno-offload")
@@ -59,10 +57,6 @@ find_package(pvfmm REQUIRED)
 find_package(STKFMM REQUIRED)
 find_package(Boost REQUIRED)
 
-set(SKELLY_INCLUDES_FMM ${PVFMM_INCLUDE_DIR}/pvfmm
-  ${PVFMM_DEP_INCLUDE_DIR}
-  ${STKFMM_INCLUDE_DIRS}
-) 
 set(SKELLY_INCLUDES ${PROJECT_SOURCE_DIR}/include)
 set(SKELLY_INCLUDES_SYSTEM
   ${PROJECT_SOURCE_DIR}/extern/spdlog/include
@@ -71,7 +65,9 @@ set(SKELLY_INCLUDES_SYSTEM
   ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
   ${MPI_CXX_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
-  ${SKELLY_INCLUDES_FMM}
+  ${PVFMM_INCLUDE_DIR}/pvfmm
+  ${PVFMM_DEP_INCLUDE_DIR}
+  ${STKFMM_INCLUDE_DIRS}
   ${Kokkos_INCLUDE_DIRS}
   ${Tpetra_INCLUDE_DIRS}
   ${Teuchos_INCLUDE_DIRS}
@@ -79,10 +75,10 @@ set(SKELLY_INCLUDES_SYSTEM
   )
 
 add_library(skelly OBJECT
-  src/fiber.cpp src/kernels.cpp src/utils.cpp src/periphery.cpp src/cnpy.cpp src/params.cpp
-  src/dynamic_instability.cpp src/system.cpp src/body.cpp src/solver_hydro.cpp src/rng.cpp
-  src/spherical_body.cpp src/deformable_body.cpp src/point_source.cpp src/streamline.cpp
-  src/listener.cpp src/trajectory_reader.cpp src/kernels.cu
+  src/core/fiber.cpp src/core/kernels.cpp src/core/utils.cpp src/core/periphery.cpp src/core/cnpy.cpp src/core/params.cpp
+  src/core/dynamic_instability.cpp src/core/system.cpp src/core/body.cpp src/core/solver_hydro.cpp src/core/rng.cpp
+  src/core/spherical_body.cpp src/core/deformable_body.cpp src/core/point_source.cpp src/core/streamline.cpp
+  src/core/listener.cpp src/core/trajectory_reader.cpp src/core/kernels.cu
 )
 
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
@@ -93,21 +89,18 @@ set_property(TARGET skelly PROPERTY CUDA_ARCHITECTURES "70;75;80")
 add_subdirectory(extern/spdlog EXCLUDE_FROM_ALL)
 add_subdirectory(extern/trng4 EXCLUDE_FROM_ALL)
 
-add_executable(skelly_sim src/skelly_sim.cpp)
+add_executable(skelly_sim src/core/skelly_sim.cpp)
 set_property(TARGET skelly_sim PROPERTY CUDA_ARCHITECTURES "70;75;80")
   
-add_subdirectory(tests)
-
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
 
 configure_file(module_template.in module)
 
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/paraview
-  DESTINATION share/skelly_sim
-  PATTERN "__pycache__" EXCLUDE)
-
 install(TARGETS skelly_sim
   CONFIGURATIONS Release
   RUNTIME DESTINATION bin)
+
+enable_testing()
+add_subdirectory(tests/core)

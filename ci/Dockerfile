@@ -3,6 +3,7 @@ FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
 ENV MKLROOT=/opt/intel/oneapi/mkl/latest
 ENV STKFMM_ROOT=/usr/local
 ENV CXXFLAGS_="-I/usr/lib/x86_64-linux-gnu/openmpi/include -march=broadwell"
+ENV pvfmm_DIR="/usr/local/share/pvfmm"
 
 RUN apt -y update && \
     apt -y install curl gpg software-properties-common && \
@@ -59,3 +60,8 @@ RUN cd build && \
     ninja install
 
 RUN rm -rf build
+
+RUN mkdir -p $pvfmm_DIR && \
+    cd $pvfmm_DIR && \
+    curl -o Precomp_stokes_PVel_m16.data https://users.flatironinstitute.org/~rblackwell/Precomp_stokes_PVel_m16.data && \
+    curl -o Precomp_stokes_vel_m16.data https://users.flatironinstitute.org/~rblackwell/Precomp_stokes_vel_m16.data

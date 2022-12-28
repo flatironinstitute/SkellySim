@@ -764,6 +764,7 @@ class Body():
     n_nodes: int = 600
     precompute_file: str = 'body_precompute.npz'
     external_force: List[float] = field(default_factory=_default_vector)
+    external_torque: List[float] = field(default_factory=_default_vector)
     nucleation_sites: List[float] = field(default_factory=list)
     
     def find_binding_site(self, fibers: List[Fiber], ds_min: float) -> Tuple[np.array, np.array]:

@@ -222,6 +222,7 @@ class SphericalBody : public Body {
     Eigen::MatrixXd ez_; ///< [ 3 x num_nodes ] Singularity subtraction vector along z
     Eigen::MatrixXd K_;  ///< [ 3*num_nodes x 6 ] matrix that helps translate body info to nodes
     Eigen::Vector3d external_force_{0.0, 0.0, 0.0}; ///< [3] vector of constant external force on body in lab frame
+    Eigen::Vector3d external_torque_{0.0, 0.0, 0.0}; ///< [3] vector of constant external torque on body in lab frame
 
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner

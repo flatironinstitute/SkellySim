@@ -15,19 +15,22 @@ pipeline {
             }
             environment {
                 HOME = "${WORKSPACE}"
+                PYPATH = "${WORKSPACE}/.local/bin"
                 LC_ALL = "C"
                 MKL_THREADING_LAYER = "GNU"
                 pvfmm_DIR = "${HOME}/.cache/pvfmm"
                 LD_LIBRARY_PATH = "/opt/intel/oneapi/mkl/latest/lib/intel64:/usr/local/lib"
             }
             steps {
-                sh 'printenv | egrep "(^HOME|^STKFMM_ROOT|^MKLROOT|^LD_LIBRARY_PATH|^pvfmm_DIR|^MKL_THREADING_LAYER|^LC_ALL|^CXX_FLAGS_)"'
-                sh 'python3 -m pip install --user .'
+                sh 'printenv | egrep "(^HOME|^PATH|^STKFMM_ROOT|^MKLROOT|^LD_LIBRARY_PATH|^pvfmm_DIR|^MKL_THREADING_LAYER|^LC_ALL|^CXX_FLAGS_)"'
+                sh 'python3 -m pip install --user ".[tests]"'
                 sh 'git submodule update --init'
                 sh 'cmake -B build . -DCMAKE_BUILD_TYPE=Release \
                     -DCMAKE_CXX_FLAGS="$CXXFLAGS_" -DBLAS_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so \
                     -DLAPACK_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so -GNinja'
                 sh 'ninja -C build'
+                sh 'PATH=$PYPATH:$PWD/build:$PATH python3 -m pytest tests --verbose'
+                sh 'cd build && ctest'
             }
         }
     }
