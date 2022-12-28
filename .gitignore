@@ -8,6 +8,9 @@
 /examples/**/*.cindex
 /examples/**/*.index
 
+_region_.*
+notes/*.aux
+notes/*.log
 
 /skelly_sim.egg-info
 __pycache__
