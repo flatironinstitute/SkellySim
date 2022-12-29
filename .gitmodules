@@ -10,3 +10,6 @@
 [submodule "extern/msgpack-c"]
 	path = extern/msgpack-c
 	url = https://github.com/msgpack/msgpack-c
+[submodule "extern/eigen"]
+	path = extern/eigen
+	url = https://gitlab.com/libeigen/eigen

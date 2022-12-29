@@ -46,7 +46,6 @@ add_definitions("-DSKELLYSIM_COMMIT=\"${SKELLYSIM_COMMIT}\"")
 # required compiler features
 find_package(MPI REQUIRED)
 find_package(OpenMP REQUIRED)
-find_package(Eigen3 REQUIRED)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 find_package(Kokkos REQUIRED HINTS $ENV{TRILINOS_BASE}/lib/cmake)
@@ -63,8 +62,8 @@ set(SKELLY_INCLUDES_SYSTEM
   ${PROJECT_SOURCE_DIR}/extern/trng4
   ${PROJECT_SOURCE_DIR}/extern/toml11
   ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
+  ${PROJECT_SOURCE_DIR}/extern/eigen
   ${MPI_CXX_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIR}
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
   ${STKFMM_INCLUDE_DIRS}
