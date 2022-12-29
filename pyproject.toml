@@ -32,6 +32,9 @@ dependencies = [
 tests = [
     'pytest',
 ]
+docs = [
+    'sphinx-book-theme'
+]
 
 [project.urls]
 homepage = "https//github.com/flatironinstitute/skelly_sim"
