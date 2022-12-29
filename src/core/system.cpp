@@ -1,6 +1,5 @@
 #include <skelly_sim.hpp>
 
-#include <csignal>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -61,8 +60,7 @@ toml::value param_table_; ///< Parsed input table
 bool resume_flag_;        ///< FIXME: Hack check if resuming or post-processing/initial run
 
 /// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
-std::tuple<int, int, int>
-get_local_node_counts() {
+std::tuple<int, int, int> get_local_node_counts() {
     return std::make_tuple(fc_.get_local_node_count(), shell_->get_local_node_count(), bc_.get_local_node_count());
 }
 
@@ -157,12 +155,6 @@ void write_config(const std::string &config_file) {
     auto trajectory_open_mode = std::ofstream::binary | std::ofstream::out;
     auto ofs = std::ofstream(config_file, trajectory_open_mode);
     write(ofs);
-}
-
-void interrupt_handler(int signum) {
-    restore();
-    write_config("skelly_sim.final_config");
-    throw std::runtime_error("Manual interrupt");
 }
 
 /// @brief Class representing a velocity field
@@ -823,7 +815,6 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
     resume_flag_ = resume_flag;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
-    signal(SIGINT, interrupt_handler);
     if (listen_flag) {
         spdlog::logger sink =
             rank_ == 0 ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stderr_sink_st>())
