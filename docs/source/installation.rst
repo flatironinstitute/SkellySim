@@ -57,7 +57,6 @@ look something like this for working within a singularity environment:
     singularity exec /path/to/skellysim_container.sif python3 gen_config.py
     singularity exec /path/to/skellysim_container.sif skelly_precompute skelly_config.toml
     singularity exec /path/to/skellysim_container.sif mpirun skelly_sim
-    singularity exec /path/to/skellysim_container.sif mpirun skelly_sim --post-process
 
 
 

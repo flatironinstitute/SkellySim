@@ -94,7 +94,7 @@ class VelocityFieldRequest:
 
     Attributes
     ----------
-    x0 : List[float], default: :obj:`[]`, units: :obj:`μm`
+    x : List[float], default: :obj:`[]`, units: :obj:`μm`
         Position of the field points [[x0,y0,z0],[x1,y1,z1],...]
     """
     x: NDArray[Shape["Any, 3"], Float64] = field(default_factory=_default_3d_matrix)
