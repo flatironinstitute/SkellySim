@@ -47,8 +47,6 @@ Terminology
 
   - :obj:`dynamic_instability` (optional): Parameters related to Fiber dynamic instability
 
-  - :obj:`velocity_field` (optional): Parameters related to measuring the velocity field
-
   - :obj:`fibers` (optional): List of :obj:`Fiber` objects
 
   - :obj:`bodies` (optional): List of :obj:`Body` objects
@@ -132,13 +130,6 @@ with a single :obj:`Fiber` attached to its surface. This object pair is containe
     # radius of periphery in microns
     config.periphery.radius = 4.25
 
-    # velocity field parameters.
-    config.params.velocity_field.resolution = 1.0
-    config.params.velocity_field.dt_write_field = 0.5
-    # track field only around bodies when True. We want the whole field inside
-    # the periphery
-    config.params.velocity_field.moving_volume = False
-
     # output our config
     config.save('skelly_config.toml')
 
@@ -190,14 +181,6 @@ Dynamic instability
 :obj:`Config.params.dynamic_instability`
 
 .. autoclass:: skelly_sim.skelly_config.DynamicInstability
-
-
-Velocity field
---------------
-:obj:`Config.params.velocity_field`
-
-.. autoclass:: skelly_sim.skelly_config.VelocityField
-
 
 Fibers
 ~~~~~~

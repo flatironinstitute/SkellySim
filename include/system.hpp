@@ -18,8 +18,7 @@ struct properties_t {
     double time = 0.0; ///< Current system time
 };
 
-void init(const std::string &input_file, bool resume_flag = false, bool post_process_flag = false,
-          bool listen_flag = false);
+void init(const std::string &input_file, bool resume_flag = false, bool listen_flag = false);
 Params *get_params();
 BodyContainer *get_body_container();
 FiberContainer *get_fiber_container();
@@ -34,7 +33,6 @@ void dynamic_instability();
 void prep_state_for_solver();
 bool step();
 void run();
-void run_post_process();
 void write();
 void write(std::ofstream &);
 bool check_collision();

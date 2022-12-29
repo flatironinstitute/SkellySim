@@ -79,12 +79,4 @@ Params::Params(toml::value &pt) {
         fiber_periphery_interaction.f_0 = toml::find_or(fp, "f_0", fiber_periphery_interaction.f_0);
         fiber_periphery_interaction.l_0 = toml::find_or(fp, "l_0", fiber_periphery_interaction.l_0);
     }
-
-    if (pt.contains("velocity_field")) {
-        const auto vf = pt.at("velocity_field");
-        velocity_field.moving_volume = toml::find_or(vf, "moving_volume", false);
-        velocity_field.dt_write_field = toml::find_or(vf, "dt_write_field", 10 * dt_write);
-        velocity_field.resolution = toml::find_or(vf, "resolution", 1.0);
-        velocity_field.moving_volume_radius = toml::find_or(vf, "moving_volume_radius", 20.0);
-    }
 }

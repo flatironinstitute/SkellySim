@@ -38,8 +38,5 @@ config.fibers[0].fill_node_positions(np.array([1.0, 0.0, 0.0]), np.array([0.0, 0
 config.periphery.n_nodes = 4000
 config.periphery.radius = 4.0
 
-config.params.velocity_field.dt_write_field = 0.1
-config.params.velocity_field.resolution = 0.2
-
 # output our config
 config.save(config_file)

@@ -185,7 +185,7 @@ class TrajectoryReader:
         Global toml data associated with the simulation
     """
 
-    def __init__(self, toml_file: str = 'skelly_config.toml', velocity_field: bool = False):
+    def __init__(self, toml_file: str = 'skelly_config.toml'):
         """
         Initialize our TrajectoryReader object
 
@@ -193,8 +193,6 @@ class TrajectoryReader:
         ---------
         toml_file : str
             Configuration file for the simulation. Usually 'skelly_config.toml', which is the default.
-        velocity_field : bool
-            Set True to read the velocity field trajectory rather than the position trajectory
         """
 
         self._fh = None
@@ -206,10 +204,7 @@ class TrajectoryReader:
         with open(toml_file, 'r') as f:
             self.config_data = toml.load(f)
 
-        if velocity_field:
-            traj_file = os.path.join(os.path.dirname(toml_file), 'skelly_sim.vf')
-        else:
-            traj_file = os.path.join(os.path.dirname(toml_file), 'skelly_sim.out')
+        traj_file = os.path.join(os.path.dirname(toml_file), 'skelly_sim.out')
 
         mtime = os.stat(traj_file).st_mtime
         index_file = traj_file + '.index'

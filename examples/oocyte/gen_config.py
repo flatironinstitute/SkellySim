@@ -30,9 +30,7 @@ config = ConfigRevolution()
 config.params.dt_write = 0.1
 config.params.dt_initial = 1E-2
 config.params.dt_max = 1E-2
-config.params.velocity_field_flag = True
 config.params.periphery_interaction_flag = False
-config.params.velocity_field.moving_volume = False
 config.params.seed = 350
 config.params.viscosity = 1
 

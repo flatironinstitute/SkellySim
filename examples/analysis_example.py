@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from skelly_sim.reader import TrajectoryReader
 
 traj = TrajectoryReader('skelly_config.toml')
-vf = TrajectoryReader('skelly_config.toml', velocity_field=True)
 body_pos = np.empty(shape=(len(traj), 3))  # COM body position in time
 plus_pos = np.empty(shape=(len(traj), 3))  # fiber plus end in time
 minus_pos = np.empty(shape=(len(traj), 3))  # fiber minus end in time
@@ -17,10 +16,6 @@ for i in range(len(traj)):
     body_pos[i, :] = traj['bodies'][0]['position_']
     minus_pos[i, :] = traj['fibers'][0]['x_'][0, :]
     plus_pos[i, :] = traj['fibers'][0]['x_'][-1, :]
-
-vf.load_frame(10)
-x = vf['x_grid']
-v = vf['v_grid']
 
 print("system keys: " + str(list(traj.keys())))
 print("fiber keys: " + str(list(traj['fibers'][0].keys())))

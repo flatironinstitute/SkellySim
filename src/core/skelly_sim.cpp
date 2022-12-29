@@ -25,13 +25,11 @@ int main(int argc, char *argv[]) {
     std::string config_file = "skelly_config.toml";
     bool resume_flag = false;
     bool overwrite_flag = false;
-    bool post_process_flag = false;
     bool listen_flag = false;
     Teuchos::CommandLineProcessor cmdp(false, true);
     cmdp.setOption("config-file", &config_file, "TOML input file.");
     cmdp.setOption("resume", "no-resume", &resume_flag, "Supply to resume simulation.");
     cmdp.setOption("overwrite", "no-overwrite", &overwrite_flag, "Supply to overwrite existing simulation.");
-    cmdp.setOption("post-process", "no-post-process", &post_process_flag, "Supply to post-process existing sim.");
     cmdp.setOption("listen", "no-listen", &listen_flag, "Supply to run in listener mode");
 
     if (cmdp.parse(argc, argv) != Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL) {
@@ -43,13 +41,9 @@ int main(int argc, char *argv[]) {
         if (resume_flag && overwrite_flag)
             throw std::runtime_error("Can't resume and overwrite simultaneously.");
         namespace fs = std::filesystem;
-        if (post_process_flag || listen_flag) {
+        if (listen_flag) {
             if (!fs::exists(fs::path{"skelly_sim.out"}))
-                throw std::runtime_error("No trajectory detected for post-process.");
-            if (resume_flag)
-                throw std::runtime_error("--post-process and --resume are mutually exclusive.");
-            if (overwrite_flag)
-                throw std::runtime_error("--post-process and --overwrite are mutually exclusive.");
+                throw std::runtime_error("No trajectory detected for listener.");
         } else if (resume_flag) {
             if (!fs::exists(fs::path{"skelly_sim.out"}))
                 throw std::runtime_error("--resume flag supplied without existing trajectory.");
@@ -58,11 +52,9 @@ int main(int argc, char *argv[]) {
                 throw std::runtime_error("Existing trajectory detected. Supply --overwrite flag to overwrite.");
         }
 
-        System::init(config_file, resume_flag, post_process_flag, listen_flag);
+        System::init(config_file, resume_flag, listen_flag);
         if (listen_flag)
             listener::run();
-        else if (post_process_flag)
-            System::run_post_process();
         else
             System::run();
     } catch (const std::runtime_error &e) {

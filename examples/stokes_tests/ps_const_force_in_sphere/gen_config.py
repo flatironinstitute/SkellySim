@@ -30,9 +30,6 @@ config.params.t_final = 0.2
 config.params.gmres_tol = 1E-10
 config.params.seed = 130319
 
-config.params.velocity_field.resolution = 0.2
-config.params.velocity_field.dt_write_field = 0.1
-
 config.periphery.n_nodes = 6000
 config.periphery.radius = np.pi / 3 / 1.04
 

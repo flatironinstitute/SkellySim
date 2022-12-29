@@ -1,11 +1,9 @@
 #include <skelly_sim.hpp>
 
-#include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <unistd.h>
 #include <unordered_map>
 
 #include <body.hpp>
@@ -23,7 +21,6 @@
 #include <cnpy.hpp>
 
 #include <mpi.h>
-#include <sys/mman.h>
 
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/null_sink.h>
@@ -50,14 +47,12 @@ Eigen::VectorXd curr_solution_;
 Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
 
 std::ofstream ofs_;    ///< Trajectory output file stream. Opened at initialization
-std::ofstream ofs_vf_; ///< Velocity field output file stream. Opened at initialization
 
 FiberContainer fc_bak_;   ///< Copy of fibers for timestep reversion
 BodyContainer bc_bak_;    ///< Copy of bodies for timestep reversion
 int rank_;                ///< MPI rank
 int size_;                ///< MPI size
 toml::value param_table_; ///< Parsed input table
-bool resume_flag_;        ///< FIXME: Hack check if resuming or post-processing/initial run
 
 /// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
 std::tuple<int, int, int> get_local_node_counts() {
@@ -156,43 +151,6 @@ void write_config(const std::string &config_file) {
     auto ofs = std::ofstream(config_file, trajectory_open_mode);
     write(ofs);
 }
-
-/// @brief Class representing a velocity field
-/// This allows for trivial dumping of the VF 'trajectory'
-class VelocityField {
-  public:
-    double time;            ///< Current time
-    Eigen::MatrixXd x_grid; ///< [3 x n_grid_points] matrix of points to evaluate the field
-    Eigen::MatrixXd v_grid; ///< [3 x n_grid_points] matrix of velocities at x_grid
-    void compute();         ///< Compute the velocity field given the current system configuration, and x_
-    Eigen::MatrixXd make_grid();
-    void write() { ///< Flush the velocity field to disk
-        int total_count = displs_.back();
-        Eigen::MatrixXd x_grid_tot;
-        Eigen::MatrixXd v_grid_tot;
-        if (rank_ == 0) {
-            x_grid_tot.resize(3, total_count / 3);
-            v_grid_tot.resize(3, total_count / 3);
-            spdlog::debug("I'm here... {} {} {}", counts_[rank_], total_count, displs_.back());
-        }
-
-        MPI_Gatherv(x_grid.data(), counts_[rank_], MPI_DOUBLE, x_grid_tot.data(), counts_.data(), displs_.data(),
-                    MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        MPI_Gatherv(v_grid.data(), counts_[rank_], MPI_DOUBLE, v_grid_tot.data(), counts_.data(), displs_.data(),
-                    MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-        x_grid = x_grid_tot;
-        v_grid = v_grid_tot;
-
-        msgpack::pack(ofs_vf_, *this);
-        ofs_vf_.flush();
-    };
-    MSGPACK_DEFINE_MAP(time, x_grid, v_grid);
-
-  private:
-    std::vector<int> counts_;
-    std::vector<int> displs_;
-};
 
 /// @brief Set system state to last state found in trajectory files
 ///
@@ -399,91 +357,6 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     return res;
 }
 
-/// @brief Create 'grid' for velocity field base on the vf parameters. Remove points from the
-/// grid where they lie outside the periphery or repeat (if multiple bodies and a 'moving'
-/// grid)
-///
-/// @return 3D list of points defining the grid
-Eigen::MatrixXd VelocityField::make_grid() {
-    const auto &vf = params_.velocity_field;
-    Eigen::MatrixXd grid_master;
-    std::unordered_map<long int, Eigen::Vector3d> grid_map;
-    using Vector3l = Eigen::Matrix<long int, 3, 1>;
-    const Vector3l key_map(1, 100000, 10000000000);
-
-    if (rank_ == 0) {
-        const double res = vf.resolution;
-        if (vf.moving_volume) {
-            Eigen::MatrixXd sphere_centers = bc_.get_global_center_positions(bc_.spherical_bodies);
-            int n_points = 1 + (2.0 * vf.moving_volume_radius / res);
-
-            for (int i_grid = 0; i_grid < sphere_centers.cols(); ++i_grid) {
-                Vector3l bottom_left =
-                    ((sphere_centers.col(i_grid).array() - vf.moving_volume_radius) / res).floor().cast<long int>();
-                for (int i = 0; i < n_points; ++i) {
-                    for (int j = 0; j < n_points; ++j) {
-                        for (int k = 0; k < n_points; ++k) {
-                            Vector3l coord_i = Vector3l{i, j, k} + bottom_left;
-                            long int key = key_map[0] * coord_i[0] + key_map[1] * coord_i[1] + key_map[2] * coord_i[2];
-                            Eigen::Vector3d test_point = res * coord_i.cast<double>();
-
-                            if (!shell_->check_collision(test_point, 0.0))
-                                grid_map[key] = test_point;
-                        }
-                    }
-                }
-            }
-            grid_master.resize(3, grid_map.size());
-            int pos = 0;
-            for (const auto &point : grid_map) {
-                grid_master.col(pos) = point.second;
-                pos++;
-            }
-        } else {
-            auto [a, b, c] = shell_->get_dimensions();
-            int n_points_x = 1 + 2.0 * a / res;
-            int n_points_y = 1 + 2.0 * b / res;
-            int n_points_z = 1 + 2.0 * c / res;
-            grid_master.resize(3, n_points_x * n_points_y * n_points_z);
-
-            int i_col = 0;
-            for (int i = 0; i < n_points_x; ++i) {
-                for (int j = 0; j < n_points_y; ++j) {
-                    for (int k = 0; k < n_points_z; ++k) {
-                        Eigen::Vector3d x{-a + i * res, -b + j * res, -c + k * res};
-                        if (!shell_->check_collision(x, 0.0)) {
-                            grid_master.col(i_col) = x;
-                            i_col++;
-                        }
-                    }
-                }
-            }
-            grid_master.conservativeResize(3, i_col);
-        }
-    }
-
-    Eigen::MatrixXd grid;
-    long int grid_size_global = grid_master.cols();
-    MPI_Bcast(&grid_size_global, 1, MPI_LONG_INT, 0, MPI_COMM_WORLD);
-
-    const int node_size_big = 3 * (grid_size_global / size_ + 1);
-    const int node_size_small = 3 * (grid_size_global / size_);
-    const int n_nodes_big = grid_size_global % size_;
-
-    counts_.resize(size_);
-    displs_.resize(size_ + 1);
-    for (int i = 0; i < size_; ++i) {
-        counts_[i] = ((i < n_nodes_big) ? node_size_big : node_size_small);
-        displs_[i + 1] = displs_[i] + counts_[i];
-    }
-
-    grid.resize(3, counts_[rank_] / 3);
-    MPI_Scatterv(grid_master.data(), counts_.data(), displs_.data(), MPI_DOUBLE, grid.data(), counts_[rank_],
-                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-    return grid;
-}
-
 Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     if (!r_trg.size())
         return Eigen::MatrixXd(3, 0);
@@ -538,12 +411,6 @@ void set_evaluator(const std::string &evaluator) {
     fc_.set_evaluator(evaluator);
     bc_.set_evaluator(evaluator);
     shell_->set_evaluator(evaluator);
-}
-
-void VelocityField::compute() {
-    time = properties.time;
-    x_grid = make_grid();
-    v_grid = velocity_at_targets(x_grid);
 }
 
 /// @brief Calculate all initial velocities/forces/RHS/BCs
@@ -742,25 +609,6 @@ void run() {
     write_config("skelly_sim.final_config");
 }
 
-/// @brief Run the post processing step
-void run_post_process() {
-    TrajectoryReader trajectory("skelly_sim.out", resume_flag_);
-
-    double dt_write_field = params_.velocity_field.dt_write_field;
-    double t_last = -dt_write_field;
-    while (trajectory.read_next_frame()) {
-        trajectory.unpack_current_frame(true);
-        if ((properties.time - t_last) / dt_write_field >= 1.0) {
-
-            VelocityField vf_curr;
-            vf_curr.compute();
-            vf_curr.write();
-            spdlog::info("{}", properties.time);
-            t_last = properties.time;
-        }
-    }
-}
-
 /// @brief Check for any collisions between objects
 ///
 /// @return true if any collision detected, false otherwise
@@ -811,8 +659,7 @@ toml::value *get_param_table() { return &param_table_; }
 /// @brief Initialize entire system. Needs to be called once at the beginning of the program execution
 /// @param[in] input_file String of toml config file specifying system parameters and initial conditions
 /// @param[in] resume_flag true if simulation is resuming from prior execution state, false otherwise.
-void init(const std::string &input_file, bool resume_flag, bool post_process_flag, bool listen_flag) {
-    resume_flag_ = resume_flag;
+void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
     if (listen_flag) {
@@ -867,17 +714,13 @@ void init(const std::string &input_file, bool resume_flag, bool post_process_fla
 
     curr_solution_.resize(get_local_solution_size());
     std::string filename = "skelly_sim.out";
-    auto trajectory_open_mode =
-        std::ofstream::binary | ((post_process_flag || listen_flag) ? std::ofstream::in : std::ofstream::out);
+    auto trajectory_open_mode = std::ofstream::binary | (listen_flag ? std::ofstream::in : std::ofstream::out);
     if (resume_flag) {
         resume_from_trajectory(filename);
         trajectory_open_mode = trajectory_open_mode | std::ofstream::app;
     }
     if (rank_ == 0)
         ofs_ = std::ofstream(filename, trajectory_open_mode);
-
-    if (post_process_flag && rank_ == 0)
-        ofs_vf_ = std::ofstream("skelly_sim.vf", std::ofstream::binary | std::ofstream::out);
 
     write_config("skelly_sim.initial_config");
 }

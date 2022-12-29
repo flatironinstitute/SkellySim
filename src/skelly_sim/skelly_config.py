@@ -340,6 +340,7 @@ class DynamicInstability():
     bending_rigidity: float = 2.5E-3
     min_separation: float = 0.1
 
+
 @dataclass
 class PeripheryBinding():
     """
@@ -361,28 +362,6 @@ class PeripheryBinding():
     polar_angle_end: float = 0.5 * np.pi
     threshold: float = 0.75
     
-
-@dataclass
-class VelocityField():
-    """
-    dataclass representing velocity field measurement parameters
-
-    Attributes
-    ----------
-    resolution : float, default: :obj:`1.0`, units: :obj:`μm`
-        Distance between grid points. n_points ~ (2 * radius / resolution)^3. Don't make too small unless you have lots of memory/storage :)
-    dt_write_field : float, default: :obj:`0.5`, units: :obj:`s`
-        Time between velocity field measurements
-    moving_volume : bool, default: :obj:`False`
-        Track velocity field around bodies. If two bodies are adjacent, their grids will be merged into one. Useful when no periphery.
-    moving_volume_radius : float, default: :obj:`30.0`, units: :obj:`μm`
-        not really a radius. half box size for volume around body to track
-    """
-    resolution: float = 1.0
-    dt_write_field: float = 0.5
-    moving_volume: bool = False
-    moving_volume_radius: float = 30.0
-
 
 @dataclass
 class Params():
@@ -416,8 +395,6 @@ class Params():
         Random number seed at simulation runtime (doesn't affect numpy seed during configuration generation)
     dynamic_instability : DynamicInstability, default: :obj:`DynamicInstability()`
         Dynamic instability parameters
-    velocity_field : VelocityField, default: :obj:`VelocityField()`
-        Velocity field parameters for post-processing
     periphery_interaction_flag : bool, default: :obj:`False`
         Experimental repulsion between periphery and Fibers
     adaptive_timestep_flag : bool, default: :obj:`True`
@@ -438,7 +415,6 @@ class Params():
     periphery_binding_flag: bool = False
     seed: int = 130319
     dynamic_instability: DynamicInstability = field(default_factory=DynamicInstability)
-    velocity_field: VelocityField = field(default_factory=VelocityField)
     periphery_binding: PeripheryBinding = field(default_factory=PeripheryBinding)
     periphery_interaction_flag: bool = False
     adaptive_timestep_flag: bool = True

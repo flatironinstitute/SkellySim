@@ -47,13 +47,6 @@ class Params {
     };
 
     struct {
-        bool moving_volume;
-        double dt_write_field;
-        double resolution;
-        double moving_volume_radius;
-    } velocity_field;
-
-    struct {
         int body_stresslet_multipole_order = 8;
         int body_stresslet_max_points = 2000;
         int body_oseen_multipole_order = 8;

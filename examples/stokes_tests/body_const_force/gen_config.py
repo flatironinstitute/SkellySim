@@ -37,9 +37,4 @@ config.bodies = [
          external_force=[0.0, 0.0, 1.5])
 ]
 
-config.params.velocity_field.resolution = 0.5
-config.params.velocity_field.dt_write_field = 0.5
-config.params.velocity_field.moving_volume = True
-config.params.velocity_field.moving_volume_radius = 5.0
-
 config.save(config_file)
