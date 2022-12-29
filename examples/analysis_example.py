@@ -23,10 +23,7 @@ print("body keys: " + str(list(traj['bodies'][0].keys())))
 print("shell keys: " + str(list(traj['shell'].keys())))
 print("velocity field keys: " + str(list(vf.keys())))
 
-ax1 = plt.subplot(2, 1, 1)
-ax2 = plt.subplot(2, 1, 2, projection='3d')
-
+ax1 = plt.subplot(1, 1, 1)
 ax1.plot(traj.times, body_pos[:, 2], traj.times, plus_pos[:, 2], traj.times, minus_pos[:, 2])
-ax2.quiver(x[:, 0], x[:, 1], x[:, 2], v[:, 0], v[:, 1], v[:, 2], length=1.0, normalize=False)
 
 plt.show()
