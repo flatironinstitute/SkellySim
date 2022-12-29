@@ -4,12 +4,11 @@
 Interactive mode
 ----------------
 
-SkellySim also supports an "interactive" mode where it runs inside a containing python process
+SkellySim supports an "interactive" mode where it runs inside a containing python process
 in :code:`listener` mode. This allows you to exploit the SkellySim machinery on demand to
-calculate various quantities without needless intermediate storage. This is extremely useful to
+calculate various quantities without intermediate storage. This is extremely useful to
 generate your own velocity fields, stream lines, and vortex lines at any given simulation
-point. Eventually this will be the dominant post-processing mode, as more facilities are
-added. Please see the following to get started:
+point. Please see the following to get started:
 `examples/listener_mode/listener_example.py
 <https://github.com/flatironinstitute/SkellySim/blob/main/examples/listener_mode/listener_example.py>`_.
 
