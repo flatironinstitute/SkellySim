@@ -46,7 +46,7 @@ Eigen::VectorXd curr_solution_;
 
 Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
 
-std::ofstream ofs_;    ///< Trajectory output file stream. Opened at initialization
+std::ofstream ofs_; ///< Trajectory output file stream. Opened at initialization
 
 FiberContainer fc_bak_;   ///< Copy of fibers for timestep reversion
 BodyContainer bc_bak_;    ///< Copy of bodies for timestep reversion
@@ -144,8 +144,9 @@ void write(std::ofstream &ofs) {
     }
 }
 
-void write() { write(ofs_); }
-
+/// @brief Dump current state to single file
+///
+/// @param[in] config_file path of file to output
 void write_config(const std::string &config_file) {
     auto trajectory_open_mode = std::ofstream::binary | std::ofstream::out;
     auto ofs = std::ofstream(config_file, trajectory_open_mode);
@@ -161,14 +162,6 @@ void resume_from_trajectory(std::string input_file) {
     }
     trajectory.unpack_current_frame();
 }
-
-// /// @brief Generate uniformly distributed point on unit sphere
-// Eigen::Vector3d uniform_on_sphere() {
-//     const double u = 2 * (RNG::uniform_unsplit()) - 1;
-//     const double theta = 2 * M_PI * RNG::uniform_unsplit();
-//     const double factor = sqrt(1 - u * u);
-//     return Eigen::Vector3d{factor * cos(theta), factor * sin(theta), u};
-// }
 
 /// @brief Calculate forces/torques on the bodies and velocities on the fibers due to attachment constraints
 /// @param[in] fibers_xt [4 x num_fiber_nodes_local] Vector of fiber node positions and tensions on current rank.
@@ -357,6 +350,10 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     return res;
 }
 
+/// @brief Evaluate the velocity at a list of target points
+///
+/// @param[in] r_trg [3 x n_trg] matrix of points to evaluate velocities
+/// @return [3 x n_trg] matrix of velocities at r_trg
 Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     if (!r_trg.size())
         return Eigen::MatrixXd(3, 0);
@@ -407,6 +404,9 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     return u_trg;
 }
 
+/// @brief Change the pair interaction evaluator method
+///
+/// @param[in] evaluator (FMM, GPU, CPU)
 void set_evaluator(const std::string &evaluator) {
     fc_.set_evaluator(evaluator);
     bc_.set_evaluator(evaluator);
@@ -486,22 +486,6 @@ void prep_state_for_solver() {
     fc_.apply_bc_rectangular(properties.dt, v_all.block(0, 0, 3, fib_node_count), external_force_fibers);
 
     shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
-}
-
-void dump_get_system_matvec(const std::string &matfile = "system_matrix.mat") {
-    int n_cols = get_local_solution_size();
-    Eigen::MatrixXd mat(n_cols, n_cols);
-
-    for (int i = 0; i < n_cols; ++i) {
-        Eigen::VectorXd b = Eigen::VectorXd::Zero(n_cols);
-        b[i] = 1.0;
-
-        // Grab row because numpy is row-major and eigen column-major, so we avoid the
-        // necessary transpose
-        mat.row(i) = apply_matvec(b);
-    }
-
-    cnpy::npy_save(matfile, mat.data(), {(unsigned long)mat.rows(), (unsigned long)mat.cols()}, "w");
 }
 
 /// @brief Generate next trial system state for the current System::properties::dt
@@ -662,23 +646,13 @@ toml::value *get_param_table() { return &param_table_; }
 void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank_);
     MPI_Comm_size(MPI_COMM_WORLD, &size_);
-    if (listen_flag) {
-        spdlog::logger sink =
-            rank_ == 0 ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stderr_sink_st>())
-                       : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
-        spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
-        spdlog::stderr_color_mt("STKFMM");
-        spdlog::stderr_color_mt("Belos");
-        spdlog::stderr_color_mt("SkellySim global");
-    } else {
-        spdlog::logger sink =
-            rank_ == 0 ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>())
-                       : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
-        spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
-        spdlog::stdout_color_mt("STKFMM");
-        spdlog::stdout_color_mt("Belos");
-        spdlog::stdout_color_mt("SkellySim global");
-    }
+    spdlog::logger sink = rank_ == 0
+                              ? spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::ansicolor_stderr_sink_st>())
+                              : spdlog::logger("SkellySim", std::make_shared<spdlog::sinks::null_sink_st>());
+    spdlog::set_default_logger(std::make_shared<spdlog::logger>(sink));
+    spdlog::stderr_color_mt("STKFMM");
+    spdlog::stderr_color_mt("Belos");
+    spdlog::stderr_color_mt("SkellySim global");
     spdlog::cfg::load_env_levels();
 
     spdlog::info("****** SkellySim {} ({}) ******", SKELLYSIM_VERSION, SKELLYSIM_COMMIT);
