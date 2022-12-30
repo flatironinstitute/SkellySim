@@ -22,7 +22,7 @@ pipeline {
                 LD_LIBRARY_PATH = "/opt/intel/oneapi/mkl/latest/lib/intel64:/usr/local/lib"
             }
             steps {
-                sh 'printenv | egrep "(^HOME|^PATH|^STKFMM_ROOT|^MKLROOT|^LD_LIBRARY_PATH|^pvfmm_DIR|^MKL_THREADING_LAYER|^LC_ALL|^CXX_FLAGS_)"'
+                sh 'printenv | egrep "(^HOME|^PATH|^STKFMM_ROOT|^MKLROOT|^LD_LIBRARY_PATH|^pvfmm_DIR|^MKL_THREADING_LAYER|^LC_ALL|^CXX_FLAGS_|&pvfmm_DIR)"'
                 sh 'python3 -m pip install --user ".[tests]"'
                 sh 'git submodule update --init'
                 sh 'cmake -B build . -DCMAKE_BUILD_TYPE=Release \
