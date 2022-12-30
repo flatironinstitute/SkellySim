@@ -18,7 +18,7 @@ pipeline {
                 PYPATH = "${WORKSPACE}/.local/bin"
                 LC_ALL = "C"
                 MKL_THREADING_LAYER = "GNU"
-                pvfmm_DIR = "${HOME}/.cache/pvfmm"
+                pvfmm_DIR = "/usr/local/share/pvfmm"
                 LD_LIBRARY_PATH = "/opt/intel/oneapi/mkl/latest/lib/intel64:/usr/local/lib"
             }
             steps {
