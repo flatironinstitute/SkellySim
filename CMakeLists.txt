@@ -95,7 +95,7 @@ target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
 
-configure_file(module_template.in module)
+configure_file(misc/module_template.in module)
 
 install(TARGETS skelly_sim
   CONFIGURATIONS Release

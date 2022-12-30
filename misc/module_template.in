@@ -16,4 +16,3 @@ module-whatis   "Sets the environment for $pkg-$version"
 prepend-path    PATH                            $root/bin
 setenv          SKELLYSIM_BASE                  $root
 setenv          SKELLYSIM_VERSION               $version
-setenv          PV_PLUGIN_PATH                  $root/share/skelly_sim/paraview/plugins
