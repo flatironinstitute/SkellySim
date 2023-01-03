@@ -661,6 +661,12 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     params_ = Params(param_table_.at("params"));
     RNG::init(params_.seed);
 
+    if ((params_.pair_evaluator == "CPU" || params_.pair_evaluator == "GPU") && size_ > 1) {
+        throw std::runtime_error("More than one MPI rank, but \"" + params_.pair_evaluator +
+                                 "\" supplied as pair evaluator. Only \"FMM\" is a "
+                                 "valid MPI evaluator currently. ");
+    }
+
     properties.dt = params_.dt_initial;
 
     if (param_table_.contains("fibers"))
