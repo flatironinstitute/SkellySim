@@ -1,6 +1,5 @@
 import numpy as np
 import msgpack
-import pickle
 import toml
 import os
 import struct
@@ -206,17 +205,17 @@ class TrajectoryReader:
 
         traj_file = os.path.join(os.path.dirname(toml_file), 'skelly_sim.out')
 
-        mtime = os.stat(traj_file).st_mtime
-        index_file = traj_file + '.index'
+        mtime = int(os.stat(traj_file).st_mtime)
+        index_file = traj_file + '.cindex'
         self._fh = open(traj_file, "rb")
 
         if os.path.isfile(index_file):
             with open(index_file, 'rb') as f:
-                index = pickle.load(f)
-                if index['mtime'] != mtime:
+                index = msgpack.load(f)
+                if index['mtime'] != mtime or 'times' not in index:
                     self._build_index(mtime, index_file)
                 else:
-                    self._fpos = index['fpos']
+                    self._fpos = index['offsets']
                     self.times = index['times']
         else:
             self._build_index(mtime, index_file)
@@ -271,11 +270,11 @@ class TrajectoryReader:
 
         index = {
             'mtime': mtime,
-            'fpos': self._fpos,
+            'offsets': self._fpos,
             'times': self.times,
         }
         with open(index_file, 'wb') as f:
-            pickle.dump(index, f)
+            msgpack.dump(index, f)
 
     def __getitem__(self, key):
         if key == 'bodies' or key == 'fibers':

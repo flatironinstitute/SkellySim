@@ -45,8 +45,8 @@ void TrajectoryReader::load_index(const std::string &traj_file) {
       buf << f.rdbuf();
       index = msgpack::unpack(buf.str().data(), buf.str().size()).get().as<decltype(index)>();
 
-      if (index.mtime != mtime) {
-          spdlog::warn("Stale index file: {} {} {}", index_file, index.mtime, mtime);
+      if (index.mtime != mtime || index.times.size() != index.offsets.size()) {
+          spdlog::warn("Stale index file: {}", index_file);
           build_index(index_file);
       }
       spdlog::info("Loaded trajectory index");
@@ -70,9 +70,10 @@ void TrajectoryReader::build_index(const std::string &index_file) {
 
     offset_ = 0;
     index.offsets.clear();
-    index.offsets.push_back(offset_);
-    while (read_next_frame()) {
-        index.offsets.push_back(offset_);
+    index.times.clear();
+    while (size_t frame_size = read_next_frame()) {
+        index.offsets.push_back(offset_ - frame_size);
+        index.times.push_back(oh_.get().as<input_map_t>().time);
     }
     spdlog::info("Built trajectory index with {} frames", index.offsets.size());
 

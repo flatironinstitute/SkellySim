@@ -25,7 +25,8 @@ class TrajectoryReader {
     struct {
         long int mtime;
         std::vector<std::size_t> offsets; ///< Vector of offsets for each frame
-        MSGPACK_DEFINE_MAP(mtime, offsets);
+        std::vector<double> times;        ///< Vector of times for each frame
+        MSGPACK_DEFINE_MAP(mtime, offsets, times);
     } index;
 
     void load_index(const std::string &traj_file);
