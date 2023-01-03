@@ -33,7 +33,7 @@ FiberContainer fc_;                ///< Fibers
 BodyContainer bc_;                 ///< Bodies
 PointSourceContainer psc_;         ///< Point Sources
 std::unique_ptr<Periphery> shell_; ///< Periphery
-std::vector<PointSource> points_;  ///< External point sources
+
 struct properties_t properties {
     .dt = 0.0, .time = 0.0,
 };
