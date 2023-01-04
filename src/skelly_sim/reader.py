@@ -19,7 +19,7 @@ def _ndencode(obj):
 
 def _default_3d_matrix():
     """
-    A default matrix factory for dataclass 'field' objects: :obj:`[]`
+    A default matrix factory for dataclass 'field' objects: :obj:`np.zeros(shape=(0, 3))`
     """
     return np.zeros(shape=(0, 3), dtype=np.float64)
 
@@ -77,7 +77,7 @@ class StreamlinesRequest:
         Relative tolerance in integrator. Lower will be more accurate, but take longer to evaluate
     back_integrate : bool, default: :obj:`True`
         Additionally integrate from [0, -t_final]
-    x0 : NDArray[Shape["Any, 3"], Float64], default: :obj:`[]`, units: :obj:`μm`
+    x0 : NDArray[Shape["Any, 3"], Float64], default: :obj:`np.zeros(shape=(0, 3))`, units: :obj:`μm`
         Position of the initial streamline seeds [[x0,y0,z0],[x1,y1,z1],...]
     """
     dt_init: float = 0.1
@@ -93,7 +93,7 @@ class VelocityFieldRequest:
 
     Attributes
     ----------
-    x : List[float], default: :obj:`[]`, units: :obj:`μm`
+    x : NDArray[Shape["Any, 3"], Float64], default: :obj:`np.zeros(shape=(0, 3))`, units: :obj:`μm`
         Position of the field points [[x0,y0,z0],[x1,y1,z1],...]
     """
     x: NDArray[Shape["Any, 3"], Float64] = field(default_factory=_default_3d_matrix)
