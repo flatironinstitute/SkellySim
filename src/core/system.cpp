@@ -33,26 +33,31 @@ FiberContainer fc_;                ///< Fibers
 BodyContainer bc_;                 ///< Bodies
 PointSourceContainer psc_;         ///< Point Sources
 std::unique_ptr<Periphery> shell_; ///< Periphery
-
-struct properties_t properties {
-    .dt = 0.0, .time = 0.0,
-};
-
-struct properties_t &get_properties() {
-    return properties;
-};
-
-Eigen::VectorXd curr_solution_;
-
-Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
-
-std::ofstream ofs_; ///< Trajectory output file stream. Opened at initialization
+Eigen::VectorXd curr_solution_;    ///< Current MPI-rank local solution vector
 
 FiberContainer fc_bak_;   ///< Copy of fibers for timestep reversion
 BodyContainer bc_bak_;    ///< Copy of bodies for timestep reversion
 int rank_;                ///< MPI rank
 int size_;                ///< MPI size
 toml::value param_table_; ///< Parsed input table
+
+std::ofstream ofs_; ///< Trajectory output file stream. Opened at initialization
+
+/// @brief external properties to the simulation
+struct properties_t properties {
+    // clang-format off
+    .dt = 0.0,   ///< Current timestep
+    .time = 0.0, ///< Current time
+    // clang-format on
+};
+
+/// @brief Get current system-wide properties (time, timestep, etc.)
+struct properties_t &get_properties() {
+    return properties;
+};
+
+/// @brief Get current MPI-rank local solution vector
+Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
 
 /// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
 std::tuple<int, int, int> get_local_node_counts() {
@@ -89,7 +94,8 @@ std::size_t get_local_solution_size() {
     return fiber_sol_size + shell_sol_size + body_sol_size;
 }
 
-/// @brief Flush current simulation state to trajectory file(s)
+/// @brief Flush current simulation state to ofstream
+/// @param[in] ofs output stream to write to
 void write(std::ofstream &ofs) {
     FiberContainer fc_global;
     BodyContainer bc_empty;
