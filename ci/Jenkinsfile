@@ -29,7 +29,7 @@ pipeline {
                 sh 'cmake -B build . -DCMAKE_BUILD_TYPE=Release \
                     -DCMAKE_CXX_FLAGS="$CXXFLAGS_" -DBLAS_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so \
                     -DLAPACK_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so -GNinja'
-                sh 'ninja -C build -j 8'
+                sh 'ninja -C build -j $OMP_NUM_THREADS'
                 sh 'cd build && ctest --output-on-failure'
                 sh 'PATH=$PYPATH:$PWD/build:$PATH python3 -m pytest tests --verbose'
             }
