@@ -16,7 +16,15 @@ inline T convert_array(const toml::array &src) {
             tmp[i] = src.at(i).as_floating();
 
         return Eigen::Quaterniond(tmp);
-    } else {
+    }
+    else if constexpr (std::is_same_v<T, Eigen::Vector3i>) {
+        T trg;
+        for (size_t i = 0; i < 3; ++i)
+            trg[i] = src.at(i).as_integer();
+
+        return trg;
+    }
+    else {
         T trg(src.size());
         for (size_t i = 0; i < src.size(); ++i)
             trg[i] = src.at(i).as_floating();

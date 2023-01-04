@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 
+#include <background_source.hpp>
 #include <body.hpp>
 #include <fiber.hpp>
 #include <io_maps.hpp>
@@ -32,6 +33,8 @@ Params params_;                    ///< Simulation input parameters
 FiberContainer fc_;                ///< Fibers
 BodyContainer bc_;                 ///< Bodies
 PointSourceContainer psc_;         ///< Point Sources
+BackgroundSource bs_;              ///< Background flow
+
 std::unique_ptr<Periphery> shell_; ///< Periphery
 Eigen::VectorXd curr_solution_;    ///< Current MPI-rank local solution vector
 
@@ -394,7 +397,8 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     u_trg = fc_.flow(r_trg, f_on_fibers, eta, false) + \
         bc_.flow(r_trg, sol_bodies, eta) + \
         shell_->flow(r_trg, sol_shell, eta) + \
-        psc_.flow(r_trg, eta, properties.time);
+        psc_.flow(r_trg, eta, properties.time) + \
+        bs_.flow(r_trg, eta);
     // clang-format on
 
     // FIXME: move this to body logic with overloading
@@ -483,6 +487,7 @@ void prep_state_for_solver() {
     }
 
     v_all += psc_.flow(r_all, params_.eta, properties.time);
+    v_all += bs_.flow(r_all, params_.eta);
 
     bc_.update_RHS(v_all.block(0, fib_node_count + shell_node_count, 3, body_node_count));
 
@@ -646,6 +651,18 @@ Periphery *get_shell() { return shell_.get(); }
 /// @brief get pointer to param table struct
 toml::value *get_param_table() { return &param_table_; }
 
+/// @brief Raise relevant exception if known conflict in parameter setup
+void sanity_check() {
+    if ((params_.pair_evaluator == "CPU" || params_.pair_evaluator == "GPU") && size_ > 1) {
+        throw std::runtime_error("More than one MPI rank, but \"" + params_.pair_evaluator +
+                                 "\" supplied as pair evaluator. Only \"FMM\" is a "
+                                 "valid MPI evaluator currently. ");
+    }
+
+    if (shell_->is_active() && bs_.is_active())
+        throw std::runtime_error("Background sources are currently incompatible with peripheries.");
+}
+
 /// @brief Initialize entire system. Needs to be called once at the beginning of the program execution
 /// @param[in] input_file String of toml config file specifying system parameters and initial conditions
 /// @param[in] resume_flag true if simulation is resuming from prior execution state, false otherwise.
@@ -666,13 +683,7 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     param_table_ = toml::parse(input_file);
     params_ = Params(param_table_.at("params"));
     RNG::init(params_.seed);
-
-    if ((params_.pair_evaluator == "CPU" || params_.pair_evaluator == "GPU") && size_ > 1) {
-        throw std::runtime_error("More than one MPI rank, but \"" + params_.pair_evaluator +
-                                 "\" supplied as pair evaluator. Only \"FMM\" is a "
-                                 "valid MPI evaluator currently. ");
-    }
-
+    
     properties.dt = params_.dt_initial;
 
     if (param_table_.contains("fibers"))
@@ -698,6 +709,11 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     if (param_table_.contains("point_sources"))
         psc_ = PointSourceContainer(param_table_.at("point_sources").as_array());
 
+    if (param_table_.contains("background"))
+        bs_ = BackgroundSource(param_table_.at("background"));
+
+    sanity_check();
+    
     curr_solution_.resize(get_local_solution_size());
     std::string filename = "skelly_sim.out";
     auto trajectory_open_mode = std::ofstream::binary | (listen_flag ? std::ofstream::in : std::ofstream::out);

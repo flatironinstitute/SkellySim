@@ -235,6 +235,13 @@ def _default_vector():
     return [0.0, 0.0, 0.0]
 
 
+def _default_ivector():
+    """
+    A default integer vector factory for dataclass 'field' objects: :obj:`[0, 0, 0]`
+    """
+    return [0, 0, 0]
+
+
 def _default_quaternion():
     """
     A default quaternion factory for dataclass 'field' objects: :obj:`[0.0, 0.0, 0.0, 1.0]`
@@ -861,6 +868,25 @@ class Point():
 
 
 @dataclass
+class BackgroundSource():
+    """dataclass for a point force/torque source
+
+    Attributes
+    ----------
+    components : List[int], default: :obj:`[0, 1, 2]`
+        Component of position to scale (x,y,z)
+        E.g. [1, 0, 2] to scale velocity in x by y, y by x, and z by z
+    scale_factor : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`1 / s`
+        Amount to scale each component by
+    uniform : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm / s`
+        Amount to scale each component by
+    """
+    components: List[int] = field(default_factory=_default_ivector)
+    scale_factor: List[float] = field(default_factory=_default_vector)
+    uniform: List[float] = field(default_factory=_default_vector)
+
+
+@dataclass
 class Config():
     """
     Parent dataclass for a SkellySim config. Use this config if you don't have a bounding volume
@@ -880,6 +906,7 @@ class Config():
     bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
+    background: BackgroundSource = field(default_factory=BackgroundSource)
 
     def plot_fibers(self, backend: str = "TKAgg"):
         """

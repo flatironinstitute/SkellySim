@@ -11,7 +11,8 @@
 10. Other formulations (Donev/Maxian/Ohm/Tangent-angle type formulation)
 11. Stealth swimmers
 12. Motors !?!?!&$@$
-13. Background flows
+13. ~Background flows~
+14. Rotate LU decomposition for bodies rather than re-decompose
 
 # Test problems:
 1. PDE solver tests for exterior confinement // mobile bodies in confinement
