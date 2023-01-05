@@ -79,6 +79,7 @@ add_library(skelly OBJECT
   src/core/spherical_body.cpp src/core/deformable_body.cpp src/core/point_source.cpp src/core/streamline.cpp
   src/core/listener.cpp src/core/trajectory_reader.cpp src/core/background_source.cpp src/core/fiber_container.cpp
   src/core/kernels.cu
+  ${SKELLY_INCLUDES}
 )
 
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
