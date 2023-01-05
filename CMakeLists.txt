@@ -85,13 +85,11 @@ add_library(skelly OBJECT
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
 target_include_directories(skelly SYSTEM PUBLIC ${SKELLY_INCLUDES_SYSTEM})
 target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
-set_property(TARGET skelly PROPERTY CUDA_ARCHITECTURES "70;75;80")
 
 add_subdirectory(extern/spdlog EXCLUDE_FROM_ALL)
 add_subdirectory(extern/trng4 EXCLUDE_FROM_ALL)
 
 add_executable(skelly_sim src/core/skelly_sim.cpp)
-set_property(TARGET skelly_sim PROPERTY CUDA_ARCHITECTURES "70;75;80")
   
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
