@@ -93,7 +93,8 @@ void run() {
         if (msgsize == 0)
             return;
         std::vector<char> cmd_payload(msgsize);
-        read(STDIN_FILENO, cmd_payload.data(), msgsize);
+        if (read(STDIN_FILENO, cmd_payload.data(), msgsize) < 0)
+            spdlog::warn("Error reading payload");
 
         auto cmd = msgpack::unpack(cmd_payload.data(), msgsize).get().as<listener_command_t>();
 
