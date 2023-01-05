@@ -77,7 +77,8 @@ add_library(skelly OBJECT
   src/core/fiber.cpp src/core/kernels.cpp src/core/utils.cpp src/core/periphery.cpp src/core/cnpy.cpp src/core/params.cpp
   src/core/dynamic_instability.cpp src/core/system.cpp src/core/body.cpp src/core/solver_hydro.cpp src/core/rng.cpp
   src/core/spherical_body.cpp src/core/deformable_body.cpp src/core/point_source.cpp src/core/streamline.cpp
-  src/core/listener.cpp src/core/trajectory_reader.cpp src/core/background_source.cpp src/core/kernels.cu
+  src/core/listener.cpp src/core/trajectory_reader.cpp src/core/background_source.cpp src/core/fiber_container.cpp
+  src/core/kernels.cu
 )
 
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
