@@ -11,6 +11,7 @@ pipeline {
                 dockerfile {
                     dir 'ci'
                     args '--gpus 1'
+                    label 'v100'
                 }
             }
             environment {
@@ -28,7 +29,7 @@ pipeline {
                 sh 'git submodule update --init'
                 sh 'cmake -B build . -DCMAKE_BUILD_TYPE=Release \
                     -DCMAKE_CXX_FLAGS="$CXXFLAGS_" -DBLAS_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so \
-                    -DLAPACK_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so -DCMAKE_CUDA_ARCHITECTURES="35;70" -GNinja'
+                    -DLAPACK_LIBRARIES=$MKLROOT/lib/intel64/libmkl_rt.so -DCMAKE_CUDA_ARCHITECTURES="70" -GNinja'
                 sh 'ninja -C build -j $OMP_NUM_THREADS'
                 sh 'cd build && ctest --output-on-failure'
                 sh 'PATH=$PYPATH:$PWD/build:$PATH python3 -m pytest tests --verbose'
