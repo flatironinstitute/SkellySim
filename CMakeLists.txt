@@ -78,6 +78,7 @@ add_library(skelly OBJECT
   src/core/dynamic_instability.cpp src/core/system.cpp src/core/body.cpp src/core/solver_hydro.cpp src/core/rng.cpp
   src/core/spherical_body.cpp src/core/deformable_body.cpp src/core/point_source.cpp src/core/streamline.cpp
   src/core/listener.cpp src/core/trajectory_reader.cpp src/core/background_source.cpp src/core/kernels.cu
+  ${SKELLY_INCLUDES}
 )
 
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
