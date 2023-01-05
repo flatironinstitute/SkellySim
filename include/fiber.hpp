@@ -95,6 +95,8 @@ class Fiber {
 
     /// @brief initialize empty fiber
     /// @param[in] n_nodes fiber 'resolution'
+    /// @param[in] radius fiber radius
+    /// @param[in] length fiber length
     /// @param[in] bending_rigidity bending rigidity of fiber
     /// @param[in] eta fluid viscosity
     ///
