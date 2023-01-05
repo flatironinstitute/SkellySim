@@ -1,17 +1,9 @@
-#include <iostream>
 #include <skelly_sim.hpp>
 
 #include <body.hpp>
-#include <cnpy.hpp>
 #include <kernels.hpp>
-#include <parse_util.hpp>
-#include <periphery.hpp>
 #include <system.hpp>
 #include <utils.hpp>
-
-#include <typeindex>
-
-#include <spdlog/spdlog.h>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -322,10 +314,9 @@ void BodyContainer::populate_sublists() {
     int solution_offset = 0;
     int node_offset = 0;
     for (const auto &body : bodies) {
-        using std::type_index;
-        if (typeid(*body) == typeid(SphericalBody)) {
+        if (dynamic_cast<SphericalBody*>(body.get())) {
             spherical_bodies.push_back(static_pointer_cast<SphericalBody>(body));
-        } else if (typeid(*body) == typeid(DeformableBody)) {
+        } else if (dynamic_cast<DeformableBody *>(body.get())) {
             deformable_bodies.push_back(static_pointer_cast<DeformableBody>(body));
         }
 

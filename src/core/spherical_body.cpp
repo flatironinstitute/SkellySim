@@ -7,8 +7,6 @@
 #include <periphery.hpp>
 #include <utils.hpp>
 
-#include <spdlog/spdlog.h>
-
 void SphericalBody::step(double dt, VectorRef &body_solution) {
     int sol_offset = 3 * n_nodes_;
 

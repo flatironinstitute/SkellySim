@@ -6,9 +6,9 @@
 #include <trng/uniform_int_dist.hpp>
 #include <trng/yarn2.hpp>
 
-#include <mpi.h>
-
 #include <iostream>
+
+#include <mpi.h>
 
 namespace RNG {
 using engine_type = trng::yarn2;

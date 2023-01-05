@@ -8,9 +8,6 @@
 #include <rng.hpp>
 #include <system.hpp>
 
-#include <mpi.h>
-#include <spdlog/spdlog.h>
-
 namespace System {
 
 /// @brief Nucleate/grow/destroy Fibers based on dynamic instability rules. See white paper for details

@@ -12,8 +12,6 @@
 
 #include <Teuchos_CommandLineProcessor.hpp>
 #include <cnpy.hpp>
-#include <mpi.h>
-#include <spdlog/spdlog.h>
 
 int main(int argc, char *argv[]) {
     int thread_level;

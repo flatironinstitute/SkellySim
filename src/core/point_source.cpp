@@ -1,7 +1,6 @@
-#include <point_source.hpp>
-#include <spdlog/spdlog.h>
-#include <parse_util.hpp>
 #include <kernels.hpp>
+#include <parse_util.hpp>
+#include <point_source.hpp>
 
 
 PointSource::PointSource(const toml::value &point_table) {

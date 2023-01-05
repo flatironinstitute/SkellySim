@@ -9,8 +9,6 @@
 
 #include <fstream>
 
-#include <mpi.h>
-#include <spdlog/spdlog.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 

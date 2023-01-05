@@ -9,7 +9,6 @@
 #include <periphery.hpp>
 #include <utils.hpp>
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 /// @file

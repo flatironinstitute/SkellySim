@@ -4,12 +4,7 @@
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <system.hpp>
-
 #include <utils.hpp>
-
-#include <mpi.h>
-
-#include <spdlog/spdlog.h>
 
 /// @brief Apply preconditioner for Periphery component of 'x'.  While local input is supplied,
 /// the preconditioner result requires the 'global' set of 'x' across all ranks, so an

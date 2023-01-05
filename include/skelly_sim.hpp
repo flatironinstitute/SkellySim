@@ -18,6 +18,8 @@
 #define EIGEN_QUATERNION_PLUGIN "eigen_quaternion_plugin.h"
 
 #include <Eigen/Core>
+#include <spdlog/spdlog.h>
+#include <mpi.h>
 
 typedef Eigen::Map<Eigen::VectorXd> VectorMap;
 typedef Eigen::Map<const Eigen::VectorXd> CVectorMap;

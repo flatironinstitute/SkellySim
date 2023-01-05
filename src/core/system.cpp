@@ -19,14 +19,9 @@
 #include <system.hpp>
 #include <trajectory_reader.hpp>
 
-#include <cnpy.hpp>
-
-#include <mpi.h>
-
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
 
 namespace System {
 Params params_;                    ///< Simulation input parameters

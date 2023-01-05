@@ -7,8 +7,6 @@
 #include <Tpetra_MultiVector.hpp>
 #include <Tpetra_Operator.hpp>
 
-#include <mpi.h>
-
 template <typename precond_T, typename matvec_T>
 class Solver {
   public:

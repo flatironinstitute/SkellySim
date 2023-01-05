@@ -2,7 +2,6 @@
 #define UTILS_HPP
 
 #include <skelly_sim.hpp>
-#include <spdlog/spdlog.h>
 
 namespace cnpy {
 struct NpyArray;

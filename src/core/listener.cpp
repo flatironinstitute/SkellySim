@@ -5,11 +5,6 @@
 #include <system.hpp>
 #include <trajectory_reader.hpp>
 
-#include <spdlog/spdlog.h>
-
-#include <cstdint>
-#include <iostream>
-
 namespace listener {
 
 typedef struct listener_command_t {

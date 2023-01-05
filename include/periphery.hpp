@@ -9,8 +9,6 @@
 #include <kernels.hpp>
 #include <params.hpp>
 
-#include <mpi.h>
-
 class SphericalBody;
 class DeformableBody;
 class Fiber;

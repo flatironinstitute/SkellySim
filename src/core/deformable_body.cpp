@@ -7,7 +7,6 @@
 #include <periphery.hpp>
 #include <utils.hpp>
 
-#include <spdlog/spdlog.h>
 
 void DeformableBody::min_copy(const std::shared_ptr<DeformableBody> &other) {}
 void DeformableBody::update_RHS(MatrixRef &v_on_body) {}

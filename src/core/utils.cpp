@@ -1,4 +1,3 @@
-#include <mpi.h>
 #include <skelly_sim.hpp>
 #include <utils.hpp>
 

@@ -6,8 +6,6 @@
 #include <boost/numeric/odeint/stepper/controlled_runge_kutta.hpp>
 #include <boost/numeric/odeint/stepper/runge_kutta_cash_karp54.hpp>
 
-#include <spdlog/spdlog.h>
-
 typedef Eigen::Vector3d point_type;
 
 void get_velocity_at_point(const point_type &x, point_type &dxdt, const double t) {

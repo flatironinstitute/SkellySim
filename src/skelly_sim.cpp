@@ -4,13 +4,10 @@
 #include <system.hpp>
 
 #include <filesystem>
-#include <spdlog/spdlog.h>
 #include <stdexcept>
 
 #include <Kokkos_Core.hpp>
 #include <Teuchos_CommandLineProcessor.hpp>
-
-#include <mpi.h>
 
 int main(int argc, char *argv[]) {
     int thread_level;

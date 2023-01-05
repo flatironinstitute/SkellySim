@@ -9,9 +9,6 @@
 #include <system.hpp>
 #include <utils.hpp>
 
-#include <spdlog/spdlog.h>
-#include <toml.hpp>
-
 using Eigen::ArrayXd;
 using Eigen::ArrayXXd;
 using Eigen::MatrixXd;

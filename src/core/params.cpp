@@ -1,8 +1,5 @@
 #include <params.hpp>
 
-#include <mpi.h>
-#include <stdexcept>
-
 Params::Params(toml::value &pt) {
     eta = toml::find_or(pt, "eta", 1.0);
     dt_initial = toml::find_or(pt, "dt_initial", 1E-2);

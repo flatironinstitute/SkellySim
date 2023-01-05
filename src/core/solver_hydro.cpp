@@ -9,8 +9,6 @@
 #include <BelosPseudoBlockGmresSolMgr.hpp>
 #include <BelosTpetraAdapter.hpp>
 
-#include <spdlog/spdlog.h>
-
 P_inv_hydro::P_inv_hydro(const Teuchos::RCP<const Teuchos::Comm<int>> comm) : comm_(comm), rank_(comm->getRank()) {
     TEUCHOS_TEST_FOR_EXCEPTION(comm.is_null(), std::invalid_argument,
                                "P_inv_hydro constructor: The input Teuchos::Comm object must be nonnull.");
