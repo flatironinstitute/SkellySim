@@ -18,30 +18,14 @@ using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
 
-/// @brief Check if fiber is within some threshold distance of the cortex attachment radius
+/// @brief Check if each fiber configuration is within some bounds for attachment with periphery
 ///
-/// Updates: Fiber::bc_minus, Fiber::bc_plus, Fiber::near_periphery
+/// Updates: Fiber::bc_minus, Fiber::bc_plus
 /// @param[in] Periphery object
 void FiberContainer::update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
-    /// FIXME: magic number in cortex interaction
-    for (auto &fib : *this) {
-        fib.bc_minus_ = fib.is_minus_clamped()
-                            ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
-                            : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
-
-        double angle = std::acos(fib.x_.col(fib.x_.cols() - 1).normalized()[2]);
-        bool near_periphery = (periphery_binding.active) && (angle >= periphery_binding.polar_angle_start) &&
-                              (angle <= periphery_binding.polar_angle_end) &&
-                              shell.check_collision(fib.x_, periphery_binding.threshold);
-        fib.bc_plus_ = near_periphery ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
-                                      : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
-        spdlog::get("SkellySim global")
-            ->debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)&fib, fib.BC_name[fib.bc_minus_.first],
-                    fib.BC_name[fib.bc_minus_.second], fib.BC_name[fib.bc_plus_.first],
-                    fib.BC_name[fib.bc_plus_.second]);
-    }
+    for (auto &fib : *this)
+        fib.update_boundary_conditions(shell, periphery_binding);
 }
-
 
 /// @brief Get total number of fibers across all ranks
 /// @return total number of fibers across all ranks
@@ -97,43 +81,12 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
     size_t offset = 0;
     int i_fib = 0;
     for (const auto &fib : *this) {
-        auto &mats = fib.matrices_.at(fib.n_nodes_);
         const int np = fib.n_nodes_;
-        const int bc_start_i = 4 * np - 14;
-        MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / fib.length_prev_, 1);
-        MatrixXd xsDs = (D_1.array().colwise() * fib.xs_.row(0).transpose().array()).transpose();
-        MatrixXd ysDs = (D_1.array().colwise() * fib.xs_.row(1).transpose().array()).transpose();
-        MatrixXd zsDs = (D_1.array().colwise() * fib.xs_.row(2).transpose().array()).transpose();
-
-        VectorXd vT = VectorXd(np * 4);
-        auto v_fib_x = v_fib.row(0).segment(offset, np).transpose();
-        auto v_fib_y = v_fib.row(1).segment(offset, np).transpose();
-        auto v_fib_z = v_fib.row(2).segment(offset, np).transpose();
-        vT.segment(0 * np, np) = v_fib_x;
-        vT.segment(1 * np, np) = v_fib_y;
-        vT.segment(2 * np, np) = v_fib_z;
-        vT.segment(3 * np, np) = xsDs * v_fib_x + ysDs * v_fib_y + zsDs * v_fib_z;
-
-        VectorXd vT_in = VectorXd::Zero(4 * np);
-        vT_in.segment(0, bc_start_i) = mats.P_downsample_bc * vT;
-
-        VectorXd xs_vT = VectorXd::Zero(4 * np); // from body attachments
-        const int minus_node = offset;
-        const int plus_node = offset + np - 1;
-        xs_vT(bc_start_i + 3) = v_fib.col(minus_node).dot(fib.xs_.col(0));
-
-        // Body link BC (match velocities of body to fiber minus end)
-        VectorXd y_BC = VectorXd::Zero(4 * np);
-        if (v_fib_boundary.size() > 0)
-            y_BC.segment(bc_start_i + 0, 7) = v_fib_boundary.col(i_fib);
-
-        if (fib.bc_plus_.first == Fiber::Velocity)
-            xs_vT(bc_start_i + 10) = v_fib.col(plus_node).dot(fib.xs_.col(np - 1));
-
-        res.segment(4 * offset, 4 * np) = fib.A_ * x_all.segment(4 * offset, 4 * np) - vT_in + xs_vT + y_BC;
+        res.segment(offset, 4 * np) =
+            fib.matvec(x_all.segment(offset, 4 * np), v_fib.block(0, i_fib, 3, np), v_fib_boundary.col(i_fib));
 
         i_fib++;
-        offset += np;
+        offset += 4 * np;
     }
 
     return res;
@@ -260,7 +213,6 @@ void FiberContainer::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, Mat
     for (auto &fib : *this) {
         fib.apply_bc_rectangular(dt, v_on_fibers.block(0, offset, 3, fib.n_nodes_),
                                  f_on_fibers.block(0, offset, 3, fib.n_nodes_));
-        // FIXME: preconditioner update probably shouldn't be here. think of how to organize it with other cache
         fib.update_preconditioner();
         offset += fib.n_nodes_;
     }
@@ -310,7 +262,6 @@ void FiberContainer::set_evaluator(const std::string &evaluator) {
     else if (evaluator == "GPU")
         stokeslet_kernel_ = kernels::stokeslet_direct_gpu;
 }
-
 
 FiberContainer::FiberContainer(Params &params) {
     spdlog::info("Initializing FiberContainer");

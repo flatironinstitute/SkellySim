@@ -6,6 +6,7 @@
 
 #include <fiber.hpp>
 #include <kernels.hpp>
+#include <periphery.hpp>
 #include <utils.hpp>
 
 #include <spdlog/spdlog.h>
@@ -63,6 +64,25 @@ void Fiber::update_derivatives() {
     xss_ = std::pow(2.0 / length_prev_, 2) * x_ * fib_mats.D_2_0;
     xsss_ = std::pow(2.0 / length_prev_, 3) * x_ * fib_mats.D_3_0;
     xssss_ = std::pow(2.0 / length_prev_, 4) * x_ * fib_mats.D_4_0;
+}
+
+/// @brief Check if fiber is within some threshold distance of the cortex attachment radius
+///
+/// Updates: Fiber::bc_minus_, Fiber::bc_plus_
+/// @param[in] Periphery object
+void Fiber::update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
+    bc_minus_ = is_minus_clamped() ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
+                                   : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
+
+    double angle = std::acos(x_.col(x_.cols() - 1).normalized()[2]);
+    bool near_periphery = (periphery_binding.active) && (angle >= periphery_binding.polar_angle_start) &&
+                          (angle <= periphery_binding.polar_angle_end) &&
+                          shell.check_collision(x_, periphery_binding.threshold);
+    bc_plus_ = near_periphery ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
+                              : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
+    spdlog::get("SkellySim global")
+        ->debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)this, BC_name[bc_minus_.first],
+                BC_name[bc_minus_.second], BC_name[bc_plus_.first], BC_name[bc_plus_.second]);
 }
 
 /// @brief Updates the linear operator A_ that defines the linear system
@@ -246,6 +266,44 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
                              xss_.row(2).transpose().array() * f_z);
         // clang-format on
     }
+}
+
+VectorXd Fiber::matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const {
+    auto &mats = matrices_.at(n_nodes_);
+    const int np = n_nodes_;
+    const int bc_start_i = 4 * np - 14;
+    MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_prev_, 1);
+    MatrixXd xsDs = (D_1.array().colwise() * xs_.row(0).transpose().array()).transpose();
+    MatrixXd ysDs = (D_1.array().colwise() * xs_.row(1).transpose().array()).transpose();
+    MatrixXd zsDs = (D_1.array().colwise() * xs_.row(2).transpose().array()).transpose();
+
+    VectorXd vT = VectorXd(np * 4);
+    VectorXd v_x = v.row(0).transpose();
+    VectorXd v_y = v.row(1).transpose();
+    VectorXd v_z = v.row(2).transpose();
+
+    vT.segment(0 * np, np) = v_x;
+    vT.segment(1 * np, np) = v_y;
+    vT.segment(2 * np, np) = v_z;
+    vT.segment(3 * np, np) = xsDs * v_x + ysDs * v_y + zsDs * v_z;
+
+    VectorXd vT_in = VectorXd::Zero(4 * np);
+    vT_in.segment(0, bc_start_i) = mats.P_downsample_bc * vT;
+
+    VectorXd xs_vT = VectorXd::Zero(4 * np); // from body attachments
+    const int minus_node = 0;
+    const int plus_node = np - 1;
+    xs_vT(bc_start_i + 3) = v.col(minus_node).dot(xs_.col(minus_node));
+
+    // Body link BC (match velocities of body to fiber minus end)
+    VectorXd y_BC = VectorXd::Zero(4 * np);
+    if (v_boundary.size() > 0)
+        y_BC.segment(bc_start_i + 0, 7) = v_boundary;
+
+    if (bc_plus_.first == Fiber::Velocity)
+        xs_vT(bc_start_i + 10) = v.col(plus_node).dot(xs_.col(plus_node));
+
+    return A_ * x - vT_in + xs_vT + y_BC;
 }
 
 /// @brief Calculate the force operator cache variable
