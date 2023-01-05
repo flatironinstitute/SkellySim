@@ -73,12 +73,9 @@ set(SKELLY_INCLUDES_SYSTEM
   ${Belos_INCLUDE_DIRS}
   )
 
+file(GLOB LIB_SRC src/core/*.cpp src/core/*.cu)
 add_library(skelly OBJECT
-  src/core/fiber.cpp src/core/kernels.cpp src/core/utils.cpp src/core/periphery.cpp src/core/cnpy.cpp src/core/params.cpp
-  src/core/dynamic_instability.cpp src/core/system.cpp src/core/body.cpp src/core/solver_hydro.cpp src/core/rng.cpp
-  src/core/spherical_body.cpp src/core/deformable_body.cpp src/core/point_source.cpp src/core/streamline.cpp
-  src/core/listener.cpp src/core/trajectory_reader.cpp src/core/background_source.cpp src/core/fiber_container.cpp
-  src/core/kernels.cu
+  ${LIB_SRC}
   ${SKELLY_INCLUDES}
 )
 
@@ -89,7 +86,7 @@ target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM
 add_subdirectory(extern/spdlog EXCLUDE_FROM_ALL)
 add_subdirectory(extern/trng4 EXCLUDE_FROM_ALL)
 
-add_executable(skelly_sim src/core/skelly_sim.cpp)
+add_executable(skelly_sim src/skelly_sim.cpp)
   
 target_link_libraries(skelly_sim PUBLIC skelly z MPI::MPI_CXX trng4_static
   ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
