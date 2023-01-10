@@ -33,5 +33,22 @@ Due to the complex dependencies of the C++ portion, until I finish packaging thi
 module -q purge
 # REMOVE python module from this if you are using conda!!!!
 module use ~rblackwell/modules
-module -q load gcc/11 openmpi python openblas/0.3.15-openmp trilinos pvfmm stkfmm fftw flexiblas skelly_sim
+module -q load gcc/11 openmpi python trilinos pvfmm/1.3.0 intel-oneapi-mkl cuda flexiblas skelly_sim
+```
+
+## Building from source at FI (developers or externs)
+
+
+```bash
+module -q purge
+module use ~rblackwell/modules
+module -q load gcc/11 openmpi python cmake trilinos pvfmm/1.3.0 stkfmm/1.1.0 intel-oneapi-mkl cuda boost flexiblas
+
+git clone https://github.com/flatironinstitute/SkellySim
+cd SkellySim
+git submodule update --init --recursive
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-march=broadwell -DCMAKE_CUDA_ARCHITECTURES="70;75"
+make -j$((2*$(nproc)))
 ```
