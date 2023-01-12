@@ -24,11 +24,11 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace System {
-Params params_;                    ///< Simulation input parameters
-FiberContainer fc_;                ///< Fibers
-BodyContainer bc_;                 ///< Bodies
-PointSourceContainer psc_;         ///< Point Sources
-BackgroundSource bs_;              ///< Background flow
+Params params_;            ///< Simulation input parameters
+FiberContainer fc_;        ///< Fibers
+BodyContainer bc_;         ///< Bodies
+PointSourceContainer psc_; ///< Point Sources
+BackgroundSource bs_;      ///< Background flow
 
 std::unique_ptr<Periphery> shell_; ///< Periphery
 Eigen::VectorXd curr_solution_;    ///< Current MPI-rank local solution vector
@@ -494,29 +494,33 @@ void prep_state_for_solver() {
     shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
 }
 
-/// @brief Generate next trial system state for the current System::properties::dt
+/// @brief Calculate solution vector given current configuration
 ///
-/// @note Modifies anything that evolves in time.
-/// @return If the Matrix solver converged to the requested tolerance with no issue.
-bool step() {
-    const double dt = properties.dt;
-
+/// @note Modifies too much stuff to note reasonably. RHS info, cache info, and current solution, most notably
+/// @return If the solver converged to the requested tolerance with no issue.
+bool solve() {
     prep_state_for_solver();
 
     Solver<P_inv_hydro, A_fiber_hydro> solver_; /// < Wrapper class for solving system
-
     solver_.set_RHS();
 
     bool converged = solver_.solve();
     curr_solution_ = solver_.get_solution();
 
-    double residual = solver_.get_residual();
-    spdlog::info("Residual: {}", residual);
+    spdlog::info("Residual: {}", solver_.get_residual());
+    return converged;
+}
 
+/// @brief Generate next trial system state for the current System::properties::dt
+///
+/// @note Modifies anything that evolves in time.
+/// @return If the solver converged to the requested tolerance with no issue.
+bool step() {
+    bool converged = solve();
     auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
 
     fc_.step(fiber_sol);
-    bc_.step(body_sol, dt);
+    bc_.step(body_sol, properties.dt);
     fc_.repin_to_bodies(bc_);
     shell_->step(shell_sol);
 
@@ -678,7 +682,7 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     param_table_ = toml::parse(input_file);
     params_ = Params(param_table_.at("params"));
     RNG::init(params_.seed);
-    
+
     properties.dt = params_.dt_initial;
 
     if (param_table_.contains("fibers"))
@@ -708,7 +712,7 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
         bs_ = BackgroundSource(param_table_.at("background"));
 
     sanity_check();
-    
+
     curr_solution_.resize(get_local_solution_size());
     std::string filename = "skelly_sim.out";
     auto trajectory_open_mode = std::ofstream::binary | (listen_flag ? std::ofstream::in : std::ofstream::out);
