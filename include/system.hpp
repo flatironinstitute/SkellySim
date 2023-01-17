@@ -8,6 +8,7 @@ class Params;
 class BodyContainer;
 class FiberContainer;
 class Periphery;
+class PointSourceContainer;
 
 /// Namespace for System, which drives the simulation and handles communication (timestepping, data wrangling, etc)
 namespace System {
@@ -23,6 +24,7 @@ Params *get_params();
 BodyContainer *get_body_container();
 FiberContainer *get_fiber_container();
 Periphery *get_shell();
+PointSourceContainer *get_point_source_container();
 toml::value *get_param_table();
 
 Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, VectorRef &x_bodies);
@@ -31,6 +33,7 @@ Eigen::VectorXd apply_preconditioner(VectorRef &x);
 Eigen::VectorXd apply_matvec(VectorRef &x);
 void dynamic_instability();
 void prep_state_for_solver();
+bool solve();
 bool step();
 void run();
 void write();

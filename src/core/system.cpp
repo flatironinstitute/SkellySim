@@ -649,6 +649,8 @@ FiberContainer *get_fiber_container() { return &fc_; }
 Periphery *get_shell() { return shell_.get(); }
 /// @brief get pointer to param table struct
 toml::value *get_param_table() { return &param_table_; }
+/// @brief get pointer to point source container
+PointSourceContainer *get_point_source_container() { return &psc_; }
 
 /// @brief Raise relevant exception if known conflict in parameter setup
 void sanity_check() {
