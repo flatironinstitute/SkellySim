@@ -52,12 +52,10 @@ void Solver<P_inv_hydro, A_fiber_hydro>::set_RHS() {
     const auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
     VectorMap RHS_fib(RHS_->getDataNonConst(0).getRawPtr(), fib_sol_size);
     VectorMap RHS_shell(RHS_->getDataNonConst(0).getRawPtr() + fib_sol_size, shell_sol_size);
-    VectorMap RHS_body(RHS_->getDataNonConst(0).getRawPtr() + fib_sol_size + shell_sol_size, body_sol_size);
 
     // Initialize GMRES RHS vector
     RHS_fib = System::get_fiber_RHS();
     RHS_shell = System::get_shell_RHS();
-    RHS_body = System::get_body_RHS();
 }
 
 template <>
