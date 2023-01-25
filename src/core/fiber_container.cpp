@@ -2,7 +2,6 @@
 
 #include <algorithm>
 
-#include <body.hpp>
 #include <fiber.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
@@ -72,15 +71,14 @@ VectorXd FiberContainer::apply_preconditioner(VectorRef &x_all) const {
     return y;
 }
 
-VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const {
+VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib) const {
     VectorXd res = VectorXd::Zero(get_local_solution_size());
 
     size_t offset = 0;
     int i_fib = 0;
     for (const auto &fib : *this) {
         const int np = fib.n_nodes_;
-        res.segment(offset, 4 * np) =
-            fib.matvec(x_all.segment(offset, 4 * np), v_fib.block(0, i_fib, 3, np), v_fib_boundary.col(i_fib));
+        res.segment(offset, 4 * np) = fib.matvec(x_all.segment(offset, 4 * np), v_fib.block(0, i_fib, 3, np));
 
         i_fib++;
         offset += 4 * np;
@@ -230,19 +228,6 @@ void FiberContainer::step(VectorRef &fiber_sol) {
     }
 }
 
-/// @brief Since the fiber and the body might not move _exactly_ the same, move the fiber to
-/// lie exactly at the binding site again
-/// Updates: [fibers].x_
-/// @param[in] bodies BodyContainer object that contains fiber binding sites
-void FiberContainer::repin_to_bodies(BodyContainer &bodies) {
-    for (auto &fib : *this) {
-        if (fib.binding_site_.first >= 0) {
-            Eigen::Vector3d delta =
-                bodies.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second) - fib.x_.col(0);
-            fib.x_.colwise() += delta;
-        }
-    }
-}
 
 void FiberContainer::set_evaluator(const std::string &evaluator) {
     auto &params = *System::get_params();

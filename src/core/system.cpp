@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 #include <background_source.hpp>
-#include <body.hpp>
 #include <fiber.hpp>
 #include <io_maps.hpp>
 #include <params.hpp>
@@ -26,7 +25,6 @@
 namespace System {
 Params params_;            ///< Simulation input parameters
 FiberContainer fc_;        ///< Fibers
-BodyContainer bc_;         ///< Bodies
 PointSourceContainer psc_; ///< Point Sources
 BackgroundSource bs_;      ///< Background flow
 
@@ -34,7 +32,6 @@ std::unique_ptr<Periphery> shell_; ///< Periphery
 Eigen::VectorXd curr_solution_;    ///< Current MPI-rank local solution vector
 
 FiberContainer fc_bak_;   ///< Copy of fibers for timestep reversion
-BodyContainer bc_bak_;    ///< Copy of bodies for timestep reversion
 int rank_;                ///< MPI rank
 int size_;                ///< MPI size
 toml::value param_table_; ///< Parsed input table
@@ -58,49 +55,44 @@ struct properties_t &get_properties() {
 Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
 
 /// @brief Get number of physical nodes local to MPI rank for each object type [fibers, shell, bodies]
-std::tuple<int, int, int> get_local_node_counts() {
-    return std::make_tuple(fc_.get_local_node_count(), shell_->get_local_node_count(), bc_.get_local_node_count());
+std::tuple<int, int> get_local_node_counts() {
+    return std::make_tuple(fc_.get_local_node_count(), shell_->get_local_node_count());
 }
 
 /// @brief Get GMRES solution size local to MPI rank for each object type [fibers, shell, bodies]
-std::tuple<int, int, int> get_local_solution_sizes() {
-    return std::make_tuple(fc_.get_local_solution_size(), shell_->get_local_solution_size(),
-                           bc_.get_local_solution_size());
+std::tuple<int, int> get_local_solution_sizes() {
+    return std::make_tuple(fc_.get_local_solution_size(), shell_->get_local_solution_size());
 }
 
 /// @brief Map 1D array data to a three-tuple of Vector Maps [fibers, shell, bodies]
-std::tuple<VectorMap, VectorMap, VectorMap> get_solution_maps(double *x) {
+std::tuple<VectorMap, VectorMap> get_solution_maps(double *x) {
     using Eigen::Map;
     using Eigen::VectorXd;
-    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
-    return std::make_tuple(VectorMap(x, fib_sol_size), VectorMap(x + fib_sol_size, shell_sol_size),
-                           VectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
+    auto [fib_sol_size, shell_sol_size] = System::get_local_solution_sizes();
+    return std::make_tuple(VectorMap(x, fib_sol_size), VectorMap(x + fib_sol_size, shell_sol_size));
 }
 
 /// @brief Map 1D array data to a three-tuple of const Vector Maps [fibers, shell, bodies]
-std::tuple<CVectorMap, CVectorMap, CVectorMap> get_solution_maps(const double *x) {
+std::tuple<CVectorMap, CVectorMap> get_solution_maps(const double *x) {
     using Eigen::Map;
     using Eigen::VectorXd;
-    auto [fib_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
-    return std::make_tuple(CVectorMap(x, fib_sol_size), CVectorMap(x + fib_sol_size, shell_sol_size),
-                           CVectorMap(x + fib_sol_size + shell_sol_size, body_sol_size));
+    auto [fib_sol_size, shell_sol_size] = System::get_local_solution_sizes();
+    return std::make_tuple(CVectorMap(x, fib_sol_size), CVectorMap(x + fib_sol_size, shell_sol_size));
 }
 
 /// @brief Get size of local solution vector
 std::size_t get_local_solution_size() {
-    auto [fiber_sol_size, shell_sol_size, body_sol_size] = System::get_local_solution_sizes();
-    return fiber_sol_size + shell_sol_size + body_sol_size;
+    auto [fiber_sol_size, shell_sol_size] = System::get_local_solution_sizes();
+    return fiber_sol_size + shell_sol_size;
 }
 
 /// @brief Flush current simulation state to ofstream
 /// @param[in] ofs output stream to write to
 void write(std::ofstream &ofs) {
     FiberContainer fc_global;
-    BodyContainer bc_empty;
-    BodyContainer &bc_global = (rank_ == 0) ? bc_ : bc_empty;
     Periphery shell_global;
 
-    const output_map_t to_merge{properties.time, properties.dt, fc_, bc_global, *shell_, {RNG::dump_state()}};
+    const output_map_t to_merge{properties.time, properties.dt, fc_, *shell_, {RNG::dump_state()}};
 
     std::stringstream mergebuf;
     msgpack::pack(mergebuf, to_merge);
@@ -126,7 +118,7 @@ void write(std::ofstream &ofs) {
         msgpack::object_handle oh;
         std::size_t offset = 0;
 
-        output_map_t to_write{properties.time, properties.dt, fc_global, bc_global, shell_global};
+        output_map_t to_write{properties.time, properties.dt, fc_global, shell_global};
         std::size_t shell_offset = 0;
         for (int i = 0; i < size_; ++i) {
             msgpack::unpack(oh, (char *)msg.data(), msg.size(), offset);
@@ -172,27 +164,26 @@ void resume_from_trajectory(std::string input_file) {
 /// @param[in] x [3 x n_nodes_local] Matrix where you want the views
 /// @return Three-tuple of node data [3 x n_fiber_nodes, 3 x n_bodiy_nodes, 3 x n_periphery_nodes]
 template <typename Derived>
-std::tuple<Eigen::Block<Derived>, Eigen::Block<Derived>, Eigen::Block<Derived>>
+std::tuple<Eigen::Block<Derived>, Eigen::Block<Derived>>
 get_node_maps(Eigen::MatrixBase<Derived> &x) {
-    auto [fib_nodes, shell_nodes, body_nodes] = get_local_node_counts();
+    auto [fib_nodes, shell_nodes] = get_local_node_counts();
     return std::make_tuple(Eigen::Block<Derived>(x.derived(), 0, 0, 3, fib_nodes),
-                           Eigen::Block<Derived>(x.derived(), 0, fib_nodes, 3, shell_nodes),
-                           Eigen::Block<Derived>(x.derived(), 0, fib_nodes + shell_nodes, 3, body_nodes));
+                           Eigen::Block<Derived>(x.derived(), 0, fib_nodes, 3, shell_nodes));
 }
 
-/// @brief Apply and return preconditioner results from fibers/body/shell
+/// @brief Apply and return preconditioner results from fibers/shell
 ///
 /// \f[ P^{-1} * x = y \f]
 /// @param [in] x [local_solution_size] Vector to apply preconditioner on
 /// @return [local_solution_size] Preconditioned input vector
 Eigen::VectorXd apply_preconditioner(VectorRef &x) {
-    const auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
-    const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
+    const auto [fib_sol_size, shell_sol_size] = get_local_solution_sizes();
+    const int sol_size = fib_sol_size + shell_sol_size;
     assert(sol_size == x.size());
     Eigen::VectorXd res(sol_size);
 
-    auto [x_fibers, x_shell, x_bodies] = get_solution_maps(x.data());
-    auto [res_fibers, res_shell, res_bodies] = get_solution_maps(res.data());
+    auto [x_fibers, x_shell] = get_solution_maps(x.data());
+    auto [res_fibers, res_shell] = get_solution_maps(res.data());
 
     res_fibers = fc_.apply_preconditioner(x_fibers);
     res_shell = shell_->apply_preconditioner(x_shell);
@@ -200,7 +191,7 @@ Eigen::VectorXd apply_preconditioner(VectorRef &x) {
     return res;
 }
 
-/// @brief Apply and return entire operator on system state vector for fibers/body/shell
+/// @brief Apply and return entire operator on system state vector for fibers/shell
 ///
 /// \f[ A * x = y \f]
 /// @param [in] x [local_solution_size] Vector to apply matvec on
@@ -212,33 +203,32 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     const Periphery &shell = *shell_;
     const double eta = params_.eta;
 
-    const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
-    const int total_node_count = fib_node_count + shell_node_count + body_node_count;
+    const auto [fib_node_count, shell_node_count] = get_local_node_counts();
+    const int total_node_count = fib_node_count + shell_node_count;
 
-    const auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
-    const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
+    const auto [fib_sol_size, shell_sol_size] = get_local_solution_sizes();
+    const int sol_size = fib_sol_size + shell_sol_size;
     assert(sol_size == x.size());
     Eigen::VectorXd res(sol_size);
 
     MatrixXd r_all(3, total_node_count), v_all(3, total_node_count);
-    auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
-    auto [v_fibers, v_shell, v_bodies] = get_node_maps(v_all);
+    auto [r_fibers, r_shell] = get_node_maps(r_all);
+    auto [v_fibers, v_shell] = get_node_maps(v_all);
     r_fibers = fc.get_local_node_positions();
     r_shell = shell.get_local_node_positions();
 
-    auto [x_fibers, x_shell, x_bodies] = get_solution_maps(x.data());
-    auto [res_fibers, res_shell, res_bodies] = get_solution_maps(res.data());
+    auto [x_fibers, x_shell] = get_solution_maps(x.data());
+    auto [res_fibers, res_shell] = get_solution_maps(res.data());
 
     // calculate fiber-fiber velocity
     MatrixXd fw = fc.apply_fiber_force(x_fibers);
     MatrixXd v_fib2all = fc.flow(r_all, fw, eta);
     MatrixXd v_shell2fibers = shell.flow(r_fibers, x_shell, eta);
-    Eigen::MatrixXd v_fib_boundary = MatrixXd::Zero(7, fib_node_count);
 
     v_all = v_fib2all;
     v_fibers += v_shell2fibers;
 
-    res_fibers = fc.matvec(x_fibers, v_fibers, v_fib_boundary);
+    res_fibers = fc.matvec(x_fibers, v_fibers);
     res_shell = shell.matvec(x_shell, v_shell);
 
     return res;
@@ -254,7 +244,7 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     Eigen::MatrixXd u_trg(r_trg.rows(), r_trg.cols());
 
     const double eta = params_.eta;
-    const auto [sol_fibers, sol_shell, sol_bodies] = get_solution_maps(curr_solution_.data());
+    const auto [sol_fibers, sol_shell] = get_solution_maps(curr_solution_.data());
     const auto &fp = params_.fiber_periphery_interaction;
 
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
@@ -289,15 +279,11 @@ void set_evaluator(const std::string &evaluator) {
 /// @note Modifies anything that evolves in time.
 void prep_state_for_solver() {
     using Eigen::MatrixXd;
+    const auto [fib_node_count, shell_node_count] = get_local_node_counts();
 
-    // Since DI can change size of fiber containers, must call first.
-    System::dynamic_instability();
-
-    const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
-
-    MatrixXd r_all(3, fib_node_count + shell_node_count + body_node_count);
+    MatrixXd r_all(3, fib_node_count + shell_node_count);
     {
-        auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
+        auto [r_fibers, r_shell] = get_node_maps(r_all);
         r_fibers = fc_.get_local_node_positions();
         r_shell = shell_->get_local_node_positions();
     }
@@ -357,7 +343,7 @@ bool solve() {
 /// @return If the solver converged to the requested tolerance with no issue.
 bool step() {
     bool converged = solve();
-    auto [fiber_sol, shell_sol, body_sol] = get_solution_maps(curr_solution_.data());
+    auto [fiber_sol, shell_sol] = get_solution_maps(curr_solution_.data());
 
     fc_.step(fiber_sol);
     shell_->step(shell_sol);
@@ -365,16 +351,14 @@ bool step() {
     return converged;
 }
 
-/// @brief store copies of Fiber and Body containers in case time step is rejected
+/// @brief store copies of Fiber container in case time step is rejected
 void backup() {
     fc_bak_ = fc_;
-    bc_bak_ = bc_;
 }
 
-/// @brief restore copies of Fiber and Body containers to the state when last backed up
+/// @brief restore copies of Fiber container to the state when last backed up
 void restore() {
     fc_ = fc_bak_;
-    bc_ = bc_bak_;
 }
 
 /// @brief Run the simulation!
@@ -462,15 +446,11 @@ bool check_collision() {
 
 /// @brief Return copy of fiber container's RHS
 Eigen::VectorXd get_fiber_RHS() { return fc_.get_RHS(); }
-/// @brief Return copy of body container's RHS
-Eigen::VectorXd get_body_RHS() { return bc_.get_RHS(); }
 /// @brief Return copy of shell's RHS
 Eigen::VectorXd get_shell_RHS() { return shell_->get_RHS(); }
 
 /// @brief get pointer to params struct
 Params *get_params() { return &params_; }
-/// @brief get pointer to body container
-BodyContainer *get_body_container() { return &bc_; }
 /// @brief get pointer to fiber container
 FiberContainer *get_fiber_container() { return &fc_; }
 /// @brief get pointer to shell

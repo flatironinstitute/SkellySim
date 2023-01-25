@@ -259,10 +259,6 @@ class Fiber():
     ----------
     n_nodes : int, default: :obj:`32`
         Number of nodes to represent fiber. Highly deformed or very long fibers will require more nodes to be accurately represented
-    parent_body : int, default: :obj:`-1`
-        Index of :obj:`Body` the :obj:`Fiber` is bound to. A value of :obj:`-1` indicates a free fiber.
-        :obj:`Fibers` attached to :obj:`Bodies` obey the :obj:`clamped` boundary condition,
-        which preserves the relative angle of attachment to the body.
     force_scale : float, default: :obj:`0.0`, units: :obj:`pN·μm⁻¹`
         Tangential force per unit length to act along filament. A positive value pushes toward the :obj:`plus` end,
         while a negative value pushes toward the :obj:`minus` end
@@ -274,13 +270,11 @@ class Fiber():
         Constraint length of this filament
     minus_clamped : bool, default: :obj:`False`
         Fix minus end of filament with "clamped" boundary condition, preserving orientation and position (:obj:`Velocity = 0, AngularVelocity = 0`).
-        If attached to a body (:obj:`parent_body >= 0`), then this parameter is implied True and ignored.
     x : List[float], default: :obj:`[]`, units: :obj:`μm`
         List of node positions in [x0,y0,z0,x1,y1,z1...] order. Extreme care must be taken when setting this since the length constraint
         can generate massive tensions with poor input. See examples.
     """
     n_nodes: int = 32
-    parent_body: int = -1
     parent_site: int = -1
     force_scale: float = 0.0
     bending_rigidity: float = 2.5E-3
@@ -715,137 +709,6 @@ class RevolutionPeriphery(Periphery):
 
 
 @dataclass
-class Body():
-    """dataclass for a single body and its parameters
-
-    Attributes
-    ----------
-    n_nucleation_sites : int, default: :obj:`0`
-        Number of available Fiber sites on the body. Don't add more fibers than this to body
-    position : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`μm`
-        Lab frame coordinate of the body center [x,y,z]
-    orientation : List[float], default: :obj:`[0.0, 0.0, 0.0, 1.0]`
-        Orientation quaternion of the body. Not worth changing
-    shape : str, default: :obj:`'sphere'`
-        Shape of the body. Sphere is currently only supported option
-    radius : float, default: :obj:`1.0`, units: :obj:`μm`
-        Radius of the body. This is the attachment radius for nucleation sites, the hydrodynamic radius is a bit smaller
-    n_nodes : int, default: :obj:`600`
-        Number of nodes to represent surface. WARNING: MAKE NEW PRECOMPUTE DATA WHEN CHANGING or you will regret it.
-    precompute_file : str, default: :obj:`'body_precompute.npz'`
-        Where precompute data is stored (quadrature data, mostly). Can be different on
-        different bodies, though should be the same if the bodies are the same radius and have
-        the same numbers of nodes.
-    external_force : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`pN`
-        Lab frame external force applied to body - useful for testing things like stokes flow
-    """
-    n_nucleation_sites: int = 0
-    position: List[float] = field(default_factory=_default_vector)
-    orientation: List[float] = field(default_factory=_default_quaternion)
-    shape: str = 'sphere'
-    radius: float = 1.0
-    n_nodes: int = 600
-    precompute_file: str = 'body_precompute.npz'
-    external_force: List[float] = field(default_factory=_default_vector)
-    external_torque: List[float] = field(default_factory=_default_vector)
-    nucleation_sites: List[float] = field(default_factory=list)
-    
-    def find_binding_site(self, fibers: List[Fiber], ds_min: float) -> Tuple[np.array, np.array]:
-        """
-        Find an open binding site given a list of Fibers that could interfere with binding
-        Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
-        interacting with the periphery directly. The binding site is guaranteed to be further than the Euclidean distance ds_min from any
-        other Fiber minus end
-
-        Arguments
-        ---------
-
-        ds_min : float
-            Minimum allowable separation between a binding site and any fiber minus end
-
-        Returns
-        -------
-        tuple(np.array, np.array)
-            position vector and its normalized version
-        """
-        com = np.array(self.position)
-        while (True):
-            u0 = _get_random_point_on_sphere()
-            x0 = u0 * self.radius + com
-
-            accept = True
-            ds_min2 = ds_min * ds_min
-            for fib in fibers:
-                dx = x0 - fib.x[0:3]
-                if np.dot(dx, dx) < ds_min2:
-                    accept = False
-                    break
-            if accept:
-                return (x0, u0)
-
-
-    def generate_nucleation_sites(self, ds_min: float, verbose: bool = True):
-        """
-        Find an open binding site given a list of Fibers that could interfere with binding
-        Binding site is assumed uniform on the surface, and placed a small epsilon away from the surface (0.9999999 * radius) to prevent
-        interacting with the periphery directly. The binding site is guaranteed to be further than the Euclidean distance ds_min from any
-        other Fiber minus end
-
-        Arguments
-        ---------
-        ds_min : float
-            Minimum allowable separation between a binding site and any fiber minus end
-
-        Returns
-        -------
-        tuple(np.array, np.array)
-            position vector and its normalized version
-        """
-        com = np.array(self.position)
-        ds_min2 = ds_min * ds_min
-
-        sites = np.empty((self.n_nucleation_sites, 3))
-        for isite in range(self.n_nucleation_sites):
-            while (True):
-                x0 = _get_random_point_on_sphere() * self.radius + com
-                accept = True
-                for jsite in range(isite):
-                    dx = x0 - sites[isite, :]
-                    if np.dot(dx, dx) < ds_min2:
-                        accept = False
-                        break
-                if accept:
-                    sites[isite, :] = x0
-                    if verbose:
-                        print("Inserting site {} at {}".format(isite, x0))
-                    break
-                
-        self.nucleation_sites = sites.flatten().tolist()
-
-            
-    def move_fibers_to_surface(self, fibers: List[Fiber], ds_min: float, verbose: bool = True) -> None:
-        """
-        Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
-
-        Arguments
-        ---------
-        fibers : List[Fiber]
-            List of fibers that will be moved. Only the Fiber.x property will be modified
-        ds_min : float
-            Minimum separation allowable between the fiber minus ends. Collisions are not searched for the rest of the fibers,
-            though they are unlikely
-        verbose : bool, default: :obj:`True`
-            If true, print a progress message
-        """
-        print("Inserting fibers")
-        for i in range(len(fibers)):
-            (x0, u0) = self.find_binding_site(fibers[0:i], ds_min)
-            if verbose:
-                print("Inserting fiber {} at {}".format(i, x0))
-            fibers[i].fill_node_positions(x0, u0)
-
-
-@dataclass
 class Point():
     """dataclass for a point force/torque source
 
@@ -895,15 +758,12 @@ class Config():
     ----------
     params : Params, default: :obj:`Params()`
         System parameters
-    bodies : List[Body], default: :obj:`[]`
-        List of bodies
     fibers : List[Fiber], default: :obj:`[]`
         List of fibers
     point_sources : List[Point], default: :obj:`[]`
         List of point sources
     """
     params: Params = field(default_factory=Params)
-    bodies: List[Body] = field(default_factory=list)
     fibers: List[Fiber] = field(default_factory=list)
     point_sources: List[Point] = field(default_factory=list)
     background: BackgroundSource = field(default_factory=BackgroundSource)
@@ -959,8 +819,6 @@ class ConfigSpherical(Config):
     ----------
     params : Params, default: :obj:`Params()`
         System parameters
-    bodies : List[Body], default: :obj:`[]`
-        List of bodies
     fibers : List[Fiber], default: :obj:`[]`
         List of fibers
     point_sources : List[Point], default: :obj:`[]`
@@ -980,8 +838,6 @@ class ConfigEllipsoidal(Config):
     ----------
     params : Params, default: :obj:`Params()`
         System parameters
-    bodies : List[Body], default: :obj:`[]`
-        List of bodies
     fibers : List[Fiber], default: :obj:`[]`
         List of fibers
     point_sources : List[Point], default: :obj:`[]`
@@ -1001,8 +857,6 @@ class ConfigRevolution(Config):
     ----------
     params : Params, default: :obj:`Params()`
         System parameters
-    bodies : List[Body], default: :obj:`[]`
-        List of bodies
     fibers : List[Fiber], default: :obj:`[]`
         List of fibers
     point_sources : List[Point], default: :obj:`[]`

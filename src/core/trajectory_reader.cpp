@@ -1,6 +1,5 @@
 #include <trajectory_reader.hpp>
 
-#include <body.hpp>
 #include <fiber.hpp>
 #include <io_maps.hpp>
 #include <periphery.hpp>
@@ -104,7 +103,6 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
     auto &params = *System::get_params();
     auto &properties = System::get_properties();
     auto &fc = *System::get_fiber_container();
-    auto &bc = *System::get_body_container();
     auto &shell = *System::get_shell();
 
     const int n_fib_tot = min_state.fibers.fibers.size();
@@ -141,11 +139,6 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
     }
 
     // make sure sublist pointers are initialized, and then fill them in
-    bc.populate_sublists();
-    for (int i = 0; i < bc.spherical_bodies.size(); ++i)
-        bc.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
-    for (int i = 0; i < bc.deformable_bodies.size(); ++i)
-        bc.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
     if (size > min_state.rng_state.size() && resume_flag_) {
         spdlog::error(
             "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
@@ -166,16 +159,8 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
     if (shell.is_active())
         shell.solution_vec_ = min_state.shell.solution_vec_.segment(shell.node_displs_[rank], shell.node_counts_[rank]);
 
-    auto [fiber_sol, shell_sol, body_sol] = System::get_solution_maps(System::get_curr_solution().data());
+    auto [fiber_sol, shell_sol] = System::get_solution_maps(System::get_curr_solution().data());
     shell_sol = shell.solution_vec_;
-
-    if (rank == 0) {
-        std::size_t body_offset = 0;
-        for (auto &body : bc.bodies) {
-            body_sol.segment(body_offset, body->solution_vec_.size()) = body->solution_vec_;
-            body_offset += body->solution_vec_.size();
-        }
-    }
 
     std::size_t fiber_offset = 0;
     for (auto &fib : fc.fibers) {
@@ -188,5 +173,4 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
     }
 
     fc.update_cache_variables(properties.dt, params.eta);
-    bc.update_cache_variables(params.eta);
 }

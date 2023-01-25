@@ -1,4 +1,3 @@
-#include <body.hpp>
 #include <cnpy.hpp>
 #include <fiber.hpp>
 #include <kernels.hpp>
@@ -79,27 +78,6 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
 /// @return true if collision, false otherwise
 void Periphery::update_RHS(MatrixRef &v_on_shell) { RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size()); }
 
-/// @brief Check for collision between SphericalPeriphery and SphericalBody
-/// If any point on body > (this->radius_ - threshold), then a collision is detected
-///
-/// @param[in] body SphericalBody to check collision
-/// @param[in] threshold signed threshold to check collision
-/// @return true if collision, false otherwise
-bool SphericalPeriphery::check_collision(const SphericalBody &body, double threshold) const {
-    const double max_distance = body.position_.norm() + body.radius_;
-    return max_distance > (radius_ - threshold);
-}
-
-/// @brief STUB Check for collision between SphericalPeriphery and DeformableBody
-///
-/// @param[in] body DeformableBody to check collision
-/// @param[in] threshold signed threshold to check collision
-/// @return always false because it's not implemented
-bool SphericalPeriphery::check_collision(const DeformableBody &body, double threshold) const {
-    spdlog::warn("check_collision not implemented for SphericalPeriphery->DeformableBody");
-    return false;
-}
-
 /// @brief Check for collision between SphericalPeriphery and a point cloud
 /// If any point lies outside R=(this->radius_ - threshold), return true
 /// Useful for collision detection between fibers and the periphery, but could be primitively used for a DeformableBody
@@ -143,30 +121,6 @@ Eigen::MatrixXd SphericalPeriphery::fiber_interaction(const Fiber &fiber,
     }
 
     return f_points;
-}
-
-/// @brief STUB Check for collision between EllipsoidalPeriphery and SphericalBody
-///
-/// @param[in] body SphericalBody to check collision
-/// @param[in] threshold signed threshold to check collision
-/// @return always false
-bool EllipsoidalPeriphery::check_collision(const SphericalBody &body, double threshold) const {
-    static bool first_call = true;
-    if (!world_rank_ && first_call) {
-        spdlog::warn("check_collision not implemented for EllipsoidalPeriphery->SphericalBody");
-        first_call = false;
-    }
-    return false;
-}
-
-/// @brief STUB Check for collision between EllipsoidalPeriphery and DeformableBody
-///
-/// @param[in] body DeformableBody to check collision
-/// @param[in] threshold signed threshold to check collision
-/// @return always false
-bool EllipsoidalPeriphery::check_collision(const DeformableBody &body, double threshold) const {
-    spdlog::warn("check_collision not implemented for EllipsoidalPeriphery->DeformableBody");
-    return false;
 }
 
 /// @brief Check for collision between EllipsoidalPeriphery and a point cloud
@@ -232,37 +186,10 @@ Eigen::MatrixXd EllipsoidalPeriphery::fiber_interaction(const Fiber &fiber,
     return f_points;
 }
 
-/// @brief STUB Check for collision between GenericPeriphery and SphericalBody
-///
-/// @param[in] body SphericalBody to check collision
-/// @param[in] threshold signed threshold to check collision
-/// @return always false
-bool GenericPeriphery::check_collision(const SphericalBody &body, double threshold) const {
-    static bool first_call = true;
-    if (!world_rank_ && first_call) {
-        spdlog::warn("check_collision not implemented for GenericPeriphery->SphericalBody");
-        first_call = false;
-    }
-    return false;
-}
-
-/// @brief STUB Check for collision between GenericPeriphery and SphericalBody
-///
-/// @param[in] body DeformableBody to check collision
-/// @param[in] threshold signed threshold to check collision
-/// @return always false
-bool GenericPeriphery::check_collision(const DeformableBody &body, double threshold) const {
-    static bool first_call = true;
-    if (!world_rank_ && first_call) {
-        spdlog::warn("check_collision not implemented for GenericPeriphery->DeformableBody");
-        first_call = false;
-    }
-    return false;
-}
 
 /// @brief STUB Check for collision between GenericPeriphery and point_cloud
 ///
-/// @param[in] body MatrixRef (point cloud) to check collision
+/// @param[in] point_cloud MatrixRef (point cloud) to check collision
 /// @param[in] threshold signed threshold to check collision
 /// @return always false
 bool GenericPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {

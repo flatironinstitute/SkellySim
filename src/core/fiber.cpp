@@ -38,10 +38,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     bending_rigidity_ = toml::find<double>(fiber_table, "bending_rigidity");
     radius_ = toml::find_or<double>(fiber_table, "radius", 0.0125);
     length_ = toml::find<double>(fiber_table, "length");
-    length_prev_ = toml::find<double>(fiber_table, "length");
     force_scale_ = toml::find_or<double>(fiber_table, "force_scale", 0.0);
-    binding_site_.first = toml::find_or<int>(fiber_table, "parent_body", -1);
-    binding_site_.second = toml::find_or<int>(fiber_table, "parent_site", -1);
     minus_clamped_ = toml::find_or<bool>(fiber_table, "minus_clamped", false);
 
     update_constants(eta);
@@ -59,10 +56,10 @@ void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_di
 /// Updates: Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_
 void Fiber::update_derivatives() {
     auto &fib_mats = matrices_.at(n_nodes_);
-    xs_ = std::pow(2.0 / length_prev_, 1) * x_ * fib_mats.D_1_0;
-    xss_ = std::pow(2.0 / length_prev_, 2) * x_ * fib_mats.D_2_0;
-    xsss_ = std::pow(2.0 / length_prev_, 3) * x_ * fib_mats.D_3_0;
-    xssss_ = std::pow(2.0 / length_prev_, 4) * x_ * fib_mats.D_4_0;
+    xs_ = std::pow(2.0 / length_, 1) * x_ * fib_mats.D_1_0;
+    xss_ = std::pow(2.0 / length_, 2) * x_ * fib_mats.D_2_0;
+    xsss_ = std::pow(2.0 / length_, 3) * x_ * fib_mats.D_3_0;
+    xssss_ = std::pow(2.0 / length_, 4) * x_ * fib_mats.D_4_0;
 }
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
@@ -203,15 +200,13 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     ArrayXd xs_z = xs_.block(2, 0, 1, np).transpose().array();
 
     ArrayXd alpha = mats.alpha;
-    ArrayXd s_dot = (1.0 + alpha) * (0.5 * v_growth_);
     ArrayXd I_arr = ArrayXd::Ones(np);
     RHS_.resize(4 * np);
     RHS_.setZero();
 
-    // TODO (GK) : xs should be calculated at x_rhs when polymerization term is added to the rhs
-    RHS_.segment(0 * np, np) = x_x / dt + s_dot * xs_x;
-    RHS_.segment(1 * np, np) = x_y / dt + s_dot * xs_y;
-    RHS_.segment(2 * np, np) = x_z / dt + s_dot * xs_z;
+    RHS_.segment(0 * np, np) = x_x / dt;
+    RHS_.segment(1 * np, np) = x_y / dt;
+    RHS_.segment(2 * np, np) = x_z / dt;
     RHS_.segment(3 * np, np) = -penalty_param_ * VectorXd::Ones(np);
 
     if (flow.size()) {
@@ -267,11 +262,11 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     }
 }
 
-VectorXd Fiber::matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const {
+VectorXd Fiber::matvec(VectorRef x, MatrixRef v) const {
     auto &mats = matrices_.at(n_nodes_);
     const int np = n_nodes_;
     const int bc_start_i = 4 * np - 14;
-    MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_prev_, 1);
+    MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
     MatrixXd xsDs = (D_1.array().colwise() * xs_.row(0).transpose().array()).transpose();
     MatrixXd ysDs = (D_1.array().colwise() * xs_.row(1).transpose().array()).transpose();
     MatrixXd zsDs = (D_1.array().colwise() * xs_.row(2).transpose().array()).transpose();
@@ -294,15 +289,10 @@ VectorXd Fiber::matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const {
     const int plus_node = np - 1;
     xs_vT(bc_start_i + 3) = v.col(minus_node).dot(xs_.col(minus_node));
 
-    // Body link BC (match velocities of body to fiber minus end)
-    VectorXd y_BC = VectorXd::Zero(4 * np);
-    if (v_boundary.size() > 0)
-        y_BC.segment(bc_start_i + 0, 7) = v_boundary;
-
     if (bc_plus_.first == Fiber::Velocity)
         xs_vT(bc_start_i + 10) = v.col(plus_node).dot(xs_.col(plus_node));
 
-    return A_ * x - vT_in + xs_vT + y_BC;
+    return A_ * x - vT_in + xs_vT;
 }
 
 /// @brief Calculate the force operator cache variable

@@ -1,7 +1,6 @@
 #ifndef IO_MAPS_HPP
 #define IO_MAPS_HPP
 
-#include <body.hpp>
 #include <fiber.hpp>
 #include <periphery.hpp>
 
@@ -15,10 +14,9 @@ typedef struct input_map_t {
     double time;                                                ///< System::properties
     double dt;                                                  ///< System::properties
     FiberContainer fibers;                                      ///< System::fc_
-    BodyContainer bodies;                                       ///< System::bc_
     Periphery shell;                                            ///< System::bc_
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, shell);     ///< Helper routine to specify serialization
 } input_map_t;
 
 /// @brief Structure for trajectory output via msgpack
@@ -29,10 +27,9 @@ typedef struct output_map_t {
     double &time;                                               ///< System::properties
     double &dt;                                                 ///< System::properties
     FiberContainer &fibers;                                     ///< System::fc_
-    BodyContainer &bodies;                                      ///< System::bc_
     Periphery &shell;                                           ///< System::shell_
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
-    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, bodies, shell); ///< Helper routine to specify serialization
+    MSGPACK_DEFINE_MAP(time, dt, rng_state, fibers, shell);     ///< Helper routine to specify serialization
 } output_map_t;
 
 #endif

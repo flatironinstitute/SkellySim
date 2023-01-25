@@ -11,7 +11,6 @@
 #include <params.hpp>
 
 class Periphery;
-class BodyContainer;
 
 /// @brief Class to represent a single flexible filament
 ///
@@ -26,7 +25,6 @@ class Fiber {
     int n_nodes_;                  ///< number of nodes representing the fiber
     double radius_;                ///< radius of the fiber (for slender-body-theory, though possibly for collisions eventually)
     double length_;                ///< Desired 'constraint' length of fiber
-    double length_prev_;           ///< Last accepted length_
     double bending_rigidity_;      ///< bending rigidity 'E' of fiber
     double penalty_param_ = 500.0; ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
     /// @brief scale of external force on node @see generate_external_force
@@ -36,11 +34,6 @@ class Fiber {
     double beta_tstep_ = 1.0; ///< penalty parameter to ensure inextensibility
     double epsilon_;   ///< slenderness parameter
     bool minus_clamped_ = false; ///< Fix minus end in space with clamped condition
-
-    /// (body, site) pair for minus end binding. -1 implies unbound
-    std::pair<int, int> binding_site_{-1, -1};
-
-    double v_growth_ = 0.0;      ///< instantaneous fiber growth velocity
 
     /// @brief Coefficient for SBT @see Fiber::init
     /// \f[ c_0 = -\frac{log(e \epsilon^\ell)}{8 \pi \eta}\f]
@@ -105,7 +98,6 @@ class Fiber {
     Fiber(int n_nodes, double radius, double length, double bending_rigidity, double eta)
         : n_nodes_(n_nodes), radius_(radius), length_(length), bending_rigidity_(bending_rigidity) {
         init();
-        length_prev_ = length_;
         update_constants(eta);
     };
 
@@ -140,7 +132,7 @@ class Fiber {
     }
 
 
-    Eigen::VectorXd matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const;
+    Eigen::VectorXd matvec(VectorRef x, MatrixRef v) const;
     void update_preconditioner();
     void update_force_operator();
     void update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding);
@@ -150,16 +142,15 @@ class Fiber {
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
     void update_stokeslet(double);
-    bool attached_to_body() { return binding_site_.first >= 0; };
-    bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
+    bool is_minus_clamped() { return minus_clamped_; };
     bool is_plus_pinned() { return bc_plus_.first == BC::Velocity; };
 #ifndef SKELLY_DEBUG
-    MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
-                       beta_tstep_, binding_site_, tension_, x_, minus_clamped_);
+    MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, bending_rigidity_, penalty_param_, force_scale_, beta_tstep_,
+                       tension_, x_, minus_clamped_);
 #else
     MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
-                       beta_tstep_, binding_site_, tension_, x_, minus_clamped_, A_, RHS_, force_operator_, bc_minus_,
-                       bc_plus_, xs_, xss_, xsss_, xssss_, stokeslet_);
+                       beta_tstep_, tension_, x_, minus_clamped_, A_, RHS_, force_operator_, bc_minus_, bc_plus_, xs_,
+                       xss_, xsss_, xssss_, stokeslet_);
 #endif
 };
 
@@ -196,7 +187,6 @@ class FiberContainer {
     void update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
     void apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
     void step(VectorRef &fiber_sol);
-    void repin_to_bodies(BodyContainer &bodies);
     void set_evaluator(const std::string &evaluator);
 
     /// @brief get total number of nodes across fibers in the container
@@ -224,7 +214,7 @@ class FiberContainer {
     const Eigen::MatrixXd &get_local_node_positions() const { return r_fib_local_; };
     Eigen::VectorXd get_RHS() const;
     Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta, bool subtract_self = true) const;
-    Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const;
+    Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib) const;
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
 
