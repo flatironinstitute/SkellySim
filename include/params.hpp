@@ -17,40 +17,11 @@ class Params {
     double dt_max;
     double dt_write;
     double implicit_motor_activation_delay;
-    bool periphery_interaction_flag;
     bool adaptive_timestep_flag;
     std::string pair_evaluator;
-
-    periphery_binding_t periphery_binding{
-        .polar_angle_start = 0.0,
-        .polar_angle_end = M_PI,
-        .threshold = 0.75,
-    };
-
-    struct {
-        int n_nodes = 0;
-        double v_growth;
-        double f_catastrophe;
-        double v_grow_collision_scale;
-        double f_catastrophe_collision_scale;
-        double nucleation_rate;
-        double min_length;
-        double radius;
-        double bending_rigidity;
-        double min_separation;
-    } dynamic_instability;
     unsigned long seed;
 
-    fiber_periphery_interaction_t fiber_periphery_interaction{
-        .f_0 = 20.0,
-        .l_0 = 0.05,
-    };
-
     struct {
-        int body_stresslet_multipole_order = 8;
-        int body_stresslet_max_points = 2000;
-        int body_oseen_multipole_order = 8;
-        int body_oseen_max_points = 2000;
         int fiber_stokeslet_multipole_order = 8;
         int fiber_stokeslet_max_points = 2000;
         int periphery_stresslet_multipole_order = 8;

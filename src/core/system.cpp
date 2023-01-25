@@ -245,16 +245,8 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
 
     const double eta = params_.eta;
     const auto [sol_fibers, sol_shell] = get_solution_maps(curr_solution_.data());
-    const auto &fp = params_.fiber_periphery_interaction;
 
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
-    if (params_.periphery_interaction_flag) {
-        int i_fib = 0;
-        for (const auto &fib : fc_) {
-            f_on_fibers.col(i_fib) += shell_->fiber_interaction(fib, fp);
-            i_fib++;
-        }
-    }
 
     // clang-format off
     u_trg = fc_.flow(r_trg, f_on_fibers, eta, false) + \
@@ -295,26 +287,16 @@ void prep_state_for_solver() {
                                       ? MatrixXd::Zero(3, fib_node_count)
                                       : fc_.generate_constant_force();
 
-    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
-    // Fiber-periphery forces (if periphery exists)
-    if (params_.periphery_interaction_flag && shell_->is_active()) {
-        int i_col = 0;
 
-        for (const auto &fib : fc_.fibers) {
-            external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
-                shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
-            i_col += fib.n_nodes_;
-        }
-    }
     // Don't include motor forces for initial calculation (explicitly handled elsewhere)
-
+    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     MatrixXd v_all = fc_.flow(r_all, external_force_fibers, params_.eta);
     v_all += psc_.flow(r_all, params_.eta, properties.time);
     v_all += bs_.flow(r_all, params_.eta);
 
     MatrixXd total_force_fibers = motor_force_fibers + external_force_fibers;
     fc_.update_RHS(properties.dt, v_all.block(0, 0, 3, fib_node_count), total_force_fibers);
-    fc_.update_boundary_conditions(*shell_, params_.periphery_binding);
+    fc_.update_boundary_conditions(*shell_);
     fc_.apply_bc_rectangular(properties.dt, v_all.block(0, 0, 3, fib_node_count), external_force_fibers);
 
     shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));

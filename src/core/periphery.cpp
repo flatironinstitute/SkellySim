@@ -80,7 +80,7 @@ void Periphery::update_RHS(MatrixRef &v_on_shell) { RHS_ = -CVectorMap(v_on_shel
 
 /// @brief Check for collision between SphericalPeriphery and a point cloud
 /// If any point lies outside R=(this->radius_ - threshold), return true
-/// Useful for collision detection between fibers and the periphery, but could be primitively used for a DeformableBody
+/// Useful for collision detection between fibers and the periphery
 ///
 /// @param[in] point_cloud [3 x n_points] matrix of points to check collision
 /// @param[in] threshold signed threshold to check collision
@@ -94,37 +94,8 @@ bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double th
     return false;
 }
 
-/// @brief Calculate steric forces between SphericalPeriphery and a fiber
-///
-/// @param[in] fiber to interact with periphery
-/// @param[in] fp_params structure which parameterizes this interaction
-/// @return [3 x n_points] matrix of forces on points due to the Periphery
-Eigen::MatrixXd SphericalPeriphery::fiber_interaction(const Fiber &fiber,
-                                                      const fiber_periphery_interaction_t &fp_params) const {
-    if (!n_nodes_global_)
-        return Eigen::MatrixXd::Zero(fiber.x_.rows(), fiber.x_.cols());
-
-    const MatrixRef &pc = fiber.x_;
-    Eigen::MatrixXd f_points = Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
-
-    const int start_index = fiber.minus_clamped_ ? 1 : 0;
-    for (int i = start_index; i < pc.cols(); ++i) {
-        double r_mag = pc.col(i).norm();
-
-        if (r_mag < radius_) {
-            Eigen::VectorXd u_hat = pc.col(i) / r_mag;
-            Eigen::Vector3d dr = pc.col(i) - u_hat * radius_;
-            double d = dr.norm();
-            f_points.col(i) = fp_params.f_0 * dr / d * exp(-(radius_ - r_mag) / fp_params.l_0);
-        } else
-            spdlog::debug("Fiber collision detected in force routine.");
-    }
-
-    return f_points;
-}
-
 /// @brief Check for collision between EllipsoidalPeriphery and a point cloud
-/// Useful for collision detection between fibers and the periphery, but could be primitively used for a DeformableBody
+/// Useful for collision detection between fibers and the periphery
 ///
 /// @param[in] point_cloud [3 x n_points] matrix of points to check collision
 /// @param[in] threshold signed threshold to check collision
@@ -147,46 +118,6 @@ bool EllipsoidalPeriphery::check_collision(const MatrixRef &point_cloud, double 
     return false;
 }
 
-/// @brief Calculate steric forces between SphericalPeriphery and a fiber
-///
-/// @param[in] fiber to interact with periphery
-/// @param[in] point_cloud [3 x n_points] matrix of points to interact with periphery
-/// @param[in] fp_params structure which parameterizes this interaction
-/// @return [3 x n_points] matrix of forces on points due to the Periphery
-Eigen::MatrixXd EllipsoidalPeriphery::fiber_interaction(const Fiber &fiber,
-                                                        const fiber_periphery_interaction_t &fp_params) const {
-    const MatrixRef &pc = fiber.x_;
-    if (!n_nodes_global_)
-        return Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
-
-    Eigen::MatrixXd f_points = Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
-
-    const int start_index = fiber.minus_clamped_ ? 1 : 0;
-    for (int i = start_index; i < pc.cols(); ++i) {
-        Eigen::Vector3d r_scaled = pc.col(i).array() / Eigen::Array3d{a_, b_, c_};
-        double r_scaled_mag = r_scaled.norm();
-        double r_mag = pc.col(i).norm();
-
-        double phi = atan2(r_scaled.y(), (r_scaled.x() + 1E-12));
-        double theta = acos(r_scaled.z() / (1E-12 + r_scaled_mag));
-        double sintheta = sin(theta);
-
-        Eigen::Vector3d r_cortex{a_ * sintheta * cos(phi), b_ * sintheta * sin(phi), c_ * cos(theta)};
-
-        double r_cortex_mag = r_cortex.norm();
-        if (r_mag < r_cortex_mag) {
-            Eigen::Vector3d dr = pc.col(i) - r_cortex;
-            double d = dr.norm();
-            f_points.col(i) = fp_params.f_0 * dr / d * exp(-(r_cortex_mag - r_mag) / fp_params.l_0);
-        } else {
-            spdlog::debug("Fiber collision detected in force routine.");
-        }
-    }
-
-    return f_points;
-}
-
-
 /// @brief STUB Check for collision between GenericPeriphery and point_cloud
 ///
 /// @param[in] point_cloud MatrixRef (point cloud) to check collision
@@ -201,21 +132,6 @@ bool GenericPeriphery::check_collision(const MatrixRef &point_cloud, double thre
     return false;
 }
 
-/// @brief STUB Calculate forces between GenericPeriphery and Fiber
-///
-/// @param[in] fiber to interact with periphery
-/// @param[in] fp_params structure which parameterizes this interaction
-/// @return [3 x n_points] matrix of forces (ZEROS) on points due to the Periphery
-Eigen::MatrixXd GenericPeriphery::fiber_interaction(const Fiber &fiber,
-                                                    const fiber_periphery_interaction_t &fp_params) const {
-    static bool first_call = true;
-    if (!world_rank_ && first_call) {
-        spdlog::warn("fiber_interaction not implemented for GenericPeriphery->Fiber");
-        first_call = false;
-    }
-
-    return Eigen::MatrixXd::Zero(fiber.x_.rows(), fiber.x_.cols());
-}
 
 void Periphery::set_evaluator(const std::string &evaluator) {
     auto &params = *System::get_params();

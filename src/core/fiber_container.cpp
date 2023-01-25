@@ -18,9 +18,9 @@ using Eigen::VectorXd;
 ///
 /// Updates: Fiber::bc_minus, Fiber::bc_plus
 /// @param[in] Periphery object
-void FiberContainer::update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
+void FiberContainer::update_boundary_conditions(Periphery &shell) {
     for (auto &fib : *this)
-        fib.update_boundary_conditions(shell, periphery_binding);
+        fib.update_boundary_conditions(shell);
 }
 
 /// @brief Get total number of fibers across all ranks

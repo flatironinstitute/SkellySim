@@ -28,7 +28,6 @@ toml::value *get_param_table();
 std::tuple<int, int> get_local_solution_sizes();
 Eigen::VectorXd apply_preconditioner(VectorRef &x);
 Eigen::VectorXd apply_matvec(VectorRef &x);
-void dynamic_instability();
 void prep_state_for_solver();
 bool solve();
 bool step();

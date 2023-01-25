@@ -66,16 +66,12 @@ void Fiber::update_derivatives() {
 ///
 /// Updates: Fiber::bc_minus_, Fiber::bc_plus_
 /// @param[in] Periphery object
-void Fiber::update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
-    bc_minus_ = is_minus_clamped() ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
-                                   : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
+void Fiber::update_boundary_conditions(Periphery &shell) {
+    bc_minus_ = is_minus_clamped()
+                    ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped at minus end
+                    : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
+    bc_plus_ = std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);                   // Free
 
-    double angle = std::acos(x_.col(x_.cols() - 1).normalized()[2]);
-    bool near_periphery = (periphery_binding.active) && (angle >= periphery_binding.polar_angle_start) &&
-                          (angle <= periphery_binding.polar_angle_end) &&
-                          shell.check_collision(x_, periphery_binding.threshold);
-    bc_plus_ = near_periphery ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
-                              : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
     spdlog::get("SkellySim global")
         ->debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)this, BC_name[bc_minus_.first],
                 BC_name[bc_minus_.second], BC_name[bc_plus_.first], BC_name[bc_plus_.second]);
@@ -284,13 +280,11 @@ VectorXd Fiber::matvec(VectorRef x, MatrixRef v) const {
     VectorXd vT_in = VectorXd::Zero(4 * np);
     vT_in.segment(0, bc_start_i) = mats.P_downsample_bc * vT;
 
-    VectorXd xs_vT = VectorXd::Zero(4 * np); // from body attachments
+    VectorXd xs_vT = VectorXd::Zero(4 * np); // from attachments
     const int minus_node = 0;
-    const int plus_node = np - 1;
-    xs_vT(bc_start_i + 3) = v.col(minus_node).dot(xs_.col(minus_node));
 
-    if (bc_plus_.first == Fiber::Velocity)
-        xs_vT(bc_start_i + 10) = v.col(plus_node).dot(xs_.col(plus_node));
+    // FIXME: Does this imply always having velocity boundary conditions?
+    xs_vT(bc_start_i + 3) = v.col(minus_node).dot(xs_.col(minus_node));
 
     return A_ * x - vT_in + xs_vT;
 }

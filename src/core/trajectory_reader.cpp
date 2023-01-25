@@ -121,12 +121,8 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
     properties.dt = min_state.dt;
     std::vector<bool> is_minus_clamped;
     // FIXME: Hack to work around not saving clamp state
-    if (!params.dynamic_instability.n_nodes) {
-        for (auto &fib : fc.fibers)
-            is_minus_clamped.push_back(fib.is_minus_clamped());
-    } else {
-        throw std::runtime_error("Resume is broken in this version of SkellySim with dynamic instability. :(");
-    }
+    for (auto &fib : fc.fibers)
+        is_minus_clamped.push_back(fib.is_minus_clamped());
 
     fc.fibers.clear();
     int i_fib = 0;

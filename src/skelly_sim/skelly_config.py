@@ -303,68 +303,6 @@ class Fiber():
 
 
 @dataclass
-class DynamicInstability():
-    """
-    dataclass for dynamic instability parameters
-
-    Attributes
-    ----------
-    n_nodes : int, default: :obj:`0`
-        Number of nodes for newly nucleated fibers (see nucleation_rate). :obj:`0` disables dynamic instability
-    v_growth : float, default: :obj:`0.0`, units: :obj:`μm·s⁻¹`
-        Growth velocity in microns/second. Growth happens at the "plus" ends
-    f_catastrophe : float, default: :obj:`0.0`, units: :obj:`s⁻¹`
-        Catastrophe frequency (probability per unit time of switching from growth to deletion) in 1/second
-    v_grow_collision_scale : float, default: :obj:`0.5`
-        When a fiber hits a boundary, scale its velocity (v_growth) by this factor
-    f_catastrophe_collision_scale : float, default: :obj:`2.0`
-        When a fiber hits a boundary, scale its catastrophe frequency (f_catastrophe) by this
-    nucleation_rate : float, default: :obj:`0.0`, units: :obj:`s⁻¹`
-        Fiber nucleation rate in units of MT nucleations / second
-    radius: float, default: :obj:`0.025`, units: :obj:`μm`
-        New fiber radius in microns
-    min_length: float, default: :obj:`0.5`, units: :obj:`μm`
-        New fiber initial length in microns
-    bending_rigidity : float, default: :obj:`2.5E-3`, units: :obj:`pN·μm²`
-        New fiber bending rigidity
-    min_separation : float, default: :obj:`0.1`, units: :obj:`μm`
-        Minimum distance between Fiber minus ends in microns when nucleating (closer than this will be rejected)
-    """
-    n_nodes: int = 0
-    v_growth: float = 0.0
-    f_catastrophe: float = 0.0
-    v_grow_collision_scale: float = 0.5
-    f_catastrophe_collision_scale: float = 2.0
-    nucleation_rate: float = 0.0
-    radius: float = 0.025
-    min_length: float = 0.5
-    bending_rigidity: float = 2.5E-3
-    min_separation: float = 0.1
-
-
-@dataclass
-class PeripheryBinding():
-    """
-    dataclass for periphery binding parameters
-
-    Attributes
-    ----------
-    active : bool, default: :obj:`False`
-        Have plus ends of fibers hinge at periphery if set
-    polar_angle_start : float, default: :obj:`0.0`, units: :obj:`radians`
-        Minimum angle where cortex binding happens
-    polar_angle_end : float, default: :obj:`pi/2`, units: :obj:`radians`
-        Maximum angle where cortex binding happens
-    threshold : float, default: :obj:`0.75`, units: :obj:`μm`
-        Minimum distance between Fiber plus ends and cortex in microns when binding happens
-    """
-    active: bool = False
-    polar_angle_start: float = 0.0
-    polar_angle_end: float = 0.5 * np.pi
-    threshold: float = 0.75
-    
-
-@dataclass
 class Params():
     """dataclass representing system/meta parameters for the entire simulation
 
@@ -389,15 +327,8 @@ class Params():
         Fiber error tolerance. Not recommended to tamper with.
         Fiber error is the maximum deviation between 1.0 and a the derivative along the fiber.
         When using adaptive timestepping, if the error exceeds this value, the timestep is rejected.
-    periphery_binding_flag : bool, default: :obj:`False`
-        If set, fiber plus ends near the periphery (closer than 0.75, hardcoded) will use
-        hinged boundary conditions. Intended for use with dynamic instability
     seed : int, default: :obj:`130319`
         Random number seed at simulation runtime (doesn't affect numpy seed during configuration generation)
-    dynamic_instability : DynamicInstability, default: :obj:`DynamicInstability()`
-        Dynamic instability parameters
-    periphery_interaction_flag : bool, default: :obj:`False`
-        Experimental repulsion between periphery and Fibers
     adaptive_timestep_flag : bool, default: :obj:`True`
         If set, use adaptive timestepping, which attempts to control simulation error by reducing the timestep
         when the solution has convergence issues
@@ -413,11 +344,7 @@ class Params():
     t_final: float = 100.0
     gmres_tol: float = 1E-8
     fiber_error_tol: float = 1E-1
-    periphery_binding_flag: bool = False
     seed: int = 130319
-    dynamic_instability: DynamicInstability = field(default_factory=DynamicInstability)
-    periphery_binding: PeripheryBinding = field(default_factory=PeripheryBinding)
-    periphery_interaction_flag: bool = False
     adaptive_timestep_flag: bool = True
     pair_evaluator: str = "FMM"
 

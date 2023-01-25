@@ -135,7 +135,7 @@ class Fiber {
     Eigen::VectorXd matvec(VectorRef x, MatrixRef v) const;
     void update_preconditioner();
     void update_force_operator();
-    void update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding);
+    void update_boundary_conditions(Periphery &shell);
     void update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external);
     void update_linear_operator(double dt, double eta);
     void apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber);
@@ -218,7 +218,7 @@ class FiberContainer {
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
 
-    void update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding);
+    void update_boundary_conditions(Periphery &shell);
 
     ActiveIterator<Fiber> begin() { return ActiveIterator<Fiber>(0, fibers); }
     ActiveIterator<Fiber> end() { return ActiveIterator<Fiber>(fibers.size(), fibers); }
