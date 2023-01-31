@@ -38,7 +38,7 @@ class Periphery {
     Eigen::VectorXd get_RHS() const { return RHS_; };
 
     Eigen::VectorXd apply_preconditioner(VectorRef &x) const;
-    Eigen::VectorXd matvec(VectorRef &x_local, MatrixRef &v_local) const;
+    Eigen::VectorXd matvec(VectorRef &x_local) const;
 
     /// pointer to FMM object (pointer to avoid constructing object with empty Periphery)
     kernels::Evaluator stresslet_kernel_;

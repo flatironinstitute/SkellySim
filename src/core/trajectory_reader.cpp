@@ -155,8 +155,8 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
     if (shell.is_active())
         shell.solution_vec_ = min_state.shell.solution_vec_.segment(shell.node_displs_[rank], shell.node_counts_[rank]);
 
-    auto [fiber_sol, shell_sol] = System::get_solution_maps(System::get_curr_solution().data());
-    shell_sol = shell.solution_vec_;
+    auto [fiber_sol] = System::get_solution_maps(System::get_curr_solution().data());
+    // shell_sol = shell.solution_vec_;
 
     std::size_t fiber_offset = 0;
     for (auto &fib : fc.fibers) {

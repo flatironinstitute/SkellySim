@@ -213,7 +213,7 @@ class FiberContainer {
     Eigen::MatrixXd generate_constant_force() const;
     const Eigen::MatrixXd &get_local_node_positions() const { return r_fib_local_; };
     Eigen::VectorXd get_RHS() const;
-    Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta, bool subtract_self = true) const;
+    Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta, bool subtract_self) const;
     Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib) const;
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
