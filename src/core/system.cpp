@@ -254,20 +254,29 @@ void prep_state_for_solver() {
 
 
     // Don't include motor forces for initial calculation (explicitly handled elsewhere)
-    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
-    MatrixXd v_all = fc_.flow(r_all, external_force_fibers, params_.eta, true /* subtract self flow */);
+
+    Eigen::VectorXd x_fibers = Eigen::VectorXd::Zero(fc_.get_local_solution_size());
+    size_t offset = 0;
+    for (auto &fiber : fc_.fibers) {
+        const auto n = fiber.n_nodes_;
+        x_fibers.segment(offset + n * 0, n) = fiber.x_.row(0);
+        x_fibers.segment(offset + n * 1, n) = fiber.x_.row(1);
+        x_fibers.segment(offset + n * 2, n) = fiber.x_.row(2);
+        offset += 4 * n;
+    }
+    MatrixXd force_fibers = fc_.apply_fiber_force(x_fibers);
+
+    MatrixXd v_all = fc_.flow(r_all, force_fibers, params_.eta, true /* subtract self flow */);
     v_all += psc_.flow(r_all, params_.eta, properties.time);
     v_all += bs_.flow(r_all, params_.eta);
-
-    MatrixXd total_force_fibers = // motor_force_fibers +
-        external_force_fibers;
 
     CVectorMap shell_velocities_flat(v_all.data() + 3 * fib_node_count, 3 * shell_node_count);
     shell_->solution_vec_ = shell_->M_inv_ * shell_velocities_flat;
     v_fibers_ = shell_->flow(fc_.get_local_node_positions(), shell_->solution_vec_, params_.eta);
     v_fibers_ += v_all.block(0, 0, 3, fib_node_count);
 
-    fc_.update_RHS(properties.dt, v_fibers_, total_force_fibers);
+    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
+    fc_.update_RHS(properties.dt, v_fibers_, external_force_fibers);
     fc_.update_boundary_conditions(*shell_);
     fc_.apply_bc_rectangular(properties.dt, v_fibers_, external_force_fibers);
 }
