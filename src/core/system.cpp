@@ -235,16 +235,14 @@ void set_evaluator(const std::string &evaluator) {
 /// @note Modifies anything that evolves in time.
 void prep_state_for_solver() {
     using Eigen::MatrixXd;
-    const auto [fib_node_count, shell_node_count] = get_local_node_counts();
-
-    MatrixXd r_all(3, fib_node_count + shell_node_count);
-    {
-        auto [r_fibers, r_shell] = get_node_maps(r_all);
-        r_fibers = fc_.get_local_node_positions();
-        r_shell = shell_->get_local_node_positions();
-    }
 
     fc_.update_cache_variables(properties.dt, params_.eta);
+
+    const auto [fib_node_count, shell_node_count] = get_local_node_counts();
+    MatrixXd r_all(3, fib_node_count + shell_node_count);
+    auto [r_fibers, r_shell] = get_node_maps(r_all);
+    r_fibers = fc_.get_local_node_positions();
+    r_shell = shell_->get_local_node_positions();
 
     // Implicit motor forces
     // MatrixXd motor_force_fibers = params_.implicit_motor_activation_delay > properties.time
@@ -270,19 +268,21 @@ void prep_state_for_solver() {
     v_all += psc_.flow(r_all, params_.eta, properties.time);
     v_all += bs_.flow(r_all, params_.eta);
 
-    MatrixXd v_shell2fib;
+    MatrixXd v_fib;
     if (shell_->is_active()) {
         CVectorMap shell_velocities_flat(v_all.data() + 3 * fib_node_count, 3 * shell_node_count);
         shell_->solution_vec_ = shell_->M_inv_ * shell_velocities_flat;
-        v_shell2fib = shell_->flow(fc_.get_local_node_positions(), shell_->solution_vec_, params_.eta);
+        v_fib = shell_->flow(r_fibers, shell_->solution_vec_, params_.eta);
     }
     else {
-        v_shell2fib = MatrixXd::Zero(3, fib_node_count);
+        v_fib = MatrixXd::Zero(3, fib_node_count);
     }
+
+    v_fib += v_all.block(0, 0, 3, fib_node_count);
 
     MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     MatrixXd external_velocity_fibers = MatrixXd::Zero(3, fib_node_count);
-    fc_.update_RHS(properties.dt, -v_shell2fib, external_force_fibers);
+    fc_.update_RHS(properties.dt, -v_fib, external_force_fibers);
     fc_.update_boundary_conditions(*shell_);
     fc_.apply_bc_rectangular(properties.dt, external_velocity_fibers, external_force_fibers);
 }
