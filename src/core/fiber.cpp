@@ -31,7 +31,10 @@ const std::string Fiber::BC_name[] = {"Force", "Torque", "Velocity", "AngularVel
 Fiber::Fiber(toml::value &fiber_table, double eta) {
     std::vector<double> x_array = toml::find<std::vector<double>>(fiber_table, "x");
     n_nodes_ = x_array.size() / 3;
+    std::vector<double> tension_array = toml::find_or(fiber_table, "tension", std::vector<double>{});
     x_ = Eigen::Map<Eigen::MatrixXd>(x_array.data(), 3, n_nodes_);
+    if (tension_array.size())
+        tension_ = Eigen::Map<Eigen::VectorXd>(tension_array.data(), n_nodes_);
 
     init();
 

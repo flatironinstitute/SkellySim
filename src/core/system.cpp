@@ -262,6 +262,7 @@ void prep_state_for_solver() {
         x_fibers.segment(offset + n * 0, n) = fiber.x_.row(0);
         x_fibers.segment(offset + n * 1, n) = fiber.x_.row(1);
         x_fibers.segment(offset + n * 2, n) = fiber.x_.row(2);
+        x_fibers.segment(offset + n * 3, n) = fiber.tension_;
         offset += 4 * n;
     }
     MatrixXd force_fibers = fc_.apply_fiber_force(x_fibers);

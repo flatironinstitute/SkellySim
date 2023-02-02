@@ -118,6 +118,9 @@ class Fiber {
             x_ = Eigen::MatrixXd::Zero(3, n_nodes_);
             x_.row(0) = Eigen::ArrayXd::LinSpaced(n_nodes_, 0, 1.0).transpose();
         }
+        if (tension_.size() != n_nodes_) {
+            tension_ = Eigen::VectorXd::Zero(n_nodes_);
+        }
 
         xs_.resize(3, n_nodes_);
         xss_.resize(3, n_nodes_);

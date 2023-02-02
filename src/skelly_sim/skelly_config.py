@@ -273,6 +273,8 @@ class Fiber():
     x : List[float], default: :obj:`[]`, units: :obj:`μm`
         List of node positions in [x0,y0,z0,x1,y1,z1...] order. Extreme care must be taken when setting this since the length constraint
         can generate massive tensions with poor input. See examples.
+    tension : List[float], default: :obj:`[]`, units: :obj:`pN·μm⁻¹`
+        Optional list of node tensions [T_0,T_1,T_2,...T_{n_nodes-1}]
     """
     n_nodes: int = 32
     parent_site: int = -1
@@ -282,6 +284,7 @@ class Fiber():
     length: float = 1.0
     minus_clamped: bool = False
     x: List[float] = field(default_factory=list)
+    tension: List[float] = field(default_factory=list)
 
     def fill_node_positions(self, x0: np.array, normal: np.array):
         """
