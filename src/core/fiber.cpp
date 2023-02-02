@@ -209,31 +209,14 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     RHS_.segment(3 * np, np) = -penalty_param_ * VectorXd::Ones(np);
 
     if (flow.size()) {
-        const int bc_start_i = 4 * np - 14;
-        MatrixXd xsDs = (D_1.array().colwise() * xs_.row(0).transpose().array()).transpose();
-        MatrixXd ysDs = (D_1.array().colwise() * xs_.row(1).transpose().array()).transpose();
-        MatrixXd zsDs = (D_1.array().colwise() * xs_.row(2).transpose().array()).transpose();
+        RHS_.segment(0 * np, np) += flow.row(0);
+        RHS_.segment(1 * np, np) += flow.row(1);
+        RHS_.segment(2 * np, np) += flow.row(2);
 
-        VectorXd vT = VectorXd(np * 4);
-        VectorXd v_x = flow.row(0).transpose();
-        VectorXd v_y = flow.row(1).transpose();
-        VectorXd v_z = flow.row(2).transpose();
-
-        vT.segment(0 * np, np) = v_x;
-        vT.segment(1 * np, np) = v_y;
-        vT.segment(2 * np, np) = v_z;
-        vT.segment(3 * np, np) = xsDs * v_x + ysDs * v_y + zsDs * v_z;
-
-        VectorXd vT_in = VectorXd::Zero(4 * np);
-        vT_in.segment(0, bc_start_i) = mats.P_downsample_bc * vT;
-
-        VectorXd xs_vT = VectorXd::Zero(4 * np); // from attachments
-        const int minus_node = 0;
-
-        // FIXME: Does this imply always having velocity boundary conditions?
-        xs_vT(bc_start_i + 3) = flow.col(minus_node).dot(xs_.col(minus_node));
-
-        RHS_ += -vT + vT_in - xs_vT;
+        RHS_.segment(3 * np, np) += (xs_x.transpose() * (flow.row(0) * D_1.matrix()).array() +
+                                     xs_y.transpose() * (flow.row(1) * D_1.matrix()).array() +
+                                     xs_z.transpose() * (flow.row(2) * D_1.matrix()).array())
+                                        .matrix();
     }
     if (f_external.size()) {
         ArrayXXd fs = f_external * D_1;
@@ -278,9 +261,7 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     }
 }
 
-VectorXd Fiber::matvec(VectorRef x, MatrixRef v) const {
-    return A_ * x;
-}
+VectorXd Fiber::matvec(VectorRef x) const { return A_ * x; }
 
 /// @brief Calculate the force operator cache variable
 ///
