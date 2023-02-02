@@ -281,9 +281,10 @@ void prep_state_for_solver() {
     }
 
     MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
-    fc_.update_RHS(properties.dt, v_shell2fib, external_force_fibers);
+    MatrixXd external_velocity_fibers = MatrixXd::Zero(3, fib_node_count);
+    fc_.update_RHS(properties.dt, -v_shell2fib, external_force_fibers);
     fc_.update_boundary_conditions(*shell_);
-    fc_.apply_bc_rectangular(properties.dt, v_shell2fib, external_force_fibers);
+    fc_.apply_bc_rectangular(properties.dt, external_velocity_fibers, external_force_fibers);
 }
 
 
