@@ -233,16 +233,7 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
         // FIXME: Does this imply always having velocity boundary conditions?
         xs_vT(bc_start_i + 3) = flow.col(minus_node).dot(xs_.col(minus_node));
 
-        RHS_ += vT_in - xs_vT;
-
-        RHS_.segment(0 * np, np) += flow.row(0);
-        RHS_.segment(1 * np, np) += flow.row(1);
-        RHS_.segment(2 * np, np) += flow.row(2);
-
-        RHS_.segment(3 * np, np) += (xs_x.transpose() * (flow.row(0) * D_1.matrix()).array() +
-                                     xs_y.transpose() * (flow.row(1) * D_1.matrix()).array() +
-                                     xs_z.transpose() * (flow.row(2) * D_1.matrix()).array())
-                                        .matrix();
+        RHS_ += -vT + vT_in - xs_vT;
     }
     if (f_external.size()) {
         ArrayXXd fs = f_external * D_1;
