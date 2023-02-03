@@ -118,6 +118,9 @@ class Fiber {
             x_ = Eigen::MatrixXd::Zero(3, n_nodes_);
             x_.row(0) = Eigen::ArrayXd::LinSpaced(n_nodes_, 0, 1.0).transpose();
         }
+        if (tension_.size() != n_nodes_) {
+            tension_ = Eigen::VectorXd::Zero(n_nodes_);
+        }
 
         xs_.resize(3, n_nodes_);
         xss_.resize(3, n_nodes_);
@@ -132,7 +135,7 @@ class Fiber {
     }
 
 
-    Eigen::VectorXd matvec(VectorRef x, MatrixRef v) const;
+    Eigen::VectorXd matvec(VectorRef x) const;
     void update_preconditioner();
     void update_force_operator();
     void update_boundary_conditions(Periphery &shell);
@@ -213,8 +216,8 @@ class FiberContainer {
     Eigen::MatrixXd generate_constant_force() const;
     const Eigen::MatrixXd &get_local_node_positions() const { return r_fib_local_; };
     Eigen::VectorXd get_RHS() const;
-    Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta, bool subtract_self = true) const;
-    Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib) const;
+    Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta, bool subtract_self) const;
+    Eigen::VectorXd matvec(VectorRef &x_all) const;
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
 

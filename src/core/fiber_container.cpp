@@ -71,14 +71,14 @@ VectorXd FiberContainer::apply_preconditioner(VectorRef &x_all) const {
     return y;
 }
 
-VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib) const {
+VectorXd FiberContainer::matvec(VectorRef &x_all) const {
     VectorXd res = VectorXd::Zero(get_local_solution_size());
 
     size_t offset = 0;
     int i_fib = 0;
     for (const auto &fib : *this) {
         const int np = fib.n_nodes_;
-        res.segment(offset, 4 * np) = fib.matvec(x_all.segment(offset, 4 * np), v_fib.block(0, i_fib, 3, np));
+        res.segment(offset, 4 * np) = fib.matvec(x_all.segment(offset, 4 * np));
 
         i_fib++;
         offset += 4 * np;

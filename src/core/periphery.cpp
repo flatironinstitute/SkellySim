@@ -28,15 +28,14 @@ Eigen::VectorXd Periphery::apply_preconditioner(VectorRef &x_local) const {
 /// @param[in] x_local [3 * n_nodes_local] vector of 'x' local to this rank
 /// @param[in] v_local [3 * n_nodes_local] vector of velocities 'v' local to this rank
 /// @return [3 * n_nodes_local] vector of A * x_local
-Eigen::VectorXd Periphery::matvec(VectorRef &x_local, MatrixRef &v_local) const {
+Eigen::VectorXd Periphery::matvec(VectorRef &x_local) const {
     if (!n_nodes_global_)
         return Eigen::VectorXd();
     assert(x_local.size() == get_local_solution_size());
-    assert(v_local.size() == get_local_solution_size());
     Eigen::VectorXd x_shell(3 * n_nodes_global_);
     MPI_Allgatherv(x_local.data(), node_counts_[world_rank_], MPI_DOUBLE, x_shell.data(), node_counts_.data(),
                    node_displs_.data(), MPI_DOUBLE, MPI_COMM_WORLD);
-    return stresslet_plus_complementary_ * x_shell + CVectorMap(v_local.data(), v_local.size());
+    return stresslet_plus_complementary_ * x_shell;
 }
 
 /// @brief Calculate velocity at target coordinates due to the periphery

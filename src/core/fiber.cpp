@@ -31,7 +31,10 @@ const std::string Fiber::BC_name[] = {"Force", "Torque", "Velocity", "AngularVel
 Fiber::Fiber(toml::value &fiber_table, double eta) {
     std::vector<double> x_array = toml::find<std::vector<double>>(fiber_table, "x");
     n_nodes_ = x_array.size() / 3;
+    std::vector<double> tension_array = toml::find_or(fiber_table, "tension", std::vector<double>{});
     x_ = Eigen::Map<Eigen::MatrixXd>(x_array.data(), 3, n_nodes_);
+    if (tension_array.size())
+        tension_ = Eigen::Map<Eigen::VectorXd>(tension_array.data(), n_nodes_);
 
     init();
 
@@ -258,36 +261,7 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     }
 }
 
-VectorXd Fiber::matvec(VectorRef x, MatrixRef v) const {
-    auto &mats = matrices_.at(n_nodes_);
-    const int np = n_nodes_;
-    const int bc_start_i = 4 * np - 14;
-    MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
-    MatrixXd xsDs = (D_1.array().colwise() * xs_.row(0).transpose().array()).transpose();
-    MatrixXd ysDs = (D_1.array().colwise() * xs_.row(1).transpose().array()).transpose();
-    MatrixXd zsDs = (D_1.array().colwise() * xs_.row(2).transpose().array()).transpose();
-
-    VectorXd vT = VectorXd(np * 4);
-    VectorXd v_x = v.row(0).transpose();
-    VectorXd v_y = v.row(1).transpose();
-    VectorXd v_z = v.row(2).transpose();
-
-    vT.segment(0 * np, np) = v_x;
-    vT.segment(1 * np, np) = v_y;
-    vT.segment(2 * np, np) = v_z;
-    vT.segment(3 * np, np) = xsDs * v_x + ysDs * v_y + zsDs * v_z;
-
-    VectorXd vT_in = VectorXd::Zero(4 * np);
-    vT_in.segment(0, bc_start_i) = mats.P_downsample_bc * vT;
-
-    VectorXd xs_vT = VectorXd::Zero(4 * np); // from attachments
-    const int minus_node = 0;
-
-    // FIXME: Does this imply always having velocity boundary conditions?
-    xs_vT(bc_start_i + 3) = v.col(minus_node).dot(xs_.col(minus_node));
-
-    return A_ * x - vT_in + xs_vT;
-}
+VectorXd Fiber::matvec(VectorRef x) const { return A_ * x; }
 
 /// @brief Calculate the force operator cache variable
 ///

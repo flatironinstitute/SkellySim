@@ -17,12 +17,14 @@
 #include <solver_hydro.hpp>
 #include <system.hpp>
 #include <trajectory_reader.hpp>
+#include <utils.hpp>
 
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace System {
+
 Params params_;            ///< Simulation input parameters
 FiberContainer fc_;        ///< Fibers
 PointSourceContainer psc_; ///< Point Sources
@@ -60,30 +62,24 @@ std::tuple<int, int> get_local_node_counts() {
 }
 
 /// @brief Get GMRES solution size local to MPI rank for each object type [fibers, shell, bodies]
-std::tuple<int, int> get_local_solution_sizes() {
-    return std::make_tuple(fc_.get_local_solution_size(), shell_->get_local_solution_size());
-}
+std::tuple<int> get_local_solution_sizes() { return std::make_tuple(fc_.get_local_solution_size()); }
 
 /// @brief Map 1D array data to a three-tuple of Vector Maps [fibers, shell, bodies]
-std::tuple<VectorMap, VectorMap> get_solution_maps(double *x) {
-    using Eigen::Map;
-    using Eigen::VectorXd;
-    auto [fib_sol_size, shell_sol_size] = System::get_local_solution_sizes();
-    return std::make_tuple(VectorMap(x, fib_sol_size), VectorMap(x + fib_sol_size, shell_sol_size));
+std::tuple<VectorMap> get_solution_maps(double *x) {
+    auto [fib_sol_size] = System::get_local_solution_sizes();
+    return std::make_tuple(VectorMap(x, fib_sol_size));
 }
 
 /// @brief Map 1D array data to a three-tuple of const Vector Maps [fibers, shell, bodies]
-std::tuple<CVectorMap, CVectorMap> get_solution_maps(const double *x) {
-    using Eigen::Map;
-    using Eigen::VectorXd;
-    auto [fib_sol_size, shell_sol_size] = System::get_local_solution_sizes();
-    return std::make_tuple(CVectorMap(x, fib_sol_size), CVectorMap(x + fib_sol_size, shell_sol_size));
+std::tuple<CVectorMap> get_solution_maps(const double *x) {
+    auto [fib_sol_size] = System::get_local_solution_sizes();
+    return std::make_tuple(CVectorMap(x, fib_sol_size));
 }
 
 /// @brief Get size of local solution vector
 std::size_t get_local_solution_size() {
-    auto [fiber_sol_size, shell_sol_size] = System::get_local_solution_sizes();
-    return fiber_sol_size + shell_sol_size;
+    auto [fiber_sol_size] = System::get_local_solution_sizes();
+    return fiber_sol_size;
 }
 
 /// @brief Flush current simulation state to ofstream
@@ -177,16 +173,15 @@ get_node_maps(Eigen::MatrixBase<Derived> &x) {
 /// @param [in] x [local_solution_size] Vector to apply preconditioner on
 /// @return [local_solution_size] Preconditioned input vector
 Eigen::VectorXd apply_preconditioner(VectorRef &x) {
-    const auto [fib_sol_size, shell_sol_size] = get_local_solution_sizes();
-    const int sol_size = fib_sol_size + shell_sol_size;
+    const auto [fib_sol_size] = get_local_solution_sizes();
+    const int sol_size = fib_sol_size;
     assert(sol_size == x.size());
     Eigen::VectorXd res(sol_size);
 
-    auto [x_fibers, x_shell] = get_solution_maps(x.data());
-    auto [res_fibers, res_shell] = get_solution_maps(res.data());
+    auto [x_fibers] = get_solution_maps(x.data());
+    auto [res_fibers] = get_solution_maps(res.data());
 
     res_fibers = fc_.apply_preconditioner(x_fibers);
-    res_shell = shell_->apply_preconditioner(x_shell);
 
     return res;
 }
@@ -197,41 +192,10 @@ Eigen::VectorXd apply_preconditioner(VectorRef &x) {
 /// @param [in] x [local_solution_size] Vector to apply matvec on
 /// @return [local_solution_size] Vector y, the result of the operator applied to x.
 Eigen::VectorXd apply_matvec(VectorRef &x) {
-    using Eigen::Block;
-    using Eigen::MatrixXd;
     const FiberContainer &fc = fc_;
-    const Periphery &shell = *shell_;
-    const double eta = params_.eta;
 
-    const auto [fib_node_count, shell_node_count] = get_local_node_counts();
-    const int total_node_count = fib_node_count + shell_node_count;
-
-    const auto [fib_sol_size, shell_sol_size] = get_local_solution_sizes();
-    const int sol_size = fib_sol_size + shell_sol_size;
-    assert(sol_size == x.size());
-    Eigen::VectorXd res(sol_size);
-
-    MatrixXd r_all(3, total_node_count), v_all(3, total_node_count);
-    auto [r_fibers, r_shell] = get_node_maps(r_all);
-    auto [v_fibers, v_shell] = get_node_maps(v_all);
-    r_fibers = fc.get_local_node_positions();
-    r_shell = shell.get_local_node_positions();
-
-    auto [x_fibers, x_shell] = get_solution_maps(x.data());
-    auto [res_fibers, res_shell] = get_solution_maps(res.data());
-
-    // calculate fiber-fiber velocity
-    MatrixXd fw = fc.apply_fiber_force(x_fibers);
-    MatrixXd v_fib2all = fc.flow(r_all, fw, eta);
-    MatrixXd v_shell2fibers = shell.flow(r_fibers, x_shell, eta);
-
-    v_all = v_fib2all;
-    v_fibers += v_shell2fibers;
-
-    res_fibers = fc.matvec(x_fibers, v_fibers);
-    res_shell = shell.matvec(x_shell, v_shell);
-
-    return res;
+    auto [x_fibers] = get_solution_maps(x.data());
+    return fc.matvec(x_fibers);
 }
 
 /// @brief Evaluate the velocity at a list of target points
@@ -244,13 +208,13 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     Eigen::MatrixXd u_trg(r_trg.rows(), r_trg.cols());
 
     const double eta = params_.eta;
-    const auto [sol_fibers, sol_shell] = get_solution_maps(curr_solution_.data());
+    const auto [sol_fibers] = get_solution_maps(curr_solution_.data());
 
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
 
     // clang-format off
-    u_trg = fc_.flow(r_trg, f_on_fibers, eta, false) + \
-        shell_->flow(r_trg, sol_shell, eta) + \
+    u_trg = fc_.flow(r_trg, f_on_fibers, eta, false /* don't subtract self flow */) + \
+     // shell_->flow(r_trg, sol_shell, eta)
         psc_.flow(r_trg, eta, properties.time) + \
         bs_.flow(r_trg, eta);
     // clang-format on
@@ -271,36 +235,62 @@ void set_evaluator(const std::string &evaluator) {
 /// @note Modifies anything that evolves in time.
 void prep_state_for_solver() {
     using Eigen::MatrixXd;
-    const auto [fib_node_count, shell_node_count] = get_local_node_counts();
-
-    MatrixXd r_all(3, fib_node_count + shell_node_count);
-    {
-        auto [r_fibers, r_shell] = get_node_maps(r_all);
-        r_fibers = fc_.get_local_node_positions();
-        r_shell = shell_->get_local_node_positions();
-    }
 
     fc_.update_cache_variables(properties.dt, params_.eta);
 
+    const auto [fib_node_count, shell_node_count] = get_local_node_counts();
+    MatrixXd r_all(3, fib_node_count + shell_node_count);
+    auto [r_fibers, r_shell] = get_node_maps(r_all);
+    r_fibers = fc_.get_local_node_positions();
+    r_shell = shell_->get_local_node_positions();
+
     // Implicit motor forces
+    // MatrixXd motor_force_fibers = params_.implicit_motor_activation_delay > properties.time
+    //                                   ? MatrixXd::Zero(3, fib_node_count)
+    //                                   : fc_.generate_constant_force();
+
+
+    // Don't include motor forces for initial calculation (explicitly handled elsewhere)
+
+    Eigen::VectorXd x_fibers = Eigen::VectorXd::Zero(fc_.get_local_solution_size());
+    size_t offset = 0;
+    for (auto &fiber : fc_.fibers) {
+        const auto n = fiber.n_nodes_;
+        x_fibers.segment(offset + n * 0, n) = fiber.x_.row(0);
+        x_fibers.segment(offset + n * 1, n) = fiber.x_.row(1);
+        x_fibers.segment(offset + n * 2, n) = fiber.x_.row(2);
+        x_fibers.segment(offset + n * 3, n) = fiber.tension_;
+        offset += 4 * n;
+    }
+    MatrixXd force_fibers = fc_.apply_fiber_force(x_fibers);
+
+    MatrixXd v_all = fc_.flow(r_all, force_fibers, params_.eta, true /* subtract self flow */);
+    v_all += psc_.flow(r_all, params_.eta, properties.time);
+    v_all += bs_.flow(r_all, params_.eta);
+
+    MatrixXd v_fib;
+    if (shell_->is_active()) {
+        CVectorMap shell_velocities_flat(v_all.data() + 3 * fib_node_count, 3 * shell_node_count);
+        shell_->solution_vec_ = shell_->M_inv_ * shell_velocities_flat;
+        v_fib = -shell_->flow(r_fibers, shell_->solution_vec_, params_.eta);
+    }
+    else {
+        v_fib = MatrixXd::Zero(3, fib_node_count);
+    }
+
+    v_fib += v_all.block(0, 0, 3, fib_node_count);
+
+    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
+    MatrixXd external_velocity_fibers = MatrixXd::Zero(3, fib_node_count);
     MatrixXd motor_force_fibers = params_.implicit_motor_activation_delay > properties.time
                                       ? MatrixXd::Zero(3, fib_node_count)
                                       : fc_.generate_constant_force();
 
-
-    // Don't include motor forces for initial calculation (explicitly handled elsewhere)
-    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
-    MatrixXd v_all = fc_.flow(r_all, external_force_fibers, params_.eta);
-    v_all += psc_.flow(r_all, params_.eta, properties.time);
-    v_all += bs_.flow(r_all, params_.eta);
-
-    MatrixXd total_force_fibers = motor_force_fibers + external_force_fibers;
-    fc_.update_RHS(properties.dt, v_all.block(0, 0, 3, fib_node_count), total_force_fibers);
+    fc_.update_RHS(properties.dt, v_fib, motor_force_fibers);
     fc_.update_boundary_conditions(*shell_);
-    fc_.apply_bc_rectangular(properties.dt, v_all.block(0, 0, 3, fib_node_count), external_force_fibers);
-
-    shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
+    fc_.apply_bc_rectangular(properties.dt, external_velocity_fibers, external_force_fibers);
 }
+
 
 /// @brief Calculate solution vector given current configuration
 ///
@@ -315,6 +305,7 @@ bool solve() {
     bool converged = solver_.solve();
     curr_solution_ = solver_.get_solution();
 
+
     spdlog::info("Residual: {}", solver_.get_residual());
     return converged;
 }
@@ -325,10 +316,9 @@ bool solve() {
 /// @return If the solver converged to the requested tolerance with no issue.
 bool step() {
     bool converged = solve();
-    auto [fiber_sol, shell_sol] = get_solution_maps(curr_solution_.data());
+    auto [fiber_sol] = get_solution_maps(curr_solution_.data());
 
     fc_.step(fiber_sol);
-    shell_->step(shell_sol);
 
     return converged;
 }
