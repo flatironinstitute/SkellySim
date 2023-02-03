@@ -282,7 +282,11 @@ void prep_state_for_solver() {
 
     MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     MatrixXd external_velocity_fibers = MatrixXd::Zero(3, fib_node_count);
-    fc_.update_RHS(properties.dt, v_fib, external_force_fibers);
+    MatrixXd motor_force_fibers = params_.implicit_motor_activation_delay > properties.time
+                                      ? MatrixXd::Zero(3, fib_node_count)
+                                      : fc_.generate_constant_force();
+
+    fc_.update_RHS(properties.dt, v_fib, motor_force_fibers);
     fc_.update_boundary_conditions(*shell_);
     fc_.apply_bc_rectangular(properties.dt, external_velocity_fibers, external_force_fibers);
 }
