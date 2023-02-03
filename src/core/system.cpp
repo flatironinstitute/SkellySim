@@ -272,7 +272,7 @@ void prep_state_for_solver() {
     if (shell_->is_active()) {
         CVectorMap shell_velocities_flat(v_all.data() + 3 * fib_node_count, 3 * shell_node_count);
         shell_->solution_vec_ = shell_->M_inv_ * shell_velocities_flat;
-        v_fib = shell_->flow(r_fibers, shell_->solution_vec_, params_.eta);
+        v_fib = -shell_->flow(r_fibers, shell_->solution_vec_, params_.eta);
     }
     else {
         v_fib = MatrixXd::Zero(3, fib_node_count);
@@ -282,7 +282,7 @@ void prep_state_for_solver() {
 
     MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     MatrixXd external_velocity_fibers = MatrixXd::Zero(3, fib_node_count);
-    fc_.update_RHS(properties.dt, -v_fib, external_force_fibers);
+    fc_.update_RHS(properties.dt, v_fib, external_force_fibers);
     fc_.update_boundary_conditions(*shell_);
     fc_.apply_bc_rectangular(properties.dt, external_velocity_fibers, external_force_fibers);
 }
