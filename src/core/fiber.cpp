@@ -1,6 +1,7 @@
 #include <skelly_sim.hpp>
 
 #include <algorithm>
+#include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -41,6 +42,13 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     force_scale_ = toml::find_or<double>(fiber_table, "force_scale", 0.0);
     minus_clamped_ = toml::find_or<bool>(fiber_table, "minus_clamped", false);
     penalty_param_ = toml::find_or<double>(fiber_table, "penalty_param", 500.0);
+    use_local_SBT_ = toml::find_or<bool>(fiber_table, "use_local_SBT", true);
+
+    static bool first_call = true;
+    if (!use_local_SBT_ && first_call) {
+        spdlog::warn("Non-local SBT not fully implemented for fibers");
+        first_call = 0;
+    }
 
     update_constants(eta);
 }

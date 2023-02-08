@@ -272,6 +272,8 @@ class Fiber():
         Scaling "beta" to soft-enforce the inextensibility constraint
     minus_clamped : bool, default: :obj:`False`
         Fix minus end of filament with "clamped" boundary condition, preserving orientation and position (:obj:`Velocity = 0, AngularVelocity = 0`).
+    use_local_SBT : bool, default: :obj:`True`
+        Use local SBT rather than non-local
     x : List[float], default: :obj:`[]`, units: :obj:`μm`
         List of node positions in [x0,y0,z0,x1,y1,z1...] order. Extreme care must be taken when setting this since the length constraint
         can generate massive tensions with poor input. See examples.
@@ -284,6 +286,7 @@ class Fiber():
     length: float = 1.0
     penalty_param: float = 500.0
     minus_clamped: bool = False
+    use_local_SBT: bool = True
     x: List[float] = field(default_factory=list)
 
     def fill_node_positions(self, x0: np.array, normal: np.array):

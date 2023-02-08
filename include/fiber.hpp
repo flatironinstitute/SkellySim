@@ -34,6 +34,7 @@ class Fiber {
     double beta_tstep_ = 1.0; ///< penalty parameter to ensure inextensibility
     double epsilon_;   ///< slenderness parameter
     bool minus_clamped_ = false; ///< Fix minus end in space with clamped condition
+    bool use_local_SBT_ = true; ///< Use local rather than non-local SBT
 
     /// @brief Coefficient for SBT @see Fiber::init
     /// \f[ c_0 = -\frac{log(e \epsilon^\ell)}{8 \pi \eta}\f]
@@ -128,7 +129,7 @@ class Fiber {
     void update_constants(double eta) {
         epsilon_ = radius_ / length_;
         c_0_ = -log(M_E * std::pow(epsilon_, 2)) / (8 * M_PI * eta);
-        c_1_ = 2.0 / (8.0 * M_PI * eta);
+        c_1_ = use_local_SBT_ ? 0.0 : 2.0 / (8.0 * M_PI * eta);
     }
 
 
