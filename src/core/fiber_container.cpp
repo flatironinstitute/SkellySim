@@ -18,9 +18,9 @@ using Eigen::VectorXd;
 ///
 /// Updates: Fiber::bc_minus, Fiber::bc_plus
 /// @param[in] Periphery object
-void FiberContainer::update_boundary_conditions(Periphery &shell) {
+void FiberContainer::update_boundary_conditions() {
     for (auto &fib : *this)
-        fib.update_boundary_conditions(shell);
+        fib.update_boundary_conditions();
 }
 
 /// @brief Get total number of fibers across all ranks
@@ -56,9 +56,9 @@ void FiberContainer::update_stokeslets(double eta) {
         fib.update_stokeslet(eta);
 }
 
-void FiberContainer::update_linear_operators(double dt, double eta) {
+void FiberContainer::update_linear_operators(double dt) {
     for (auto &fib : *this)
-        fib.update_linear_operator(dt, eta);
+        fib.update_linear_operator(dt);
 }
 
 VectorXd FiberContainer::apply_preconditioner(VectorRef &x_all) const {
@@ -187,7 +187,7 @@ void FiberContainer::update_cache_variables(double dt, double eta) {
         fib.update_constants(eta);
         fib.update_derivatives();
         fib.update_stokeslet(eta);
-        fib.update_linear_operator(dt, eta);
+        fib.update_linear_operator(dt);
         fib.update_force_operator();
     }
 

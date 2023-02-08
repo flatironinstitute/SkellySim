@@ -75,7 +75,7 @@ void Fiber::update_derivatives() {
 ///
 /// Updates: Fiber::bc_minus_, Fiber::bc_plus_
 /// @param[in] Periphery object
-void Fiber::update_boundary_conditions(Periphery &shell) {
+void Fiber::update_boundary_conditions() {
     bc_minus_ = is_minus_clamped()
                     ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped at minus end
                     : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
@@ -90,7 +90,7 @@ void Fiber::update_boundary_conditions(Periphery &shell) {
 ///
 /// \f[ A * (X^{n+1}, T^{n+1}) = \textrm{RHS} \f]
 /// Updates: Fiber::A_
-void Fiber::update_linear_operator(double dt, double eta) {
+void Fiber::update_linear_operator(double dt) {
     int n_nodes_up = n_nodes_;
     int n_nodes_down = n_nodes_;
 
@@ -162,9 +162,6 @@ void Fiber::update_linear_operator(double dt, double eta) {
 
     A_ZT = -(c_0_ * 2.0) * (D_1.colwise() * xs_z);
     A_ZT += -(c_0_ + c_1_) * xss_z.matrix().asDiagonal();
-
-    // A_TX = -(self.c_1 + 7.0 * self.c_0) * self.E * (D_4.T * xss[:, 0]).T - 6.0 * self.c_0 * self.E * (
-    //         D_3.T * xsss[:, 0]).T - self.penalty_param * (D_1.T * xs[:, 0]).T
 
     A_TX = -(c_1_ + 7.0 * c_0_) * bending_rigidity_ * (D_4.colwise() * xss_x).matrix() -
            6.0 * c_0_ * bending_rigidity_ * (D_3.colwise() * xsss_x).matrix() -

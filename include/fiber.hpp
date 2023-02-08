@@ -10,8 +10,6 @@
 #include <kernels.hpp>
 #include <params.hpp>
 
-class Periphery;
-
 /// @brief Class to represent a single flexible filament
 ///
 /// Actions on the fiber class are typically handled via the container object, which will
@@ -86,22 +84,6 @@ class Fiber {
 
     Fiber(toml::value &fiber_table, double eta);
     Fiber() = default;
-
-    /// @brief initialize empty fiber
-    /// @param[in] n_nodes fiber 'resolution'
-    /// @param[in] radius fiber radius
-    /// @param[in] length fiber length
-    /// @param[in] bending_rigidity bending rigidity of fiber
-    /// @param[in] eta fluid viscosity
-    ///
-    /// @deprecated Initializing with a toml::table structure is the preferred initialization. This is only around for
-    /// testing.
-    Fiber(int n_nodes, double radius, double length, double bending_rigidity, double eta)
-        : n_nodes_(n_nodes), radius_(radius), length_(length), bending_rigidity_(bending_rigidity) {
-        init();
-        update_constants(eta);
-    };
-
     Fiber(const Fiber &old_fib, const double eta) {
         *this = old_fib;
         update_constants(eta);
@@ -136,9 +118,9 @@ class Fiber {
     Eigen::VectorXd matvec(VectorRef x, MatrixRef v) const;
     void update_preconditioner();
     void update_force_operator();
-    void update_boundary_conditions(Periphery &shell);
+    void update_boundary_conditions();
     void update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external);
-    void update_linear_operator(double dt, double eta);
+    void update_linear_operator(double dt);
     void apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber);
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
@@ -182,7 +164,7 @@ class FiberContainer {
 
     void update_derivatives();
     void update_stokeslets(double eta);
-    void update_linear_operators(double dt, double eta);
+    void update_linear_operators(double dt);
     void update_cache_variables(double dt, double eta);
     void update_local_node_positions();
     void update_RHS(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
@@ -219,7 +201,7 @@ class FiberContainer {
     Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const;
 
-    void update_boundary_conditions(Periphery &shell);
+    void update_boundary_conditions();
 
     ActiveIterator<Fiber> begin() { return ActiveIterator<Fiber>(0, fibers); }
     ActiveIterator<Fiber> end() { return ActiveIterator<Fiber>(fibers.size(), fibers); }
