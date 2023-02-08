@@ -40,6 +40,7 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     length_ = toml::find<double>(fiber_table, "length");
     force_scale_ = toml::find_or<double>(fiber_table, "force_scale", 0.0);
     minus_clamped_ = toml::find_or<bool>(fiber_table, "minus_clamped", false);
+    penalty_param_ = toml::find_or<double>(fiber_table, "penalty_param", 500.0);
 
     update_constants(eta);
 }

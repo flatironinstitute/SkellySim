@@ -268,6 +268,8 @@ class Fiber():
         Radius of fiber (for purposes of SBT, currently no physical dimension)
     length : float, default: :obj:`1.0`, units: :obj:`μm`
         Constraint length of this filament
+    penalty_param : float, default: :obj:`500.0`
+        Scaling "beta" to soft-enforce the inextensibility constraint
     minus_clamped : bool, default: :obj:`False`
         Fix minus end of filament with "clamped" boundary condition, preserving orientation and position (:obj:`Velocity = 0, AngularVelocity = 0`).
     x : List[float], default: :obj:`[]`, units: :obj:`μm`
@@ -280,6 +282,7 @@ class Fiber():
     bending_rigidity: float = 2.5E-3
     radius: float = 0.0125
     length: float = 1.0
+    penalty_param: float = 500.0
     minus_clamped: bool = False
     x: List[float] = field(default_factory=list)
 
@@ -335,6 +338,8 @@ class Params():
     pair_evaluator : str, default: :obj:`"FMM"`
         Type of evaluator to use for kernels (stokeslet, stokes double layer, etc)
         Valid values: "CPU", "FMM"
+    implicit_motor_activation_delay : float, default: :obj:`0.0`, units: :obj:`s`
+        Time in simulation units after which the fiber "force_scale" becomes enabled
     """
     eta: float = 1.0
     dt_initial: float = 0.025
@@ -347,6 +352,7 @@ class Params():
     seed: int = 130319
     adaptive_timestep_flag: bool = True
     pair_evaluator: str = "FMM"
+    implicit_motor_activation_delay: float = 0.0
 
 
 @dataclass
