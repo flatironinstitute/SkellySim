@@ -27,7 +27,7 @@ utils::CubicHermiteSplines::CubicHermiteSplines(const MatrixRef &x, const Vector
 }
 
 utils::CubicHermiteSplines::CubicHermiteSplines(const MatrixRef &x) {
-    *this = CubicHermiteSplines(x, Eigen::Vector3d{}, Eigen::Vector3d{});
+    *this = CubicHermiteSplines(x, Eigen::VectorXd(), Eigen::VectorXd());
 }
 
 double utils::CubicHermiteSplines::arc_length(const int n_nodes) {
@@ -53,6 +53,7 @@ double utils::CubicHermiteSplines::arc_length(const int n_nodes) {
 
     const Eigen::MatrixXd dx = x_new.block(0, 1, 3, n_nodes - 1) - x_new.block(0, 0, 3, n_nodes - 1);
     const Eigen::VectorXd dL_new = dx.colwise().norm();
+
     return dL_new.sum();
 }
 
