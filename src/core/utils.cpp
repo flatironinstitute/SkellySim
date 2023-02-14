@@ -3,6 +3,59 @@
 
 #include <cnpy.hpp>
 
+utils::CubicHermiteSplines::CubicHermiteSplines(const MatrixRef &x, const VectorRef &tan_start,
+                                                const VectorRef &tan_end) {
+    const int n_panels = x.cols() - 1;
+    const Eigen::MatrixXd dx = x.block(0, 1, 3, n_panels) - x.block(0, 0, 3, n_panels);
+
+    dL = dx.colwise().norm();
+    L_tot = dL.sum();
+
+    Eigen::MatrixXd m(3, n_panels + 1);
+    m.col(0) = tan_start.any() ? tan_start : dx.col(0) / dL[0];
+    m.col(n_panels) = tan_end.any() ? tan_end : dx.col(n_panels - 1) / dL[n_panels - 1];
+    for (int k = 1; k < n_panels; ++k)
+        m.col(k) = 0.5 * (dx.col(k) / dL[k] + dx.col(k - 1) / dL[k - 1]);
+
+    panels.resize(n_panels);
+    for (int k = 0; k < n_panels; ++k) {
+        panels[k].c.col(0) = 2 * x.col(k) + m.col(k) * dL[k] - 2 * x.col(k + 1) + m.col(k + 1) * dL[k];
+        panels[k].c.col(1) = -3 * x.col(k) + +3 * x.col(k + 1) - 2 * m.col(k) * dL[k] - m.col(k + 1) * dL[k];
+        panels[k].c.col(2) = m.col(k) * dL[k];
+        panels[k].c.col(3) = x.col(k);
+    }
+}
+
+utils::CubicHermiteSplines::CubicHermiteSplines(const MatrixRef &x) {
+    *this = CubicHermiteSplines(x, Eigen::Vector3d{}, Eigen::Vector3d{});
+}
+
+double utils::CubicHermiteSplines::arc_length(const int n_nodes) {
+    Eigen::MatrixXd x_new(3, n_nodes);
+
+    const double ds = L_tot / (n_nodes - 1);
+    int curr_panel = 0;
+    double L_endseg = dL[curr_panel];
+    for (int i = 0; i < n_nodes - 1; ++i) {
+        const double s = i * ds;
+        double t;
+
+        while (s > L_endseg) {
+            curr_panel++;
+            L_endseg += dL[curr_panel];
+        }
+
+        t = (s - L_endseg + dL[curr_panel]) / dL[curr_panel];
+
+        x_new.col(i) = panels[curr_panel].eval(t);
+    }
+    x_new.col(n_nodes-1) = panels.back().eval(1.0);
+
+    const Eigen::MatrixXd dx = x_new.block(0, 1, 3, n_nodes - 1) - x_new.block(0, 0, 3, n_nodes - 1);
+    const Eigen::VectorXd dL_new = dx.colwise().norm();
+    return dL_new.sum();
+}
+
 //  Following the paper Calculation of weights in finite different formulas,
 //  Bengt Fornberg, SIAM Rev. 40 (3), 685 (1998).
 //
@@ -106,7 +159,9 @@ Eigen::VectorXd utils::collect_into_global(VectorRef &local_vec) {
 }
 
 Eigen::MatrixXd utils::load_mat(cnpy::npz_t &npz, const char *var) {
-    return Eigen::Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0]).matrix().transpose();
+    return Eigen::Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0])
+        .matrix()
+        .transpose();
 }
 
 Eigen::VectorXd utils::load_vec(cnpy::npz_t &npz, const char *var) {

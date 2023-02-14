@@ -9,6 +9,31 @@ using npz_t = std::map<std::string, NpyArray>;
 } // namespace cnpy
 
 namespace utils {
+
+class CubicHermiteSplines {
+  public:
+    CubicHermiteSplines(const MatrixRef &x);
+    CubicHermiteSplines(const MatrixRef &x, const VectorRef &tan_start, const VectorRef &tan_end);
+
+    struct Panel {
+        Eigen::Vector3d eval(double t) {
+            const double t2 = t * t;
+            const double t3 = t * t2;
+            return c * Eigen::Vector4d{t3, t2, t, 1.0};
+        };
+        Eigen::Vector3d evald(double t) {
+            const double t2 = t * t;
+            return c * Eigen::Vector4d{3.0 * t2, 2.0 * t, 1.0, 0.0};
+        };
+        Eigen::Matrix<double, 3, 4> c;
+    };
+
+    double arc_length(const int n_nodes);
+    std::vector<Panel> panels;
+    Eigen::VectorXd dL;
+    double L_tot;
+};
+
 Eigen::MatrixXd finite_diff(ArrayRef &s, int M, int n_s);
 Eigen::VectorXd collect_into_global(VectorRef &local_vec);
 

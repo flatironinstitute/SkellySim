@@ -53,6 +53,8 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
     update_constants(eta);
 }
 
+double Fiber::calc_length() const { return utils::CubicHermiteSplines(x_).arc_length(2 * n_nodes_ - 1); }
+
 /// @brief Update stokeslet for points along fiber
 /// Calls kernels::oseen_tensor_direct with Fiber::x_ as source/target
 ///

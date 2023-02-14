@@ -277,7 +277,8 @@ FiberContainer::FiberContainer(toml::array &fiber_tables, Params &params) {
 
             auto &fib = fibers.back();
             spdlog::get("SkellySim global")
-                ->debug("Fiber {}: {} {} {}", i_fib, fib.n_nodes_, fib.bending_rigidity_, fib.length_);
+                ->debug("Fiber {}: {} {} {} {}", i_fib, fib.n_nodes_, fib.bending_rigidity_, fib.length_,
+                        fib.calc_length());
         }
     }
 

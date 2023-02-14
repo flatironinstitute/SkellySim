@@ -116,6 +116,7 @@ class Fiber {
 
 
     Eigen::VectorXd matvec(VectorRef x, MatrixRef v) const;
+    double calc_length() const;
     void update_preconditioner();
     void update_force_operator();
     void update_boundary_conditions();
