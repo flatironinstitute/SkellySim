@@ -48,6 +48,6 @@ cd SkellySim
 git submodule update --init --recursive
 mkdir -p build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-march=broadwell -DCMAKE_CUDA_ARCHITECTURES="70;75;80;85" -DBLA_VENDOR=FlexiBLAS
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=-march=broadwell -DCMAKE_CUDA_ARCHITECTURES="70;75;86;90" -DBLA_VENDOR=FlexiBLAS
 make -j$((2*$(nproc)))
 ```
