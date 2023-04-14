@@ -12,7 +12,7 @@
 #include <toml.hpp>
 
 /// @file
-/// @brief Implement Fiber and FiberContainer classes and associated functions
+/// @brief Implementation for Fiber class
 
 using Eigen::ArrayXd;
 using Eigen::ArrayXXd;

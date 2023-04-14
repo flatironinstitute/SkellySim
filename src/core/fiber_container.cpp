@@ -9,6 +9,9 @@
 #include <system.hpp>
 #include <utils.hpp>
 
+/// @file
+/// @brief Implementation for FiberContainer class
+
 using Eigen::ArrayXd;
 using Eigen::ArrayXXd;
 using Eigen::MatrixXd;

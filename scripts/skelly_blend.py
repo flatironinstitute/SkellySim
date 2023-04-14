@@ -40,7 +40,7 @@ def _create_sphere(position : np.array, radius : float, name : str, material : s
     bmesh.ops.create_uvsphere(bm,
                               u_segments=64,
                               v_segments=32,
-                              diameter=radius)
+                              radius=radius)
 
     if half:
         modifier = sphere.modifiers.new(name="Solidify", type="SOLIDIFY")

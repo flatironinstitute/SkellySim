@@ -9,6 +9,9 @@
 #include <Kokkos_Core.hpp>
 #include <Teuchos_CommandLineProcessor.hpp>
 
+/// @file
+/// @brief Implementation of SkellySim
+
 int main(int argc, char *argv[]) {
     int thread_level;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &thread_level);

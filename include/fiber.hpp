@@ -10,6 +10,9 @@
 #include <kernels.hpp>
 #include <params.hpp>
 
+/// @file
+/// @brief Declares classes for Fiber and FiberContainer 
+
 class Periphery;
 class BodyContainer;
 
@@ -42,7 +45,7 @@ class Fiber {
 
     double v_growth_ = 0.0;      ///< instantaneous fiber growth velocity
 
-    /// @brief Coefficient for SBT @see Fiber::init
+    /// @brief Coefficient for SBT radius@see Fiber::init
     /// \f[ c_0 = -\frac{log(e \epsilon^\ell)}{8 \pi \eta}\f]
     double c_0_;
 
@@ -116,9 +119,9 @@ class Fiber {
 
     bool active() const { return true; }
 
-    ///< @brief Set some default values and resize arrays
+    /// @brief Set some default values and resize arrays
     ///
-    ///< _MUST_ be called from constructors.
+    /// _MUST_ be called from constructors.
     ///
     /// Initializes: Fiber::x_, Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_, Fiber::c_0_, Fiber::c_1_
     void init() {
@@ -165,7 +168,7 @@ class Fiber {
 
 MSGPACK_ADD_ENUM(Fiber::BC);
 
-/// Class to hold the fiber objects.
+/// @brief Class to hold the fiber objects.
 ///
 /// The container object is designed to work on fibers local to that MPI rank. Each MPI rank
 /// should have its own container, with its own unique fibers. The container object does not

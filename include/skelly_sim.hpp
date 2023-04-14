@@ -21,6 +21,9 @@
 #include <spdlog/spdlog.h>
 #include <mpi.h>
 
+/// @file
+/// @brief Header for SkellySim
+
 typedef Eigen::Map<Eigen::VectorXd> VectorMap;
 typedef Eigen::Map<const Eigen::VectorXd> CVectorMap;
 typedef Eigen::Map<Eigen::ArrayXd> ArrayMap;
