@@ -150,8 +150,8 @@ class Fiber {
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
     void update_stokeslet(double);
-    bool attached_to_body() { return binding_site_.first >= 0; };
-    bool is_minus_clamped() { return minus_clamped_ || attached_to_body(); };
+    bool attached_to_body() const { return binding_site_.first >= 0; };
+    bool is_minus_clamped() const { return minus_clamped_ || attached_to_body(); };
     bool is_plus_pinned() { return bc_plus_.first == BC::Velocity; };
 #ifndef SKELLY_DEBUG
     MSGPACK_DEFINE_MAP(n_nodes_, radius_, length_, length_prev_, bending_rigidity_, penalty_param_, force_scale_,
@@ -245,6 +245,13 @@ class FiberContainer {
 
   public:
     MSGPACK_DEFINE(fibers);
+};
+
+/// @brief Finite-difference fiber
+class FiniteDifferenceFiber : public Fiber {
+  public:
+    // Input parameters
+    double penalty_param_ = 500.0;  ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
 };
 
 #endif

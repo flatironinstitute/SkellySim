@@ -61,6 +61,8 @@ class Params {
 
     Params() = default;
     Params(toml::value &param_table);
+
+    void Print();
 };
 
 #endif

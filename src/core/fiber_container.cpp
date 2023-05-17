@@ -76,14 +76,16 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
     VectorXd res = VectorXd::Zero(get_local_solution_size());
 
     size_t offset = 0;
+    size_t offset_node = 0;
     int i_fib = 0;
     for (const auto &fib : *this) {
         const int np = fib.n_nodes_;
         res.segment(offset, 4 * np) =
-            fib.matvec(x_all.segment(offset, 4 * np), v_fib.block(0, i_fib, 3, np), v_fib_boundary.col(i_fib));
+            fib.matvec(x_all.segment(offset, 4 * np), v_fib.block(0, offset_node, 3, np), v_fib_boundary.col(i_fib));
 
         i_fib++;
         offset += 4 * np;
+        offset_node += np;
     }
 
     return res;

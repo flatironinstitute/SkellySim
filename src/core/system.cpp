@@ -449,6 +449,7 @@ void prep_state_for_solver() {
     if (params_.periphery_interaction_flag && shell_->is_active()) {
         int i_col = 0;
 
+        // Make sure it's not adding any numbers, etc
         for (const auto &fib : fc_.fibers) {
             external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
                 shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
@@ -503,6 +504,7 @@ bool solve() {
 
     Solver<P_inv_hydro, A_fiber_hydro> solver_; /// < Wrapper class for solving system
     solver_.set_RHS();
+    // FIXME: Rename this, as it just packs up things for the solver, something like grab_RHS_from_system
 
     bool converged = solver_.solve();
     curr_solution_ = solver_.get_solution();
@@ -607,9 +609,9 @@ void run() {
 ///
 /// @return true if any collision detected, false otherwise
 bool check_collision() {
-    BodyContainer &bc = bc_;
-    FiberContainer &fc = fc_;
-    Periphery &shell = *shell_;
+    const BodyContainer &bc = bc_;
+    const FiberContainer &fc = fc_;
+    const Periphery &shell = *shell_;
     const double threshold = 0.0;
     using Eigen::VectorXd;
 
@@ -621,6 +623,19 @@ bool check_collision() {
     for (const auto &fiber : fc.fibers)
         if (!collided && shell.check_collision(fiber.x_, threshold))
             collided = true;
+
+    for (const auto &fiber : fc.fibers) {
+       if (fiber.is_minus_clamped()) {
+           if (!collided && shell.check_collision(fiber.x_.block(0, 1, 3, fiber.n_nodes_ - 1), threshold)) {
+               collided = true;
+           }
+       }
+       else  {
+           if (!collided && shell.check_collision(fiber.x_, threshold)) {
+               collided = true;
+           }
+       }
+    }
 
     for (auto &body1 : bc.bodies)
         for (auto &body2 : bc.bodies)
@@ -683,6 +698,7 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
 
     param_table_ = toml::parse(input_file);
     params_ = Params(param_table_.at("params"));
+    params_.Print();
     RNG::init(params_.seed);
 
     properties.dt = params_.dt_initial;
