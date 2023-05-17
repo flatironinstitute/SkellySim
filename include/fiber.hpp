@@ -250,4 +250,11 @@ class FiberContainer {
     MSGPACK_DEFINE(fibers);
 };
 
+/// @brief Finite-difference fiber
+class FiniteDifferenceFiber : public Fiber {
+  public:
+    // Input parameters
+    double penalty_param_ = 500.0;  ///< @brief Tension penalty parameter for linear operator @see update_linear_operator
+};
+
 #endif

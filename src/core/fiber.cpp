@@ -190,6 +190,7 @@ void Fiber::update_linear_operator(double dt, double eta) {
 /// @param[in] flow [ 3 x n_nodes_ ] matrix of flow field sampled at the fiber points
 /// @param[in] f_external [ 3 x n_nodes_ ] matrix of external forces on the fiber points
 void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
+    // FIXME: Could be cleaned up, but is going to be replaced, so whatever
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
@@ -209,16 +210,18 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     RHS_.setZero();
 
     // TODO (GK) : xs should be calculated at x_rhs when polymerization term is added to the rhs
+    // CJE: This is X/dt basically (Robert: exactly)
     RHS_.segment(0 * np, np) = x_x / dt + s_dot * xs_x;
     RHS_.segment(1 * np, np) = x_y / dt + s_dot * xs_y;
     RHS_.segment(2 * np, np) = x_z / dt + s_dot * xs_z;
-    RHS_.segment(3 * np, np) = -penalty_param_ * VectorXd::Ones(np);
+    RHS_.segment(3 * np, np) = -penalty_param_ * VectorXd::Ones(np); // Hey it's the penalty param
 
     if (flow.size()) {
         RHS_.segment(0 * np, np) += flow.row(0);
         RHS_.segment(1 * np, np) += flow.row(1);
         RHS_.segment(2 * np, np) += flow.row(2);
 
+        // CJE: This is the tension term
         RHS_.segment(3 * np, np) += (xs_x.transpose() * (flow.row(0) * D_1.matrix()).array() +
                                      xs_y.transpose() * (flow.row(1) * D_1.matrix()).array() +
                                      xs_z.transpose() * (flow.row(2) * D_1.matrix()).array())

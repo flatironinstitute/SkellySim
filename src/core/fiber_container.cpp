@@ -79,14 +79,18 @@ VectorXd FiberContainer::matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v
     VectorXd res = VectorXd::Zero(get_local_solution_size());
 
     size_t offset = 0;
+    size_t offset_node = 0;
     int i_fib = 0;
     for (const auto &fib : *this) {
         const int np = fib.n_nodes_;
         res.segment(offset, 4 * np) =
-            fib.matvec(x_all.segment(offset, 4 * np), v_fib.block(0, i_fib, 3, np), v_fib_boundary.col(i_fib));
+            fib.matvec(x_all.segment(offset, 4 * np), v_fib.block(0, offset_node, 3, np), v_fib_boundary.col(i_fib));
+        // FIXME: This is probably where the bug is, as it came from the offset variable
+        // FIXME: Setup an index so that we just know where nodes/solutions/etc start, rather than using offsets. Something like a node_start_map and a solution_start_map
 
         i_fib++;
         offset += 4 * np;
+        offset_node += np;
     }
 
     return res;
@@ -187,6 +191,7 @@ void FiberContainer::update_local_node_positions() {
     }
 }
 
+// FIXME: Make this so it gets abstracted away
 void FiberContainer::update_cache_variables(double dt, double eta) {
     for (auto &fib : *this) {
         fib.update_constants(eta);

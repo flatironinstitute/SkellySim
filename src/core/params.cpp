@@ -3,20 +3,20 @@
 Params::Params(toml::value &pt) {
     eta = toml::find_or(pt, "eta", 1.0);
     dt_initial = toml::find_or(pt, "dt_initial", 1E-2);
-    gmres_tol = toml::find_or(pt, "gmres_tol", 1E-10);
-    t_final = toml::find_or(pt, "t_final", 1.0);
-    fiber_error_tol = toml::find_or(pt, "fiber_error_tol", 1E-1);
+    dt_min = toml::find_or(pt, "dt_min", 1E-4);
     dt_max = toml::find_or(pt, "dt_max", 2.0);
     beta_up = toml::find_or(pt, "beta_up", 1.2);
     beta_down = toml::find_or(pt, "beta_down", 0.5);
-    seed = toml::find_or(pt, "seed", 1);
-    dt_min = toml::find_or(pt, "dt_min", 1E-4);
-    dt_write = toml::find_or(pt, "dt_write", 0.25);
-    implicit_motor_activation_delay = toml::find_or(pt, "implicit_motor_activation_delay", 0.0);
-    seed = toml::find_or(pt, "seed", 1);
-    periphery_interaction_flag = toml::find_or(pt, "periphery_interaction_flag", false);
     adaptive_timestep_flag = toml::find_or(pt, "adaptive_timestep_flag", true);
+    dt_write = toml::find_or(pt, "dt_write", 0.25);
+    t_final = toml::find_or(pt, "t_final", 1.0);
+    gmres_tol = toml::find_or(pt, "gmres_tol", 1E-10);
+    fiber_error_tol = toml::find_or(pt, "fiber_error_tol", 1E-1);
+    seed = toml::find_or(pt, "seed", 1);
+    implicit_motor_activation_delay = toml::find_or(pt, "implicit_motor_activation_delay", 0.0);
+    periphery_interaction_flag = toml::find_or(pt, "periphery_interaction_flag", false);
     pair_evaluator = toml::find_or(pt, "pair_evaluator", "FMM");
+    fiber_type = toml::find_or(pt, "fiber_type", "finite_difference");
 
     if (pt.contains("dynamic_instability")) {
         const auto &di = pt.at("dynamic_instability");
@@ -76,4 +76,27 @@ Params::Params(toml::value &pt) {
         fiber_periphery_interaction.f_0 = toml::find_or(fp, "f_0", fiber_periphery_interaction.f_0);
         fiber_periphery_interaction.l_0 = toml::find_or(fp, "l_0", fiber_periphery_interaction.l_0);
     }
+}
+
+void Params::Print() {
+    // Print out the information that we have on the system (only one, don't do it to global)
+    // XXX: Whenever you add a new variable, make sure to also add a print statement here!
+    spdlog::info("****** SkellySim {} ({}) ******", SKELLYSIM_VERSION, SKELLYSIM_COMMIT);
+    spdlog::info("******    Parameters     ******");
+    spdlog::info("eta                               = {}", eta);
+    spdlog::info("dt_initial                        = {}", dt_initial);
+    spdlog::info("dt_min                            = {}", dt_min);
+    spdlog::info("dt_max                            = {}", dt_max);
+    spdlog::info("beta_up                           = {}", beta_up);
+    spdlog::info("beta_down                         = {}", beta_down);
+    spdlog::info("adaptive_timestep_flag            = {}", adaptive_timestep_flag);
+    spdlog::info("dt_write                          = {}", dt_write);
+    spdlog::info("t_final                           = {}", t_final);
+    spdlog::info("gmres_tol                         = {}", gmres_tol);
+    spdlog::info("fiber_error_tol                   = {}", fiber_error_tol);
+    spdlog::info("seed                              = {}", seed);
+    spdlog::info("implicit_motor_activation_delay   = {}", implicit_motor_activation_delay);
+    spdlog::info("periphery_interaction_flag        = {}", periphery_interaction_flag);
+    spdlog::info("pair_evaluator                    = {}", pair_evaluator);
+    spdlog::info("fiber_type                        = {}", fiber_type);
 }
