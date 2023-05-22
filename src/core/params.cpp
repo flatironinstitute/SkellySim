@@ -77,7 +77,7 @@ Params::Params(toml::value &pt) {
     }
 }
 
-void Params::Print() {
+void Params::print() {
     // Print out the information that we have on the system (only one, don't do it to global)
     // XXX: Whenever you add a new variable, make sure to also add a print statement here!
     spdlog::info("****** SkellySim {} ({}) ******", SKELLYSIM_VERSION, SKELLYSIM_COMMIT);
