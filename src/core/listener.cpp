@@ -6,7 +6,6 @@
 #include <trajectory_reader.hpp>
 
 namespace listener {
-
 typedef struct listener_command_t {
     std::size_t frame_no = 0;
     std::string evaluator = "CPU";
@@ -89,12 +88,22 @@ void run() {
     TrajectoryReader traj("skelly_sim.out", false);
 
     uint64_t msgsize = 0;
-    while (read(STDIN_FILENO, &msgsize, sizeof(msgsize)) > 0) {
-        if (msgsize == 0)
+    while (read(STDIN_FILENO, &msgsize, sizeof(msgsize))) {
+        if (msgsize == 0) {
+            spdlog::info("Terminate message received. Exiting listener mode");
             return;
+        }
+
         std::vector<char> cmd_payload(msgsize);
-        if (read(STDIN_FILENO, cmd_payload.data(), msgsize) < 0)
-            spdlog::warn("Error reading payload");
+        ssize_t bytes_read = 0;
+        while (bytes_read < msgsize) {
+            ssize_t readsize = read(STDIN_FILENO, cmd_payload.data() + bytes_read, msgsize - bytes_read);
+            if (readsize < 0) {
+                spdlog::error("Error reading payload");
+                return;
+            }
+            bytes_read += readsize;
+        }
 
         auto cmd = msgpack::unpack(cmd_payload.data(), msgsize).get().as<listener_command_t>();
 

@@ -3,6 +3,7 @@ import msgpack
 import toml
 import os
 import struct
+
 from typing import List
 from dataclasses import dataclass, field, asdict
 from dataclass_utils import check_type
@@ -145,7 +146,7 @@ class Listener:
         with open(toml_file, 'r') as f:
             self.config_data = toml.load(f)
 
-        self._proc = Popen([binary, '--listen'], stdin=PIPE, stdout=PIPE)
+        self._proc = Popen(f'mpirun -n 1 -q -mca orte_abort_on_non_zero_status false {binary} --listen'.split(' '), stdin=PIPE, stdout=PIPE)
 
 
     def request(self, command: Request):
@@ -168,7 +169,11 @@ class Listener:
 
 
     def __del__(self):
-        self._proc.terminate()
+        self._proc.stdin.write(np.uint64(0))
+        try: 
+            self._proc.terminate()
+        except:
+            pass
 
 
 
