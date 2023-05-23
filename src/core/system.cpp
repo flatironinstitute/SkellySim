@@ -426,6 +426,7 @@ void prep_state_for_solver() {
 
     // Since DI can change size of fiber containers, must call first.
     System::dynamic_instability();
+    fc_.update_cache_variables(properties.dt, params_.eta);
 
     const auto [fib_node_count, shell_node_count, body_node_count] = get_local_node_counts();
 
@@ -436,8 +437,6 @@ void prep_state_for_solver() {
         r_shell = shell_->get_local_node_positions();
         r_bodies = bc_.get_local_node_positions(bc_.bodies);
     }
-
-    fc_.update_cache_variables(properties.dt, params_.eta);
 
     // Implicit motor forces
     MatrixXd motor_force_fibers = params_.implicit_motor_activation_delay > properties.time
