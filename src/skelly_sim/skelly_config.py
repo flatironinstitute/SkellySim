@@ -421,6 +421,7 @@ class Params():
     fiber_error_tol: float = 1E-1
     periphery_binding_flag: bool = False
     seed: int = 130319
+    implicit_motor_activation_delay: float = 0.0
     dynamic_instability: DynamicInstability = field(default_factory=DynamicInstability)
     periphery_binding: PeripheryBinding = field(default_factory=PeripheryBinding)
     periphery_interaction_flag: bool = False
