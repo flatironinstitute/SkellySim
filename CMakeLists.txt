@@ -8,7 +8,7 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-set(SKELLYSIM_VERSION "0.9.11")
+set(SKELLYSIM_VERSION "0.9.12")
 message("SkellySim version: v${SKELLYSIM_VERSION} (${SKELLYSIM_COMMIT})")
 
 project(
