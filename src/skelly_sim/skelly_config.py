@@ -368,7 +368,7 @@ class PeripheryBinding():
     polar_angle_start: float = 0.0
     polar_angle_end: float = 0.5 * np.pi
     threshold: float = 0.75
-    
+
 
 @dataclass
 class Params():
@@ -750,7 +750,7 @@ class Body():
     external_force: List[float] = field(default_factory=_default_vector)
     external_torque: List[float] = field(default_factory=_default_vector)
     nucleation_sites: List[float] = field(default_factory=list)
-    
+
     def find_binding_site(self, fibers: List[Fiber], ds_min: float) -> Tuple[np.array, np.array]:
         """
         Find an open binding site given a list of Fibers that could interfere with binding
@@ -820,10 +820,10 @@ class Body():
                     if verbose:
                         print("Inserting site {} at {}".format(isite, x0))
                     break
-                
+
         self.nucleation_sites = sites.flatten().tolist()
 
-            
+
     def move_fibers_to_surface(self, fibers: List[Fiber], ds_min: float, verbose: bool = True) -> None:
         """
         Take a list of fibers and randomly and uniformly place them normal to the surface with a minimum separation ds_min.
@@ -909,26 +909,22 @@ class Config():
     point_sources: List[Point] = field(default_factory=list)
     background: BackgroundSource = field(default_factory=BackgroundSource)
 
-    def plot_fibers(self, backend: str = "TKAgg"):
+    def plot_fibers(self):
         """
         Scatter plot fiber beginning and end points. Note axes are not scaled, so results may look
         'squished' and not exactly uniform.
 
-        Arguments
-        ---------
-        backend : str, default: :obj:`TKAgg`
-            matplotlib backend to use. This is a workaround to how matplotlib is sometimes configured by default
+        Returns
+        -------
+        tuple(matplotlib figure, matplotlib axis)
+            position vector and its normalized version
+
         """
-        import matplotlib
-        try:
-            matplotlib.use(backend)
-        except:
-            print("Unable to use backend: '{}'. Trying to plot with default".format(backend))
-            pass
         import matplotlib.pyplot as plt
         x_fib = np.array([fib.x[0:3] for fib in self.fibers])
         x_fib_2 = np.array([fib.x[-3:] for fib in self.fibers])
-        ax = plt.axes(projection='3d')
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
         ax.scatter(x_fib[:, 0], x_fib[:, 1], x_fib[:, 2], color='blue')
         ax.scatter(x_fib_2[:, 0], x_fib_2[:, 1], x_fib_2[:, 2], color='green')
         plt.show()
