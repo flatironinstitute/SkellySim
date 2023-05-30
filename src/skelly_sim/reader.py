@@ -141,8 +141,10 @@ class Listener:
 
         Arguments
         ---------
-        toml_file : str
+        toml_file : str, default: 'skelly_config.toml'
             Configuration file for the simulation. Usually 'skelly_config.toml', which is the default.
+        binary : str, default: 'skelly_sim'
+            Name of SkellySim executable in your PATH or full path to SkellySim executable
         """
 
         self.config_data: dict = {}
@@ -154,6 +156,18 @@ class Listener:
 
 
     def request(self, command: Request):
+        """
+        Execute request on listener subprocess
+
+        Arguments
+        ---------
+        command : Request
+            Request payload
+
+        Returns
+        -------
+            Dictionary of result data. Should be relatively self-documenting. Check examples or res.keys().
+        """
         check_type(command)
         if _check_invalid_attributes(self):
             print("Invalid request to Listener. Please fix listed attributes and try again")
