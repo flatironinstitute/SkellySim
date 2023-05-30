@@ -112,6 +112,10 @@ class Request:
         CPU and GPU are typically fastest for smaller systems
     streamlines : StreamlinesRequest, default: :obj:`StreamlinesRequest()`
         Streamlines to build
+    vortexlines : StreamlinesRequest, default: :obj:`StreamlinesRequest()`
+        Vortex lines to build
+    velocity_field : VelocityFieldRequest, default :obj:`VelocityFieldRequest()`
+        Velocity field to build
     """
     frame_no: int = 0
     evaluator: str = "CPU"
