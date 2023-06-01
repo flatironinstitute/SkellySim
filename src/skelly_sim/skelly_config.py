@@ -395,9 +395,6 @@ class Params():
         Fiber error tolerance. Not recommended to tamper with.
         Fiber error is the maximum deviation between 1.0 and a the derivative along the fiber.
         When using adaptive timestepping, if the error exceeds this value, the timestep is rejected.
-    periphery_binding_flag : bool, default: :obj:`False`
-        If set, fiber plus ends near the periphery (closer than 0.75, hardcoded) will use
-        hinged boundary conditions. Intended for use with dynamic instability
     seed : int, default: :obj:`130319`
         Random number seed at simulation runtime (doesn't affect numpy seed during configuration generation)
     dynamic_instability : DynamicInstability, default: :obj:`DynamicInstability()`
@@ -410,6 +407,7 @@ class Params():
     pair_evaluator : str, default: :obj:`"FMM"`
         Type of evaluator to use for kernels (stokeslet, stokes double layer, etc)
         Valid values: "CPU", "FMM"
+    periphery_binding : PeripheryBinding, default: :obj:`PeripheryBinding()`
     """
     eta: float = 1.0
     dt_initial: float = 0.025
@@ -419,7 +417,6 @@ class Params():
     t_final: float = 100.0
     gmres_tol: float = 1E-8
     fiber_error_tol: float = 1E-1
-    periphery_binding_flag: bool = False
     seed: int = 130319
     implicit_motor_activation_delay: float = 0.0
     dynamic_instability: DynamicInstability = field(default_factory=DynamicInstability)
