@@ -247,9 +247,9 @@ SphericalBody::SphericalBody(const toml::value &body_table, const Params &params
             external_force_type_ = EXTFORCE::Linear;
         } else if (external_force_type_str == "Oscillatory") {
             external_force_type_ = EXTFORCE::Oscillatory;
-            extforce_oscillation_amplitude_ = toml::find<double>(body_table, "extforce_oscillatory_amplitude");
-            extforce_oscillation_omega_ = 2.0 * M_PI * toml::find<double>(body_table, "extforce_oscillatory_frequency");
-            extforce_oscillation_phase_ = toml::find<double>(body_table, "extforce_oscillatory_phase");
+            extforce_oscillation_amplitude_ = toml::find<double>(body_table, "external_oscillation_force_amplitude");
+            extforce_oscillation_omega_ = 2.0 * M_PI * toml::find<double>(body_table, "external_oscillation_force_frequency");
+            extforce_oscillation_phase_ = toml::find<double>(body_table, "external_oscillation_force_phase");
         }
     }
 
