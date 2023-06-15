@@ -734,8 +734,17 @@ class Body():
         Where precompute data is stored (quadrature data, mostly). Can be different on
         different bodies, though should be the same if the bodies are the same radius and have
         the same numbers of nodes.
+    external_force_type: str, default: :obj:`Linear`
+        External force type [Linear, Oscillatory]. Linear force just applies the external force to the body.
+        Oscillatory force usese the external_force vector as the direction of the oscillatory force.
     external_force : List[float], default: :obj:`[0.0, 0.0, 0.0]`, units: :obj:`pN`
         Lab frame external force applied to body - useful for testing things like stokes flow
+    external_oscillation_force_amplitude: float, default: :obj:`0.0`, units: :obj:`pN`
+        Oscillation force amplitude if using external oscillatory forces.
+    external_oscillation_force_frequency: float, default: :obj:`0.0`, units: :obj:`Hz`
+        Oscillation force frequency in Hz if using external oscillatory forces.
+    external_oscillation_force_phase: float, default: :obj:`0.0`, units: :obj:`rad`
+        Oscillation force phase if using external oscillatory forces.
     """
     n_nucleation_sites: int = 0
     position: List[float] = field(default_factory=_default_vector)
@@ -744,9 +753,13 @@ class Body():
     radius: float = 1.0
     n_nodes: int = 600
     precompute_file: str = 'body_precompute.npz'
+    external_force_type: str = 'Linear'
     external_force: List[float] = field(default_factory=_default_vector)
     external_torque: List[float] = field(default_factory=_default_vector)
     nucleation_sites: List[float] = field(default_factory=list)
+    external_oscillation_force_amplitude: float = 0.0
+    external_oscillation_force_frequency: float = 0.0
+    external_oscillation_force_phase: float = 0.0
 
     def find_binding_site(self, fibers: List[Fiber], ds_min: float) -> Tuple[np.array, np.array]:
         """

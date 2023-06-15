@@ -7,6 +7,8 @@
 #include <periphery.hpp>
 #include <utils.hpp>
 
+const std::string Body::EXTFORCE_name[] = {"Linear", "Oscillatory"};
+
 void SphericalBody::step(double dt, VectorRef &body_solution) {
     int sol_offset = 3 * n_nodes_;
 
@@ -235,6 +237,30 @@ SphericalBody::SphericalBody(const toml::value &body_table, const Params &params
         external_force_ = convert_array<>(body_table.at("external_force").as_array());
     if (body_table.contains("external_torque"))
         external_torque_ = convert_array<>(body_table.at("external_torque").as_array());
+
+    // Check if we are doing something like oscillatory force and override what we just read in
+    string external_force_type_str = "Linear";
+    if (body_table.contains("external_force_type")) {
+        external_force_type_str = toml::find<string>(body_table, "external_force_type");
+        // external_force_ now sets the vector direction of the force, XXX: check if unit force
+        if (external_force_type_str == "Linear") {
+            external_force_type_ = EXTFORCE::Linear;
+        } else if (external_force_type_str == "Oscillatory") {
+            external_force_type_ = EXTFORCE::Oscillatory;
+            extforce_oscillation_amplitude_ = toml::find<double>(body_table, "external_oscillation_force_amplitude");
+            extforce_oscillation_omega_ = 2.0 * M_PI * toml::find<double>(body_table, "external_oscillation_force_frequency");
+            extforce_oscillation_phase_ = toml::find<double>(body_table, "external_oscillation_force_phase");
+        }
+    }
+
+    // Print functionality (TODO)
+    spdlog::info("  body external force type        = {}", EXTFORCE_name[external_force_type_]);
+    spdlog::info("  body external force director    = [ {}, {}, {} ]", external_force_[0], external_force_[1], external_force_[2]);
+    if (external_force_type_ == EXTFORCE::Oscillatory) {
+        spdlog::info("  body external oscillatory force amplitutde  = {}", extforce_oscillation_amplitude_);
+        spdlog::info("  body external oscillatory force frequency   = {}", extforce_oscillation_omega_/(2.0 * M_PI));
+        spdlog::info("  body external oscillatory force phase       = {}", extforce_oscillation_phase_);
+    }
 
     place(position_, orientation_);
 
