@@ -384,7 +384,11 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     // This routine zeros out the external force. is that correct?
     calculate_body_fiber_link_conditions(sol_fibers, sol_bodies_global);
     for (auto &body : bc_.spherical_bodies) {
-        body->force_torque_.segment(0, 3) += body->external_force_;
+        if (body->external_force_type_ == Body::EXTFORCE::Linear) {
+            body->force_torque_.segment(0, 3) += body->external_force_;
+        } else if (body->external_force_type_ == Body::EXTFORCE::Oscillatory) {
+            body->force_torque_.segment(0, 3) += body->extforce_oscillation_amplitude_ * std::sin(body->extforce_oscillation_omega_ * properties.time - body->extforce_oscillation_phase_) * body->external_force_;
+        }
         body->force_torque_.segment(3, 3) += body->external_torque_;
     }
 
@@ -465,7 +469,12 @@ void prep_state_for_solver() {
     for (auto &body : bc_.spherical_bodies) {
         body->force_torque_.setZero();
         // Hack so that when you sum global forces, it should sum back to the external force
-        body->force_torque_.segment(0, 3) = body->external_force_ / size_;
+        // Also make sure we look up what kind of external force we are inducing (linear, oscillatory)
+        if (body->external_force_type_ == Body::EXTFORCE::Linear) {
+            body->force_torque_.segment(0, 3) = body->external_force_ / size_;
+        } else if (body->external_force_type_ == Body::EXTFORCE::Oscillatory) {
+            body->force_torque_.segment(0, 3) = body->extforce_oscillation_amplitude_ * std::sin(body->extforce_oscillation_omega_ * properties.time - body->extforce_oscillation_phase_) * body->external_force_ / size_;
+        }
         body->force_torque_.segment(3, 3) = body->external_torque_ / size_;
         external_force_body = external_force_body | body->external_force_.any() | body->external_torque_.any();
     }
