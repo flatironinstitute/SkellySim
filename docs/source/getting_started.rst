@@ -8,14 +8,14 @@ easy.
 
 1. :ref:`Generate a configuration file<generating-configuration-files>`
 
-   :code:`$ python gen_config.py skelly_config.toml`
+   :code:`$ python gen_config.py`
 2. Generate precompute data
 
-   :code:`$ skelly_precompute skelly_config.toml`
+   :code:`$ skelly_precompute`
 3. Run the simulation. Recommended in an :code:`sbatch` script. See `example submission script
    <https://github.com/flatironinstitute/SkellySim/tree/main/examples/skelly_sim_slurm_sbatch.sh>`_
 
-   :code:`$ mpirun skelly_sim --config-file=skelly_config.toml`
+   :code:`$ mpirun skelly_sim`
 4. :ref:`Visualize<visualization>` or :ref:`post-process<post-processing>`
 
 
@@ -63,7 +63,7 @@ activate that environment first. Note that this can take some time, especially i
 
 .. code-block::
 
-    % skelly_precompute skelly_config.toml
+    % skelly_precompute
     {'nucleation_type': 'auto', 'n_nucleation_sites': 50, 'position': [0.0, 0.0, 0.0], 'orientation': [0.0, 0.0, 0.0, 1.0], 'shape': 'sphere', 'radius': 0.5, 'n_nodes': 400, 'precompute_file': 'body_precompute.npz', 'external_force': [0.0, 0.0, 0.5]}
     Building Quadrature Weights
     Finished building Quadrature Weights
