@@ -186,8 +186,10 @@ bool EllipsoidalPeriphery::check_collision(const MatrixRef &point_cloud, double 
 
         Eigen::Vector3d r_cortex{(a_ - threshold) * sintheta * cos(phi), (b_ - threshold) * sintheta * sin(phi),
                                  (c_ - threshold) * cos(theta)};
-        if (pc.col(i).squaredNorm() >= r_cortex.squaredNorm())
+        if (pc.col(i).squaredNorm() >= r_cortex.squaredNorm()) {
+            spdlog::debug("EllipsoidalPeriphery and Fiber collision, fiber point [{}] (may be adjusted due to clamping)", i);
             return true;
+        }
     }
 
     return false;

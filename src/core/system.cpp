@@ -628,9 +628,9 @@ bool check_collision() {
         if (!collided && body->check_collision(shell, threshold))
             collided = true;
 
-    for (const auto &fiber : fc.fibers)
-        if (!collided && shell.check_collision(fiber.x_, threshold))
-            collided = true;
+    //for (const auto &fiber : fc.fibers)
+    //    if (!collided && shell.check_collision(fiber.x_, threshold))
+    //        collided = true;
 
     for (const auto &fiber : fc.fibers) {
        if (fiber.is_minus_clamped()) {
