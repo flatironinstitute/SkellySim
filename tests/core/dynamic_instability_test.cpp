@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include <fiber.hpp>
+#include <fiber_container.hpp>
 #include <params.hpp>
 #include <system.hpp>
 

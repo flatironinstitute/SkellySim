@@ -4,6 +4,7 @@
 
 #include <body.hpp>
 #include <fiber.hpp>
+#include <fiber_container.hpp>
 #include <params.hpp>
 #include <rng.hpp>
 #include <system.hpp>

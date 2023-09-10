@@ -2,6 +2,7 @@
 
 #include <body.hpp>
 #include <fiber.hpp>
+#include <fiber_container.hpp>
 #include <io_maps.hpp>
 #include <periphery.hpp>
 #include <rng.hpp>

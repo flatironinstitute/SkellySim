@@ -9,6 +9,7 @@
 #include <background_source.hpp>
 #include <body.hpp>
 #include <fiber.hpp>
+#include <fiber_container.hpp>
 #include <io_maps.hpp>
 #include <params.hpp>
 #include <parse_util.hpp>

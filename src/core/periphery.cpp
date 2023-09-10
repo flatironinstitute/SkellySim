@@ -1,6 +1,7 @@
 #include <body.hpp>
 #include <cnpy.hpp>
 #include <fiber.hpp>
+#include <fiber_container.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <system.hpp>

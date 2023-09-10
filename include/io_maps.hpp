@@ -3,6 +3,7 @@
 
 #include <body.hpp>
 #include <fiber.hpp>
+#include <fiber_container.hpp>
 #include <periphery.hpp>
 
 #include <msgpack.hpp>
