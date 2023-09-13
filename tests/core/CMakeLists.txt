@@ -14,3 +14,18 @@ foreach(kernel stokeslet;stresslet)
     add_test(NAME ${kernel}_${driver} COMMAND kernel_test --kernel=${kernel} --driver=${driver})
   endforeach()
 endforeach()
+
+###############################################################################
+# Fetch google test
+###############################################################################
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY  https://github.com/google/googletest.git
+    GIT_TAG         release-1.12.1
+    )
+# Do the same Windows preventing override from MuNDy
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+add_subdirectory(unit_tests)

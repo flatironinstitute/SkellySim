@@ -81,7 +81,9 @@ add_library(skelly OBJECT
 
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
 target_include_directories(skelly SYSTEM PUBLIC ${SKELLY_INCLUDES_SYSTEM})
-target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
+#target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)
+target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX z MPI::MPI_CXX trng4_static
+    ${Kokkos_LIBRARIES} ${Tpetra_LIBRARIES} ${Teuchos_LIBRARIES} ${Belos_LIBRARIES})
 
 add_subdirectory(extern/spdlog EXCLUDE_FROM_ALL)
 add_subdirectory(extern/trng4 EXCLUDE_FROM_ALL)
@@ -99,4 +101,5 @@ install(TARGETS skelly_sim
   RUNTIME DESTINATION bin)
 
 enable_testing()
+add_custom_target(test_all ALL)
 add_subdirectory(tests/core)
