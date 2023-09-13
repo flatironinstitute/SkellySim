@@ -473,10 +473,13 @@ void prep_state_for_solver() {
         if (body->external_force_type_ == Body::EXTFORCE::Linear) {
             body->force_torque_.segment(0, 3) = body->external_force_ / size_;
         } else if (body->external_force_type_ == Body::EXTFORCE::Oscillatory) {
-            body->force_torque_.segment(0, 3) = body->extforce_oscillation_amplitude_ * std::sin(body->extforce_oscillation_omega_ * properties.time - body->extforce_oscillation_phase_) * body->external_force_ / size_;
+            body->force_torque_.segment(0, 3) =
+                body->extforce_oscillation_amplitude_ *
+                std::sin(body->extforce_oscillation_omega_ * properties.time - body->extforce_oscillation_phase_) *
+                body->external_force_ / size_;
         }
         body->force_torque_.segment(3, 3) = body->external_torque_ / size_;
-        external_force_body = external_force_body | body->external_force_.any() | body->external_torque_.any();
+        external_force_body = external_force_body || body->external_force_.any() || body->external_torque_.any();
     }
 
     if (external_force_body) {
