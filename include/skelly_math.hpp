@@ -1,6 +1,8 @@
 #ifndef SKELLY_MATH_HPP_
 #define SKELLY_MATH_HPP_
 
+#include <skelly_sim.hpp>
+
 namespace skelly_math {
 
 using Eigen::ArrayXd;

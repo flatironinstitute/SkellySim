@@ -28,4 +28,7 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+# Create the test files directory
+set(TEST_FILES_DIR ${CMAKE_SOURCE_DIR}/tests/core/test_files)
+
 add_subdirectory(unit_tests)

@@ -17,7 +17,7 @@ foreach (CUR_TEST ${TEST_LIST} ${MPI_TEST_LIST})
     # Add the executable
     add_executable(${CUR_TEST} EXCLUDE_FROM_ALL ${CUR_TEST}.cpp)
 
-    #target_compile_definitions(${CUR_TEST} PRIVATE TEST_FILES_DIR="${TEST_FILES_DIR}")
+    target_compile_definitions(${CUR_TEST} PRIVATE TEST_FILES_DIR="${TEST_FILES_DIR}")
 
     add_dependencies(test_all ${CUR_TEST})
 
