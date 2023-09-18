@@ -1,5 +1,5 @@
-/// \file unit_test_configurator.cpp
-/// \brief Unit tests for Configurator (single MPI rank)
+/// \file unit_test_fiber_finitedifference.cpp
+/// \brief Unit tests for FiberFiniteDifference (single MPI rank)
 
 // C++ includes
 #include <iostream>

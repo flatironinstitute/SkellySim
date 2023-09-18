@@ -1,6 +1,7 @@
 
 set(TEST_LIST
 	unit_test_fiber_finitedifference
+    unit_test_fibercontainerbase
     )
 
 # Setup the MPI testing environment for the MPI tests
