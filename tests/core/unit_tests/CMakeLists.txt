@@ -11,7 +11,7 @@ SET("NProc_${_KEY}" "${_VALUE}")
 SET(MPI_TEST_LIST ${MPI_TEST_LIST} ${_KEY})
 ENDMACRO(ADD_TO_MPI_TESTS)
 
-#ADD_TO_MPI_TESTS(unit_test_mpilogger 2)
+ADD_TO_MPI_TESTS(unit_test_fibercontainer_finitedifference_mpi 2)
 
 # Set up the test executables
 foreach (CUR_TEST ${TEST_LIST} ${MPI_TEST_LIST})
