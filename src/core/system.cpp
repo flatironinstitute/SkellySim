@@ -10,6 +10,8 @@
 #include <body.hpp>
 #include <fiber.hpp>
 #include <fiber_container.hpp>
+#include <fiber_container_finitedifference.hpp>
+#include <fiber_finitedifference.hpp>
 #include <io_maps.hpp>
 #include <params.hpp>
 #include <parse_util.hpp>
@@ -194,6 +196,7 @@ Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, Vecto
     for (auto &body : bc.spherical_bodies)
         body->force_torque_.setZero();
 
+    // XXX FIXME Touch fibers directly, make sure through container rather than here
     for (const auto &fib : fc.fibers) {
         const auto &fib_mats = fib.matrices_.at(fib.n_nodes_);
         const int n_pts = fib.n_nodes_;
@@ -369,6 +372,7 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     const auto &fp = params_.fiber_periphery_interaction;
 
     Eigen::MatrixXd f_on_fibers = fc_.apply_fiber_force(sol_fibers);
+    // XXX FIXME This touches the fibers directly, don't do that
     if (params_.periphery_interaction_flag) {
         int i_fib = 0;
         for (const auto &fib : fc_) {
@@ -388,7 +392,10 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
         if (body->external_force_type_ == Body::EXTFORCE::Linear) {
             body->force_torque_.segment(0, 3) += body->external_force_;
         } else if (body->external_force_type_ == Body::EXTFORCE::Oscillatory) {
-            body->force_torque_.segment(0, 3) += body->extforce_oscillation_amplitude_ * std::sin(body->extforce_oscillation_omega_ * properties.time - body->extforce_oscillation_phase_) * body->external_force_;
+            body->force_torque_.segment(0, 3) +=
+                body->extforce_oscillation_amplitude_ *
+                std::sin(body->extforce_oscillation_omega_ * properties.time - body->extforce_oscillation_phase_) *
+                body->external_force_;
         }
         body->force_torque_.segment(3, 3) += body->external_torque_;
     }
@@ -454,6 +461,7 @@ void prep_state_for_solver() {
         int i_col = 0;
 
         // Make sure it's not adding any numbers, etc
+        // XXX CJE Fix this, as we touch fibers directly here and are implementation dependent
         for (const auto &fib : fc_.fibers) {
             external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
                 shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
@@ -564,6 +572,7 @@ void run() {
         bool converged = System::step();
         // Maximum error in the fiber derivative
         double fiber_error = 0.0;
+        // XXX FIXME Touch fibers directly, make sure through container rather than here
         for (const auto &fib : fc_.fibers) {
             const auto &mats = fib.matrices_.at(fib.n_nodes_);
             const Eigen::MatrixXd xs = std::pow(2.0 / fib.length_, 1) * fib.x_ * mats.D_1_0;
@@ -632,17 +641,17 @@ bool check_collision() {
         if (!collided && body->check_collision(shell, threshold))
             collided = true;
 
+    // XXX FIXME Touch fibers directly, make sure through container rather than here
     for (const auto &fiber : fc.fibers) {
-       if (fiber.is_minus_clamped()) {
-           if (!collided && shell.check_collision(fiber.x_.block(0, 1, 3, fiber.n_nodes_ - 1), threshold)) {
-               collided = true;
-           }
-       }
-       else  {
-           if (!collided && shell.check_collision(fiber.x_, threshold)) {
-               collided = true;
-           }
-       }
+        if (fiber.is_minus_clamped()) {
+            if (!collided && shell.check_collision(fiber.x_.block(0, 1, 3, fiber.n_nodes_ - 1), threshold)) {
+                collided = true;
+            }
+        } else {
+            if (!collided && shell.check_collision(fiber.x_, threshold)) {
+                collided = true;
+            }
+        }
     }
 
     for (auto &body1 : bc.bodies)

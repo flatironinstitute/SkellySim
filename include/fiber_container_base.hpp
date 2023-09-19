@@ -56,6 +56,9 @@ class FiberContainerBase {
     /// @brief Set the local fiber number, node count, and solution size
     void set_local_fiber_numbers(int n_fibers, int n_local_nodes, int n_local_solution_size);
 
+    /// @brief Get the local node positions in REAL SPACE
+    const Eigen::MatrixXd &get_local_node_positions() const { return r_fib_local_; }
+
     //@}
 
     //! \name Public virtual functions
@@ -71,6 +74,63 @@ class FiberContainerBase {
     /// Most fibers have nodes, so this is a virtual method
     virtual void update_local_node_positions() {
         throw std::runtime_error("update_local_node_positions undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Update any fiber cache variables
+    virtual void update_cache_variables(double dt, double eta) {
+        throw std::runtime_error("update_cache_variables undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Generate a constant force
+    virtual Eigen::MatrixXd generate_constant_force() const {
+        throw std::runtime_error("generate_constant_force undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Generate the flow
+    virtual Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta,
+                                 bool subtract_self = true) const {
+        throw std::runtime_error("flow undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Matvec operator
+    virtual Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const {
+        throw std::runtime_error("matvec undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Update the RHS of the equation
+    virtual void update_rhs(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+        throw std::runtime_error("update_rhs undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Update the boundary conditions
+    virtual void update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
+        throw std::runtime_error("update_boundary_conditions undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Apply the boundary conditions of the system
+    virtual void apply_bcs(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+        throw std::runtime_error("apply_bcs undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Apply preconditioner
+    virtual Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const {
+        throw std::runtime_error("apply_preconditioner undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Apply fiber force
+    virtual Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const {
+        throw std::runtime_error("apply_fiber_force undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Perform a timestep
+    virtual void step(VectorRef &fiber_sol) {
+        throw std::runtime_error("step undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Repin the fibers to bodies
+    /// XXX FIXME This could be restated differently and abstracted more cleanly
+    virtual void repin_to_bodies(BodyContainer &bodies) {
+        throw std::runtime_error("repin_to_bodies undefined on base FiberContainer class\n");
     }
 
     //@}
