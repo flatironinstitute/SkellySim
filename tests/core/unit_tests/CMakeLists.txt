@@ -2,6 +2,7 @@
 set(TEST_LIST
 	unit_test_fiber_finitedifference
     unit_test_fibercontainer_finitedifference
+    unit_test_serialization
     )
 
 # Setup the MPI testing environment for the MPI tests
@@ -12,6 +13,7 @@ SET(MPI_TEST_LIST ${MPI_TEST_LIST} ${_KEY})
 ENDMACRO(ADD_TO_MPI_TESTS)
 
 ADD_TO_MPI_TESTS(unit_test_fibercontainer_finitedifference_mpi 2)
+ADD_TO_MPI_TESTS(unit_test_serialization_mpi 2)
 
 # Set up the test executables
 foreach (CUR_TEST ${TEST_LIST} ${MPI_TEST_LIST})
