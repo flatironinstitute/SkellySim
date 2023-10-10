@@ -11,6 +11,18 @@ using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
 
+/// @brief Empty constructor
+FiberContainerFinitedifference::FiberContainerFinitedifference() {
+    spdlog::debug("FiberContainerFinitedifference::FiberContainerFinitedifference (empty)");
+
+    // This just exists to set the fiber type
+    fiber_type_ = FIBERTYPE::FiniteDifference;
+    // We need to make sure we do what init_fiber_container might set in terms of variables
+    set_local_fiber_numbers(fibers_.size(), 0, 0);
+
+    spdlog::debug("FiberContainerFinitedifference::FiberContainerFinitedifference (empty) return");
+}
+
 /// @brief Constructor
 FiberContainerFinitedifference::FiberContainerFinitedifference(toml::array &fiber_tables, Params &params)
     : FiberContainerBase(fiber_tables, params) {
@@ -32,7 +44,7 @@ void FiberContainerFinitedifference::init_fiber_container(toml::array &fiber_tab
 
     const int n_fibs_tot = fiber_tables.size();
     const int n_fibs_extra = n_fibs_tot % world_size_;
-    spdlog::info("Reading in {} fibers (finite difference).", n_fibs_tot);
+    spdlog::info("  Reading in {} fibers (finite difference).", n_fibs_tot);
 
     std::vector<int> displs(world_size_ + 1);
     for (int i = 1; i < world_size_ + 1; ++i) {
@@ -255,6 +267,18 @@ void FiberContainerFinitedifference::repin_to_bodies(BodyContainer &bodies) {
             fib.x_.colwise() += delta;
         }
     }
+}
+
+/// @brief Get the RHS of the solution for FiberFiniteDifference.
+VectorXd FiberContainerFinitedifference::get_rhs() const {
+    Eigen::VectorXd RHS(get_local_solution_size());
+    int offset = 0;
+    for (const auto &fib : *this) {
+        RHS.segment(offset, fib.RHS_.size()) = fib.RHS_;
+        offset += fib.RHS_.size();
+    }
+
+    return RHS;
 }
 
 /// @brief Apply the preconditioner to the fibers

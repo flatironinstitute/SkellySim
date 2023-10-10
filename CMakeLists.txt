@@ -79,6 +79,9 @@ add_library(skelly OBJECT
   ${SKELLY_INCLUDES}
 )
 
+# Additions to keep the RPATH set for things like libmetis
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+set(INSTALL_RPATH_USE_LINK_PATH TRUE)
 target_include_directories(skelly PUBLIC ${SKELLY_INCLUDES})
 target_include_directories(skelly SYSTEM PUBLIC ${SKELLY_INCLUDES_SYSTEM})
 #target_link_libraries(skelly PUBLIC ${STKFMM_LIBRARIES} ${PVFMM_LIB_DIR}/${PVFMM_STATIC_LIB} ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX)

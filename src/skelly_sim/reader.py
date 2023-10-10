@@ -205,6 +205,8 @@ class TrajectoryReader:
         Simulation time of the corresponding frames
     config_data : dict
         Global toml data associated with the simulation
+    fiber_type : int
+        Fiber type associated with the simulation
     """
 
     def __init__(self, toml_file: str = 'skelly_config.toml'):
@@ -222,6 +224,7 @@ class TrajectoryReader:
         self._frame_data: dict = None
         self.times: List[float] = []
         self.config_data: dict = {}
+        self.fiber_type: int = 0
 
         with open(toml_file, 'r') as f:
             self.config_data = toml.load(f)
@@ -300,8 +303,12 @@ class TrajectoryReader:
             msgpack.dump(index, f)
 
     def __getitem__(self, key):
-        if key == 'bodies' or key == 'fibers':
+        if key == 'bodies':
             return self._frame_data[key][0]
+        elif key == 'fibers':
+            # Need to put down what kind of fiber we are...
+            self.fiber_type = self._frame_data[key][0]
+            return self._frame_data[key][1]
         return self._frame_data[key]
 
     def __iter__(self):

@@ -17,6 +17,11 @@ class FiberContainerFinitedifference : public FiberContainerBase {
     //! \name Constructors and destructors
     //@{
 
+    /// Almost empty container for list initializations
+    ///
+    /// Need this for initializaitons of an empty container, but we need to have the FIBERTYPE set
+    FiberContainerFinitedifference();
+
     /// Constructor using TOML and params
     FiberContainerFinitedifference(toml::array &fiber_tables, Params &params);
 
@@ -65,6 +70,9 @@ class FiberContainerFinitedifference : public FiberContainerBase {
     /// Repin the fibers to a body
     void repin_to_bodies(BodyContainer &bodies) override;
 
+    /// Get the RHS of the solution for FiberFiniteDifference
+    Eigen::VectorXd get_rhs() const override;
+
     /// Begin of an iterator to this object
     ActiveIterator<FiberFiniteDifference> begin() { return ActiveIterator<FiberFiniteDifference>(0, fibers_); }
 
@@ -93,7 +101,7 @@ class FiberContainerFinitedifference : public FiberContainerBase {
     //@}
 
     //! \name Special external things
-    MSGPACK_DEFINE(fibers_);
+    MSGPACK_DEFINE(fiber_type_, fibers_);
 
   private:
     //! \name Private member helper functions

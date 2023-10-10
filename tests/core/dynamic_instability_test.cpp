@@ -6,8 +6,9 @@
 #include <string>
 #include <unordered_map>
 
-#include <fiber.hpp>
-#include <fiber_container.hpp>
+#include <fiber_container_base.hpp>
+#include <fiber_container_finitedifference.hpp>
+#include <fiber_finitedifference.hpp>
 #include <params.hpp>
 #include <system.hpp>
 
@@ -33,7 +34,13 @@ int main(int argc, char *argv[]) {
         auto params = System::get_params();
         auto &properties = System::get_properties();
         double t_final = params->t_final;
+
+        // Only used with finite difference fibers (for now)
         auto &fc = *System::get_fiber_container();
+        if (fc.fiber_type_ != FiberContainerBase::FIBERTYPE::FiniteDifference) {
+            throw std::runtime_error("dynamic_instability_test only compatible with FiniteDifferenceFiber(s) for now");
+        }
+        FiberContainerFinitedifference *fc_fd = static_cast<FiberContainerFinitedifference *>(&fc);
 
         std::vector<float> times;
         std::vector<int> n_fibers;
@@ -42,9 +49,10 @@ int main(int argc, char *argv[]) {
         double t = 0.0;
         while (t < t_final) {
             times.push_back(t);
-            n_fibers.push_back(fc.get_global_count());
-            double length = std::accumulate(fc.fibers.begin(), fc.fibers.end(), 0.0,
-                                            [](const double &a, const Fiber &b) { return a + b.length_; });
+            n_fibers.push_back(fc_fd->get_global_fiber_number());
+            double length =
+                std::accumulate(fc_fd->fibers_.begin(), fc_fd->fibers_.end(), 0.0,
+                                [](const double &a, const FiberFiniteDifference &b) { return a + b.length_; });
             double length_tot;
             MPI_Reduce(&length, &length_tot, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 

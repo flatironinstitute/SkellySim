@@ -2,9 +2,11 @@
 #define IO_MAPS_HPP
 
 #include <body.hpp>
-#include <fiber.hpp>
-#include <fiber_container.hpp>
+#include <fiber_container_base.hpp>
+#include <fiber_container_finitedifference.hpp>
+#include <fiber_finitedifference.hpp>
 #include <periphery.hpp>
+#include <serialization.hpp>
 
 #include <msgpack.hpp>
 
@@ -15,7 +17,7 @@
 typedef struct input_map_t {
     double time;                                                ///< System::properties
     double dt;                                                  ///< System::properties
-    FiberContainer fibers;                                      ///< System::fc_
+    std::unique_ptr<FiberContainerBase> fibers;                 ///< System::fc_new_
     BodyContainer bodies;                                       ///< System::bc_
     Periphery shell;                                            ///< System::bc_
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG
@@ -29,7 +31,7 @@ typedef struct input_map_t {
 typedef struct output_map_t {
     double &time;                                               ///< System::properties
     double &dt;                                                 ///< System::properties
-    FiberContainer &fibers;                                     ///< System::fc_
+    std::unique_ptr<FiberContainerBase> &fibers;                ///< System::fc_new_
     BodyContainer &bodies;                                      ///< System::bc_
     Periphery &shell;                                           ///< System::shell_
     std::vector<std::pair<std::string, std::string>> rng_state; ///< string representation of split/unsplit state in RNG

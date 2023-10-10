@@ -1,8 +1,9 @@
 #include <trajectory_reader.hpp>
 
 #include <body.hpp>
-#include <fiber.hpp>
-#include <fiber_container.hpp>
+#include <fiber_container_base.hpp>
+#include <fiber_container_finitedifference.hpp>
+#include <fiber_finitedifference.hpp>
 #include <io_maps.hpp>
 #include <periphery.hpp>
 #include <rng.hpp>
@@ -37,21 +38,21 @@ TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_fl
 }
 
 void TrajectoryReader::load_index(const std::string &traj_file) {
-  const std::string index_file = traj_file + ".cindex";
-  try {
-      std::fstream f(index_file, std::ios::binary | std::ios::in);
-      std::stringstream buf;
-      buf << f.rdbuf();
-      index = msgpack::unpack(buf.str().data(), buf.str().size()).get().as<decltype(index)>();
+    const std::string index_file = traj_file + ".cindex";
+    try {
+        std::fstream f(index_file, std::ios::binary | std::ios::in);
+        std::stringstream buf;
+        buf << f.rdbuf();
+        index = msgpack::unpack(buf.str().data(), buf.str().size()).get().as<decltype(index)>();
 
-      if (index.mtime != mtime || index.times.size() != index.offsets.size()) {
-          spdlog::warn("Stale index file: {}", index_file);
-          build_index(index_file);
-      }
-      spdlog::info("Loaded trajectory index");
-  } catch (...) {
-      build_index(index_file);
-  }
+        if (index.mtime != mtime || index.times.size() != index.offsets.size()) {
+            spdlog::warn("Stale index file: {}", index_file);
+            build_index(index_file);
+        }
+        spdlog::info("Loaded trajectory index");
+    } catch (...) {
+        build_index(index_file);
+    }
 }
 
 std::size_t TrajectoryReader::TrajectoryReader::read_next_frame() {
@@ -108,86 +109,101 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
     auto &bc = *System::get_body_container();
     auto &shell = *System::get_shell();
 
-    const int n_fib_tot = min_state.fibers.fibers.size();
-    const int fib_count_big = n_fib_tot / size + 1;
-    const int fib_count_small = n_fib_tot / size;
-    const int n_fib_big = n_fib_tot % size;
+    // FIXME XXX This is awful and I hate it, come back later and fix
+    // Use a large if statement to capture the polymorphism of the fiber type for now
+    if (min_state.fibers->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
 
-    std::vector<int> counts(size);
-    std::vector<int> displs(size + 1);
-    for (int i = 0; i < size; ++i) {
-        counts[i] = ((i < n_fib_big) ? fib_count_big : fib_count_small);
-        displs[i + 1] = displs[i] + counts[i];
-    }
+        // Cast both the min_state and fc (global) fiber containers to the correct type
+        const FiberContainerFinitedifference *fibers_minstate_fd =
+            static_cast<const FiberContainerFinitedifference *>(min_state.fibers.get());
+        FiberContainerFinitedifference *fibers_fd = static_cast<FiberContainerFinitedifference *>(&fc);
 
-    properties.time = min_state.time;
-    properties.dt = min_state.dt;
-    std::vector<bool> is_minus_clamped;
-    // FIXME: Hack to work around not saving clamp state
-    if (!params.dynamic_instability.n_nodes) {
-        for (auto &fib : fc.fibers)
-            is_minus_clamped.push_back(fib.is_minus_clamped());
-    } else {
-        throw std::runtime_error("Resume is broken in this version of SkellySim with dynamic instability. :(");
-    }
+        // const int n_fib_tot = min_state.fibers.fibers.size();
+        const int n_fib_tot = fibers_minstate_fd->fibers_.size();
+        const int fib_count_big = n_fib_tot / size + 1;
+        const int fib_count_small = n_fib_tot / size;
+        const int n_fib_big = n_fib_tot % size;
 
-    fc.fibers.clear();
-    int i_fib = 0;
-    for (const auto &min_fib : min_state.fibers.fibers) {
-        if (i_fib >= displs[rank] && i_fib < displs[rank + 1]) {
-            fc.fibers.emplace_back(Fiber(min_fib, params.eta));
-            fc.fibers.back().minus_clamped_ = is_minus_clamped[i_fib - displs[rank]];
+        std::vector<int> counts(size);
+        std::vector<int> displs(size + 1);
+        for (int i = 0; i < size; ++i) {
+            counts[i] = ((i < n_fib_big) ? fib_count_big : fib_count_small);
+            displs[i + 1] = displs[i] + counts[i];
         }
-        i_fib++;
-    }
 
-    // make sure sublist pointers are initialized, and then fill them in
-    bc.populate_sublists();
-    for (int i = 0; i < bc.spherical_bodies.size(); ++i)
-        bc.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
-    for (int i = 0; i < bc.deformable_bodies.size(); ++i)
-        bc.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
-    if (size > min_state.rng_state.size() && resume_flag_) {
-        spdlog::error(
-            "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
-        MPI_Finalize();
-        exit(1);
-    } else if (size < min_state.rng_state.size() && !silence_output && resume_flag_) {
-        spdlog::warn("Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
-                     "the RNG.");
-    }
-    if (size != min_state.rng_state.size() && resume_flag_) {
-        spdlog::error("Different number MPI ranks provided than previous run for resume. This is currently broken.");
-        MPI_Finalize();
-        exit(1);
-    }
-
-    RNG::init(min_state.rng_state[rank]);
-
-    if (shell.is_active())
-        shell.solution_vec_ = min_state.shell.solution_vec_.segment(shell.node_displs_[rank], shell.node_counts_[rank]);
-
-    auto [fiber_sol, shell_sol, body_sol] = System::get_solution_maps(System::get_curr_solution().data());
-    shell_sol = shell.solution_vec_;
-
-    if (rank == 0) {
-        std::size_t body_offset = 0;
-        for (auto &body : bc.bodies) {
-            body_sol.segment(body_offset, body->solution_vec_.size()) = body->solution_vec_;
-            body_offset += body->solution_vec_.size();
+        properties.time = min_state.time;
+        properties.dt = min_state.dt;
+        std::vector<bool> is_minus_clamped;
+        // FIXME: Hack to work around not saving clamp state
+        if (!params.dynamic_instability.n_nodes) {
+            for (auto &fib : fibers_fd->fibers_)
+                is_minus_clamped.push_back(fib.is_minus_clamped());
+        } else {
+            throw std::runtime_error("Resume is broken in this version of SkellySim with dynamic instability. :(");
         }
-    }
 
-    std::size_t fiber_offset = 0;
-    for (auto &fib : fc.fibers) {
-        for (int i = 0; i < 3; ++i) {
-            fiber_sol.segment(fiber_offset, fib.n_nodes_) = fib.x_.row(i);
+        fibers_fd->fibers_.clear();
+        int i_fib = 0;
+        // for (const auto &min_fib : min_state.fibers.fibers) {
+        for (const auto &min_fib : fibers_minstate_fd->fibers_) {
+            if (i_fib >= displs[rank] && i_fib < displs[rank + 1]) {
+                fibers_fd->fibers_.emplace_back(FiberFiniteDifference(min_fib, params.eta));
+                fibers_fd->fibers_.back().minus_clamped_ = is_minus_clamped[i_fib - displs[rank]];
+            }
+            i_fib++;
+        }
+
+        // make sure sublist pointers are initialized, and then fill them in
+        bc.populate_sublists();
+        for (int i = 0; i < bc.spherical_bodies.size(); ++i)
+            bc.spherical_bodies[i]->min_copy(min_state.bodies.spherical_bodies[i]);
+        for (int i = 0; i < bc.deformable_bodies.size(); ++i)
+            bc.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
+        if (size > min_state.rng_state.size() && resume_flag_) {
+            spdlog::error(
+                "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
+            MPI_Finalize();
+            exit(1);
+        } else if (size < min_state.rng_state.size() && !silence_output && resume_flag_) {
+            spdlog::warn(
+                "Fewer MPI ranks provided than previous run for resume. This will be non-deterministic if using "
+                "the RNG.");
+        }
+        if (size != min_state.rng_state.size() && resume_flag_) {
+            spdlog::error(
+                "Different number MPI ranks provided than previous run for resume. This is currently broken.");
+            MPI_Finalize();
+            exit(1);
+        }
+
+        RNG::init(min_state.rng_state[rank]);
+
+        if (shell.is_active())
+            shell.solution_vec_ =
+                min_state.shell.solution_vec_.segment(shell.node_displs_[rank], shell.node_counts_[rank]);
+
+        auto [fiber_sol, shell_sol, body_sol] = System::get_solution_maps(System::get_curr_solution().data());
+        shell_sol = shell.solution_vec_;
+
+        if (rank == 0) {
+            std::size_t body_offset = 0;
+            for (auto &body : bc.bodies) {
+                body_sol.segment(body_offset, body->solution_vec_.size()) = body->solution_vec_;
+                body_offset += body->solution_vec_.size();
+            }
+        }
+
+        std::size_t fiber_offset = 0;
+        for (auto &fib : fibers_fd->fibers_) {
+            for (int i = 0; i < 3; ++i) {
+                fiber_sol.segment(fiber_offset, fib.n_nodes_) = fib.x_.row(i);
+                fiber_offset += fib.n_nodes_;
+            }
+            fiber_sol.segment(fiber_offset, fib.n_nodes_) = fib.tension_;
             fiber_offset += fib.n_nodes_;
         }
-        fiber_sol.segment(fiber_offset, fib.n_nodes_) = fib.tension_;
-        fiber_offset += fib.n_nodes_;
-    }
 
-    fc.update_cache_variables(properties.dt, params.eta);
-    bc.update_cache_variables(params.eta);
+        fc.update_cache_variables(properties.dt, params.eta);
+        bc.update_cache_variables(params.eta);
+    }
 }

@@ -133,6 +133,11 @@ class FiberContainerBase {
         throw std::runtime_error("repin_to_bodies undefined on base FiberContainer class\n");
     }
 
+    /// @brief Get the RHS for all fibers
+    virtual Eigen::VectorXd get_rhs() const {
+        throw std::runtime_error("get_rhs undefined on base FiberContainer class\n");
+    }
+
     //@}
 
     //! \name Public member variables
@@ -154,5 +159,7 @@ class FiberContainerBase {
     int world_rank_;
     Eigen::MatrixXd r_fib_local_; ///< Local fiber node positions
 };
+
+MSGPACK_ADD_ENUM(FiberContainerBase::FIBERTYPE);
 
 #endif

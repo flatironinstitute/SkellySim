@@ -6,6 +6,7 @@
 
 // skelly includes
 #include <fiber_container_finitedifference.hpp>
+#include <serialization.hpp>
 
 // test files
 #include "./mpi_environment.hpp"
@@ -57,5 +58,39 @@ TEST(FiberContainerFiniteDifference, ConstructN10Fibers) {
     EXPECT_EQ(fiber_container->get_global_fiber_number(), 10);
     EXPECT_EQ(fiber_container->get_global_node_count(), 320);
     EXPECT_EQ(fiber_container->get_global_solution_size(), 1280);
+}
+
+TEST(FiberContainerFiniteDifference, SimpleSerializeDeserialize) {
+
+    // Get a finite difference TOML file
+    const std::string toml_file = std::string(TEST_FILES_DIR) + "/fiber_container_fdf_n1.toml";
+    auto param_table = toml::parse(toml_file);
+    auto params = Params(param_table.at("params"));
+    params.print();
+
+    // Construct an abstract fiber container, pointed at a FiberContainerFiniteDifference
+    std::unique_ptr<FiberContainerBase> fiber_container;
+    fiber_container = std::make_unique<FiberContainerFinitedifference>(param_table.at("fibers").as_array(), params);
+
+    // Get a pointer to the derived class
+    FiberContainerFinitedifference *fiber_container_fd =
+        dynamic_cast<FiberContainerFinitedifference *>(fiber_container.get());
+
+    // Construct the serialization of the derived class
+    std::stringstream sbuf;
+    msgpack::pack(sbuf, *fiber_container_fd);
+
+    // Now deserialize to get it back out
+    std::size_t offset = 0;
+    auto const &str = sbuf.str();
+    auto oh = msgpack::unpack(str.data(), str.size(), offset);
+    auto obj = oh.get();
+    // Get a new boject to make sure we aren't accidentally just reading the old one
+    FiberContainerFinitedifference fiber_container_deserialized = obj.as<FiberContainerFinitedifference>();
+
+    // Compare the x_ variable inside the fibers for if we read it back in correctly
+    for (std::size_t i = 0; i < fiber_container_fd->fibers_.size(); ++i) {
+        EXPECT_EQ(fiber_container_fd->fibers_[i].x_, fiber_container_deserialized.fibers_[i].x_);
+    }
 }
 

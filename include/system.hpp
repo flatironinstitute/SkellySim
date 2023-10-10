@@ -6,7 +6,7 @@
 
 class Params;
 class BodyContainer;
-class FiberContainer;
+class FiberContainerBase;
 class Periphery;
 class PointSourceContainer;
 
@@ -22,7 +22,7 @@ struct properties_t {
 void init(const std::string &input_file, bool resume_flag = false, bool listen_flag = false);
 Params *get_params();
 BodyContainer *get_body_container();
-FiberContainer *get_fiber_container();
+FiberContainerBase *get_fiber_container();
 Periphery *get_shell();
 PointSourceContainer *get_point_source_container();
 toml::value *get_param_table();
