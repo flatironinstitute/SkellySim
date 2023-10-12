@@ -27,7 +27,7 @@
 
 namespace System {
 Params params_;                          ///< Simulation input parameters
-std::unique_ptr<FiberContainerBase> fc_; ///< Fibers (new)
+std::unique_ptr<FiberContainerBase> fc_; ///< Fibers
 BodyContainer bc_;                       ///< Bodies
 PointSourceContainer psc_;               ///< Point Sources
 BackgroundSource bs_;                    ///< Background flow
@@ -35,7 +35,7 @@ BackgroundSource bs_;                    ///< Background flow
 std::unique_ptr<Periphery> shell_; ///< Periphery
 Eigen::VectorXd curr_solution_;    ///< Current MPI-rank local solution vector
 
-std::unique_ptr<FiberContainerBase> fc_bak_; ///< Copy of fibers (new) for timestep reversion
+std::unique_ptr<FiberContainerBase> fc_bak_; ///< Copy of fibers for timestep reversion
 BodyContainer bc_bak_;                       ///< Copy of bodies for timestep reversion
 int rank_;                                   ///< MPI rank
 int size_;                                   ///< MPI size
@@ -206,7 +206,6 @@ Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, Vecto
     auto &fc = fc_;
     auto &bc = bc_;
 
-    // Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
     Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc->get_local_fiber_count());
 
     MatrixXd body_velocities(6, bc.spherical_bodies.size());
@@ -619,18 +618,7 @@ void run() {
         // Run the system timestep and store convergence
         bool converged = System::step();
         // Maximum error in the fiber derivative
-        double fiber_error = 0.0;
-        // XXX FIXME Touch fibers directly, make sure through container rather than here
-        if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-            const FiberContainerFiniteDifference *fc_fd =
-                static_cast<const FiberContainerFiniteDifference *>(fc_.get());
-            for (const auto &fib : fc_fd->fibers_) {
-                const auto &mats = fib.matrices_.at(fib.n_nodes_);
-                const Eigen::MatrixXd xs = std::pow(2.0 / fib.length_, 1) * fib.x_ * mats.D_1_0;
-                for (int i = 0; i < fib.n_nodes_; ++i)
-                    fiber_error = std::max(fabs(xs.col(i).norm() - 1.0), fiber_error);
-            }
-        }
+        double fiber_error = fc_->fiber_error_local();
         MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
         double dt_new = properties.dt;

@@ -33,6 +33,19 @@ FiberContainerFiniteDifference::FiberContainerFiniteDifference(toml::array &fibe
     spdlog::debug("FiberContainerFiniteDifference::FiberContainerFiniteDifference return");
 }
 
+// @brief Calculate max error from active fibers
+double FiberContainerFiniteDifference::fiber_error_local() const {
+    double error = 0.0;
+    for (const auto &fib : *this) {
+        const auto &mats = fib.matrices_.at(fib.n_nodes_);
+        const Eigen::MatrixXd xs = std::pow(2.0 / fib.length_, 1) * fib.x_ * mats.D_1_0;
+        for (int i = 0; i < fib.n_nodes_; ++i)
+            error = std::max(fabs(xs.col(i).norm() - 1.0), error);
+    }
+
+    return error;
+}
+
 /// @brief initialization function (overridden from base class)
 ///
 /// This is a two-step method of initialization that is somewhat replicated, as the base class shouldn't call virtual

@@ -104,6 +104,8 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
     }
     int get_local_solution_size() const override { return get_local_node_count() * 4; }
 
+    double fiber_error_local() const override;
+
     //@}
 
     //! \name Public member variables
