@@ -4,8 +4,8 @@
 
 #include <body.hpp>
 #include <fiber_container_base.hpp>
-#include <fiber_container_finitedifference.hpp>
-#include <fiber_finitedifference.hpp>
+#include <fiber_container_finite_difference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <params.hpp>
 #include <rng.hpp>
 #include <system.hpp>
@@ -64,7 +64,7 @@ void dynamic_instability() {
     int n_active_old_local = 0;
     // FIXME This is specified for finite difference fibers only
     if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        FiberContainerFinitedifference *fibers_fd = static_cast<FiberContainerFinitedifference *>(fc);
+        FiberContainerFiniteDifference *fibers_fd = static_cast<FiberContainerFiniteDifference *>(fc);
         auto fib = fibers_fd->fibers_.begin();
         while (fib != fibers_fd->fibers_.end()) {
             fib->v_growth_ = params.dynamic_instability.v_growth;
@@ -126,7 +126,7 @@ void dynamic_instability() {
     int n_fibers = 0;
     // FIXME Again, do this specifically for the finite difference fibers
     if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        const FiberContainerFinitedifference *fibers_fd = static_cast<const FiberContainerFinitedifference *>(fc);
+        const FiberContainerFiniteDifference *fibers_fd = static_cast<const FiberContainerFiniteDifference *>(fc);
         n_fibers = fibers_fd->fibers_.size();
     } else {
         throw std::runtime_error("dynamic_instability (n_fibers) fiber type " + std::to_string(fc->fiber_type_) +
@@ -165,7 +165,7 @@ void dynamic_instability() {
         if (min_fib.rank == mpi_rank) {
             // FIXME finite difference fibers only for now
             if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-                FiberContainerFinitedifference *fibers_fd = static_cast<FiberContainerFinitedifference *>(fc);
+                FiberContainerFiniteDifference *fibers_fd = static_cast<FiberContainerFiniteDifference *>(fc);
                 FiberFiniteDifference fib(params.dynamic_instability.n_nodes, params.dynamic_instability.radius,
                                           params.dynamic_instability.min_length,
                                           params.dynamic_instability.bending_rigidity, params.eta);
@@ -191,7 +191,7 @@ void dynamic_instability() {
 
     // Each rank needs to go make it's internal numbers for fiber number, local node number, and local solution size
     if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        FiberContainerFinitedifference *fibers_fd = static_cast<FiberContainerFinitedifference *>(fc);
+        FiberContainerFiniteDifference *fibers_fd = static_cast<FiberContainerFiniteDifference *>(fc);
         int node_tot = 0;
         for (auto &fib : fibers_fd->fibers_) {
             node_tot += fib.n_nodes_;

@@ -1,11 +1,11 @@
 /// \file unit_test_fibercontainer_finitedifference.cpp
-/// \brief Unit tests for FiberContainerFinitedifference(single MPI rank)
+/// \brief Unit tests for FiberContainerFiniteDifference(single MPI rank)
 
 // C++ includes
 #include <iostream>
 
 // skelly includes
-#include <fiber_container_finitedifference.hpp>
+#include <fiber_container_finite_difference.hpp>
 #include <serialization.hpp>
 
 // test files
@@ -28,7 +28,7 @@ TEST(FiberContainerFiniteDifference, ConstructN1Fibers) {
 
     // Construct an abstract fiber container, pointed at a FiberContainerFiniteDifference
     std::unique_ptr<FiberContainerBase> fiber_container;
-    fiber_container = std::make_unique<FiberContainerFinitedifference>(param_table.at("fibers").as_array(), params);
+    fiber_container = std::make_unique<FiberContainerFiniteDifference>(param_table.at("fibers").as_array(), params);
 
     // Test if the number of nodes, etc, in the fiber is what we expect
     EXPECT_EQ(fiber_container->get_local_fiber_number(), 1);
@@ -49,7 +49,7 @@ TEST(FiberContainerFiniteDifference, ConstructN10Fibers) {
 
     // Construct an abstract fiber container, pointed at a FiberContainerFiniteDifference
     std::unique_ptr<FiberContainerBase> fiber_container;
-    fiber_container = std::make_unique<FiberContainerFinitedifference>(param_table.at("fibers").as_array(), params);
+    fiber_container = std::make_unique<FiberContainerFiniteDifference>(param_table.at("fibers").as_array(), params);
 
     // Test if the number of nodes, etc, in the fiber is what we expect
     EXPECT_EQ(fiber_container->get_local_fiber_number(), 10);
@@ -70,11 +70,11 @@ TEST(FiberContainerFiniteDifference, SimpleSerializeDeserialize) {
 
     // Construct an abstract fiber container, pointed at a FiberContainerFiniteDifference
     std::unique_ptr<FiberContainerBase> fiber_container;
-    fiber_container = std::make_unique<FiberContainerFinitedifference>(param_table.at("fibers").as_array(), params);
+    fiber_container = std::make_unique<FiberContainerFiniteDifference>(param_table.at("fibers").as_array(), params);
 
     // Get a pointer to the derived class
-    FiberContainerFinitedifference *fiber_container_fd =
-        dynamic_cast<FiberContainerFinitedifference *>(fiber_container.get());
+    FiberContainerFiniteDifference *fiber_container_fd =
+        dynamic_cast<FiberContainerFiniteDifference *>(fiber_container.get());
 
     // Construct the serialization of the derived class
     std::stringstream sbuf;
@@ -86,7 +86,7 @@ TEST(FiberContainerFiniteDifference, SimpleSerializeDeserialize) {
     auto oh = msgpack::unpack(str.data(), str.size(), offset);
     auto obj = oh.get();
     // Get a new boject to make sure we aren't accidentally just reading the old one
-    FiberContainerFinitedifference fiber_container_deserialized = obj.as<FiberContainerFinitedifference>();
+    FiberContainerFiniteDifference fiber_container_deserialized = obj.as<FiberContainerFiniteDifference>();
 
     // Compare the x_ variable inside the fibers for if we read it back in correctly
     for (std::size_t i = 0; i < fiber_container_fd->fibers_.size(); ++i) {

@@ -2,8 +2,8 @@
 
 #include <body.hpp>
 #include <fiber_container_base.hpp>
-#include <fiber_container_finitedifference.hpp>
-#include <fiber_finitedifference.hpp>
+#include <fiber_container_finite_difference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <io_maps.hpp>
 #include <periphery.hpp>
 #include <rng.hpp>
@@ -114,9 +114,9 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
     if (min_state.fibers->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
 
         // Cast both the min_state and fc (global) fiber containers to the correct type
-        const FiberContainerFinitedifference *fibers_minstate_fd =
-            static_cast<const FiberContainerFinitedifference *>(min_state.fibers.get());
-        FiberContainerFinitedifference *fibers_fd = static_cast<FiberContainerFinitedifference *>(&fc);
+        const FiberContainerFiniteDifference *fibers_minstate_fd =
+            static_cast<const FiberContainerFiniteDifference *>(min_state.fibers.get());
+        FiberContainerFiniteDifference *fibers_fd = static_cast<FiberContainerFiniteDifference *>(&fc);
 
         // const int n_fib_tot = min_state.fibers.fibers.size();
         const int n_fib_tot = fibers_minstate_fd->fibers_.size();

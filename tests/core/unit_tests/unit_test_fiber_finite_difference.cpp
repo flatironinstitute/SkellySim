@@ -1,11 +1,11 @@
-/// \file unit_test_fiber_finitedifference.cpp
+/// \file unit_test_fiber_finite_difference.cpp
 /// \brief Unit tests for FiberFiniteDifference (single MPI rank)
 
 // C++ includes
 #include <iostream>
 
 // skelly includes
-#include <fiber_finitedifference.hpp>
+#include <fiber_finite_difference.hpp>
 
 // test files
 #include "./mpi_environment.hpp"

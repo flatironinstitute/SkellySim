@@ -1,7 +1,7 @@
 #include <body.hpp>
 #include <cnpy.hpp>
-#include <fiber_container_finitedifference.hpp>
-#include <fiber_finitedifference.hpp>
+#include <fiber_container_finite_difference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <system.hpp>

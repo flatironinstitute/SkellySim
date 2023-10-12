@@ -1,11 +1,11 @@
 /// \file unit_test_fibercontainer_finitedifference_mpi.cpp
-/// \brief Unit tests for FiberContainerFinitedifference(2 MPI ranks)
+/// \brief Unit tests for FiberContainerFiniteDifference(2 MPI ranks)
 
 // C++ includes
 #include <iostream>
 
 // skelly includes
-#include <fiber_container_finitedifference.hpp>
+#include <fiber_container_finite_difference.hpp>
 #include <serialization.hpp>
 
 // test files
@@ -28,7 +28,7 @@ TEST(FiberContainerFiniteDifference, MPIConstructN10Fibers) {
 
     // Construct an abstract fiber container, pointed at a FiberContainerFiniteDifference
     std::unique_ptr<FiberContainerBase> fiber_container;
-    fiber_container = std::make_unique<FiberContainerFinitedifference>(param_table.at("fibers").as_array(), params);
+    fiber_container = std::make_unique<FiberContainerFiniteDifference>(param_table.at("fibers").as_array(), params);
 
     // Test if the number of nodes, etc, in the fiber is what we expect
     EXPECT_EQ(fiber_container->get_local_fiber_number(), 5);
@@ -52,7 +52,7 @@ typedef struct test_output_map_t {
     MSGPACK_DEFINE_MAP(dt, fibers);
 } test_output_map_t;
 
-// This test should go through a full setup of the FiberContainerFinitedifference, and then also go through how to
+// This test should go through a full setup of the FiberContainerFiniteDifference, and then also go through how to
 // serialize and deserialize it like the write function in system.cpp does.
 TEST(FiberContainerFiniteDifference, FullSerializeDeserialize) {
 
@@ -70,14 +70,14 @@ TEST(FiberContainerFiniteDifference, FullSerializeDeserialize) {
 
     // Create the fiber container
     std::unique_ptr<FiberContainerBase> fiber_container;
-    fiber_container = std::make_unique<FiberContainerFinitedifference>(param_table.at("fibers").as_array(), params);
+    fiber_container = std::make_unique<FiberContainerFiniteDifference>(param_table.at("fibers").as_array(), params);
 
     // Do this exactly as the write function
     // We have to create a global version of the fibers that is the same type as the fibers we already have
     std::unique_ptr<FiberContainerBase> fc_global;
     // Create an empty global fiber container of the correct type
     if (fiber_container->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        fc_global = std::make_unique<FiberContainerFinitedifference>();
+        fc_global = std::make_unique<FiberContainerFiniteDifference>();
     } else {
         throw std::runtime_error("Somehow got an incorrect fiber container base type in test");
     }
@@ -119,11 +119,11 @@ TEST(FiberContainerFiniteDifference, FullSerializeDeserialize) {
             // Do a check here for what fiber type, for completeness
             if (min_state.fibers->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
                 // Cast to correct type and do the fibers
-                const FiberContainerFinitedifference *fibers_fd =
-                    static_cast<const FiberContainerFinitedifference *>(min_state.fibers.get());
+                const FiberContainerFiniteDifference *fibers_fd =
+                    static_cast<const FiberContainerFiniteDifference *>(min_state.fibers.get());
                 // Also need to cast the global fibers to the correct type to use them
-                FiberContainerFinitedifference *fc_fd_global =
-                    static_cast<FiberContainerFinitedifference *>(fc_global.get());
+                FiberContainerFiniteDifference *fc_fd_global =
+                    static_cast<FiberContainerFiniteDifference *>(fc_global.get());
                 for (const auto &min_fib : fibers_fd->fibers_) {
                     fc_fd_global->fibers_.emplace_back(FiberFiniteDifference(min_fib, params.eta));
                 }
@@ -133,7 +133,7 @@ TEST(FiberContainerFiniteDifference, FullSerializeDeserialize) {
         // Check the contents of the global fiber against what we have
         if (fc_global->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
             // Cast the global fiber type correctly
-            auto fc_fd_global = static_cast<FiberContainerFinitedifference *>(fc_global.get());
+            auto fc_fd_global = static_cast<FiberContainerFiniteDifference *>(fc_global.get());
             EXPECT_EQ(fc_fd_global->fibers_.size(), 10);
         }
 
@@ -149,10 +149,10 @@ TEST(FiberContainerFiniteDifference, FullSerializeDeserialize) {
         auto test_obj = test_oh.get();
         // Do full deserialization, unfortunatley
         test_input_map_t const &deserialized_state = test_obj.as<test_input_map_t>();
-        const FiberContainerFinitedifference *fibers_deserialized =
-            static_cast<const FiberContainerFinitedifference *>(deserialized_state.fibers.get());
-        const FiberContainerFinitedifference *fibers_original =
-            static_cast<const FiberContainerFinitedifference *>(fiber_container.get());
+        const FiberContainerFiniteDifference *fibers_deserialized =
+            static_cast<const FiberContainerFiniteDifference *>(deserialized_state.fibers.get());
+        const FiberContainerFiniteDifference *fibers_original =
+            static_cast<const FiberContainerFiniteDifference *>(fiber_container.get());
         std::cout << "Full fiber deserialization\n";
         for (int i = 0; i < fibers_deserialized->fibers_.size(); ++i) {
             std::cout << fibers_deserialized->fibers_[i].x_ << std::endl;

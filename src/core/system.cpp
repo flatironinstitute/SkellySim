@@ -9,8 +9,8 @@
 #include <background_source.hpp>
 #include <body.hpp>
 #include <fiber_container_base.hpp>
-#include <fiber_container_finitedifference.hpp>
-#include <fiber_finitedifference.hpp>
+#include <fiber_container_finite_difference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <io_maps.hpp>
 #include <params.hpp>
 #include <parse_util.hpp>
@@ -106,7 +106,7 @@ void write(std::ofstream &ofs) {
 
     // Set up the type of FiberContainer we are going to serialize
     if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        fc_global = std::make_unique<FiberContainerFinitedifference>();
+        fc_global = std::make_unique<FiberContainerFiniteDifference>();
     } else {
         throw std::runtime_error("Fiber discretization " + std::to_string(fc_->fiber_type_) +
                                  " used in write command, which does not exist.");
@@ -148,10 +148,10 @@ void write(std::ofstream &ofs) {
             // FIXME: Get the new fiber implementation into its correct place
             if (min_state.fibers->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
                 // Cast to correct type and do the fibers
-                const FiberContainerFinitedifference *fibers_fd =
-                    static_cast<const FiberContainerFinitedifference *>(min_state.fibers.get());
-                FiberContainerFinitedifference *fc_fd_global =
-                    static_cast<FiberContainerFinitedifference *>(fc_global.get());
+                const FiberContainerFiniteDifference *fibers_fd =
+                    static_cast<const FiberContainerFiniteDifference *>(min_state.fibers.get());
+                FiberContainerFiniteDifference *fc_fd_global =
+                    static_cast<FiberContainerFiniteDifference *>(fc_global.get());
                 for (const auto &min_fib : fibers_fd->fibers_) {
                     fc_fd_global->fibers_.emplace_back(FiberFiniteDifference(min_fib, params_.eta));
                 }
@@ -223,7 +223,7 @@ Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, Vecto
 
     // XXX FIXME Touch fibers directly, make sure through container rather than here
     if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        const FiberContainerFinitedifference *fc_fd = static_cast<const FiberContainerFinitedifference *>(fc.get());
+        const FiberContainerFiniteDifference *fc_fd = static_cast<const FiberContainerFiniteDifference *>(fc.get());
         // for (const auto &fib : fc.fibers) {
         for (const auto &fib : fc_fd->fibers_) {
             const auto &fib_mats = fib.matrices_.at(fib.n_nodes_);
@@ -405,8 +405,8 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
         if (params_.periphery_interaction_flag) {
             int i_fib = 0;
-            const FiberContainerFinitedifference *fc_fd =
-                static_cast<const FiberContainerFinitedifference *>(fc_.get());
+            const FiberContainerFiniteDifference *fc_fd =
+                static_cast<const FiberContainerFiniteDifference *>(fc_.get());
             for (const auto &fib : *fc_fd) {
                 f_on_fibers.col(i_fib) += shell_->fiber_interaction_finitediff(fib, fp);
                 i_fib++;
@@ -498,8 +498,8 @@ void prep_state_for_solver() {
         // Make sure it's not adding any numbers, etc
         // XXX CJE Fix this, as we touch fibers directly here and are implementation dependent
         if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-            const FiberContainerFinitedifference *fc_fd =
-                static_cast<const FiberContainerFinitedifference *>(fc_.get());
+            const FiberContainerFiniteDifference *fc_fd =
+                static_cast<const FiberContainerFiniteDifference *>(fc_.get());
             for (const auto &fib : fc_fd->fibers_) {
                 external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
                     shell_->fiber_interaction_finitediff(fib, params_.fiber_periphery_interaction);
@@ -622,8 +622,8 @@ void run() {
         double fiber_error = 0.0;
         // XXX FIXME Touch fibers directly, make sure through container rather than here
         if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-            const FiberContainerFinitedifference *fc_fd =
-                static_cast<const FiberContainerFinitedifference *>(fc_.get());
+            const FiberContainerFiniteDifference *fc_fd =
+                static_cast<const FiberContainerFiniteDifference *>(fc_.get());
             for (const auto &fib : fc_fd->fibers_) {
                 const auto &mats = fib.matrices_.at(fib.n_nodes_);
                 const Eigen::MatrixXd xs = std::pow(2.0 / fib.length_, 1) * fib.x_ * mats.D_1_0;
@@ -696,7 +696,7 @@ bool check_collision() {
 
     // XXX FIXME Touch fibers directly, make sure through container rather than here
     if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        const FiberContainerFinitedifference *fc_fd = static_cast<const FiberContainerFinitedifference *>(fc_.get());
+        const FiberContainerFiniteDifference *fc_fd = static_cast<const FiberContainerFiniteDifference *>(fc_.get());
         for (const auto &fiber : fc_fd->fibers_) {
             if (fiber.is_minus_clamped()) {
                 if (!collided && shell.check_collision(fiber.x_.block(0, 1, 3, fiber.n_nodes_ - 1), threshold)) {
@@ -781,9 +781,9 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     spdlog::trace("Creating FiberContainerBase");
     if (param_table_.contains("fibers")) {
         if (params_.fiber_type == "FiniteDifference") {
-            fc_ = std::make_unique<FiberContainerFinitedifference>(param_table_.at("fibers").as_array(), params_);
+            fc_ = std::make_unique<FiberContainerFiniteDifference>(param_table_.at("fibers").as_array(), params_);
             // Create the empty version of this too for the backup
-            fc_bak_ = std::make_unique<FiberContainerFinitedifference>();
+            fc_bak_ = std::make_unique<FiberContainerFiniteDifference>();
         } else if (params_.fiber_type == "None") {
             throw std::runtime_error("Fibers found but no fiber discretization specified.");
         } else {
@@ -791,12 +791,12 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
                                      " specified.");
         }
     } else {
-        spdlog::trace("  Creating an empty FiberContainerFinitedifference (no fibers)");
+        spdlog::trace("  Creating an empty FiberContainerFiniteDifference (no fibers)");
         // Default will be an empty finite difference fiber setup, as the base class doesn't know anything, and may
         // error if compiled in and run
-        fc_ = std::make_unique<FiberContainerFinitedifference>();
+        fc_ = std::make_unique<FiberContainerFiniteDifference>();
         // Backup version
-        fc_bak_ = std::make_unique<FiberContainerFinitedifference>();
+        fc_bak_ = std::make_unique<FiberContainerFiniteDifference>();
     }
 
     if (param_table_.contains("periphery")) {

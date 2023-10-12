@@ -1,8 +1,8 @@
-#ifndef FIBER_CONTAINER_FINITEDIFFERENCE_HPP
-#define FIBER_CONTAINER_FINITEDIFFERENCE_HPP
+#ifndef FIBER_CONTAINER_FINITE_DIFFERENCE_HPP
+#define FIBER_CONTAINER_FINITE_DIFFERENCE_HPP
 
 #include <fiber_container_base.hpp>
-#include <fiber_finitedifference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <kernels.hpp>
 #include <params.hpp>
 #include <skelly_sim.hpp>
@@ -12,7 +12,7 @@ class BodyContainer;
 
 /// Finite difference fiber container class
 
-class FiberContainerFinitedifference : public FiberContainerBase {
+class FiberContainerFiniteDifference : public FiberContainerBase {
   public:
     //! \name Constructors and destructors
     //@{
@@ -20,10 +20,10 @@ class FiberContainerFinitedifference : public FiberContainerBase {
     /// Almost empty container for list initializations
     ///
     /// Need this for initializaitons of an empty container, but we need to have the FIBERTYPE set
-    FiberContainerFinitedifference();
+    FiberContainerFiniteDifference();
 
     /// Constructor using TOML and params
-    FiberContainerFinitedifference(toml::array &fiber_tables, Params &params);
+    FiberContainerFiniteDifference(toml::array &fiber_tables, Params &params);
 
     //@}
 

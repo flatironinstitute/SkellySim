@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
-#include <fiber_finitedifference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <utils.hpp>
