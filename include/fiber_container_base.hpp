@@ -151,6 +151,11 @@ class FiberContainerBase {
         throw std::runtime_error("check_collision undefined on base FiberContainer class\n");
     }
 
+    /// @brief Calculate forces on fibers due to periphery
+    virtual Eigen::MatrixXd periphery_force(const Periphery &, const fiber_periphery_interaction_t &) const {
+        throw std::runtime_error("periphery_force undefined on base FiberContainer class\n");
+    }
+
     //@}
 
     //! \name Public member variables

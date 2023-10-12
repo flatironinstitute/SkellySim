@@ -122,8 +122,8 @@ bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double th
 /// @param[in] fiber to interact with periphery
 /// @param[in] fp_params structure which parameterizes this interaction
 /// @return [3 x n_points] matrix of forces on points due to the Periphery
-Eigen::MatrixXd SphericalPeriphery::fiber_interaction_finitediff(const FiberFiniteDifference &fiber,
-                                                                 const fiber_periphery_interaction_t &fp_params) const {
+Eigen::MatrixXd SphericalPeriphery::fiber_interaction(const FiberFiniteDifference &fiber,
+                                                      const fiber_periphery_interaction_t &fp_params) const {
     if (!n_nodes_global_)
         return Eigen::MatrixXd::Zero(fiber.x_.rows(), fiber.x_.cols());
 
@@ -204,9 +204,8 @@ bool EllipsoidalPeriphery::check_collision(const MatrixRef &point_cloud, double 
 /// @param[in] point_cloud [3 x n_points] matrix of points to interact with periphery
 /// @param[in] fp_params structure which parameterizes this interaction
 /// @return [3 x n_points] matrix of forces on points due to the Periphery
-Eigen::MatrixXd
-EllipsoidalPeriphery::fiber_interaction_finitediff(const FiberFiniteDifference &fiber,
-                                                   const fiber_periphery_interaction_t &fp_params) const {
+Eigen::MatrixXd EllipsoidalPeriphery::fiber_interaction(const FiberFiniteDifference &fiber,
+                                                        const fiber_periphery_interaction_t &fp_params) const {
     const MatrixRef &pc = fiber.x_;
     if (!n_nodes_global_)
         return Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
@@ -285,8 +284,8 @@ bool GenericPeriphery::check_collision(const MatrixRef &point_cloud, double thre
 /// @param[in] fiber to interact with periphery
 /// @param[in] fp_params structure which parameterizes this interaction
 /// @return [3 x n_points] matrix of forces (ZEROS) on points due to the Periphery
-Eigen::MatrixXd GenericPeriphery::fiber_interaction_finitediff(const FiberFiniteDifference &fiber,
-                                                               const fiber_periphery_interaction_t &fp_params) const {
+Eigen::MatrixXd GenericPeriphery::fiber_interaction(const FiberFiniteDifference &fiber,
+                                                    const fiber_periphery_interaction_t &fp_params) const {
     static bool first_call = true;
     if (!world_rank_ && first_call) {
         spdlog::warn("fiber_interaction_finitediff not implemented for GenericPeriphery->FiberFiniteDifference");

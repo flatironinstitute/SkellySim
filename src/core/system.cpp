@@ -398,20 +398,8 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     const auto &fp = params_.fiber_periphery_interaction;
 
     Eigen::MatrixXd f_on_fibers = fc_->apply_fiber_force(sol_fibers);
-    // XXX FIXME This touches the fibers directly, don't do that
-    if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        if (params_.periphery_interaction_flag) {
-            int i_fib = 0;
-            const FiberContainerFiniteDifference *fc_fd =
-                static_cast<const FiberContainerFiniteDifference *>(fc_.get());
-            for (const auto &fib : *fc_fd) {
-                f_on_fibers.col(i_fib) += shell_->fiber_interaction_finitediff(fib, fp);
-                i_fib++;
-            }
-        }
-    } else {
-        throw std::runtime_error("velocity_at_targets incorrect fiber type " + std::to_string(fc_->fiber_type_) + ".");
-    }
+    if (params_.periphery_interaction_flag)
+        f_on_fibers += fc_->periphery_force(*shell_, fp);
 
     // FIXME: This is likely wrong, but more right than before
     Eigen::VectorXd sol_bodies_global(bc_.get_global_solution_size());
@@ -499,7 +487,7 @@ void prep_state_for_solver() {
                 static_cast<const FiberContainerFiniteDifference *>(fc_.get());
             for (const auto &fib : fc_fd->fibers_) {
                 external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
-                    shell_->fiber_interaction_finitediff(fib, params_.fiber_periphery_interaction);
+                    shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
                 i_col += fib.n_nodes_;
             }
         }

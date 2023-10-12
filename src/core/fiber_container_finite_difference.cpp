@@ -34,7 +34,7 @@ FiberContainerFiniteDifference::FiberContainerFiniteDifference(toml::array &fibe
     spdlog::debug("FiberContainerFiniteDifference::FiberContainerFiniteDifference return");
 }
 
-/// @bried for collision of fiber with periphery within some threshold
+/// @brief for collision of fiber with periphery within some threshold
 bool FiberContainerFiniteDifference::check_collision(const Periphery &periphery, double threshold) const {
     bool collided = false;
     for (const auto &fiber : *this) {
@@ -50,6 +50,20 @@ bool FiberContainerFiniteDifference::check_collision(const Periphery &periphery,
     }
 
     return collided;
+}
+
+Eigen::MatrixXd FiberContainerFiniteDifference::periphery_force(const Periphery &shell,
+                                                                const fiber_periphery_interaction_t &fp_params) const {
+    const int n_nodes = get_local_node_count();
+    Eigen::MatrixXd f_on_nodes(3, n_nodes);
+
+    int i_fib = 0;
+    for (const auto &fib : *this) {
+        f_on_nodes.col(i_fib) += shell.fiber_interaction(fib, fp_params);
+        i_fib++;
+    }
+
+    return f_on_nodes;
 }
 
 // @brief Calculate max error from active fibers

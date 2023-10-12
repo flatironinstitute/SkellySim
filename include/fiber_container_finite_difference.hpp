@@ -107,6 +107,7 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
     double fiber_error_local() const override;
 
     bool check_collision(const Periphery &periphery, double threshold) const override;
+    Eigen::MatrixXd periphery_force(const Periphery &, const fiber_periphery_interaction_t &) const override;
 
     //@}
 
