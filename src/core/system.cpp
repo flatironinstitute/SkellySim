@@ -475,23 +475,9 @@ void prep_state_for_solver() {
                                       ? MatrixXd::Zero(3, fib_node_count)
                                       : fc_->generate_constant_force();
 
-    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     // Fiber-periphery forces (if periphery exists)
-    if (params_.periphery_interaction_flag && shell_->is_active()) {
-        int i_col = 0;
+    MatrixXd external_force_fibers = fc_->periphery_force(*shell_, params_.fiber_periphery_interaction);
 
-        // Make sure it's not adding any numbers, etc
-        // XXX CJE Fix this, as we touch fibers directly here and are implementation dependent
-        if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-            const FiberContainerFiniteDifference *fc_fd =
-                static_cast<const FiberContainerFiniteDifference *>(fc_.get());
-            for (const auto &fib : fc_fd->fibers_) {
-                external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
-                    shell_->fiber_interaction(fib, params_.fiber_periphery_interaction);
-                i_col += fib.n_nodes_;
-            }
-        }
-    }
     // Don't include motor forces for initial calculation (explicitly handled elsewhere)
     MatrixXd v_all = fc_->flow(r_all, external_force_fibers, params_.eta);
 

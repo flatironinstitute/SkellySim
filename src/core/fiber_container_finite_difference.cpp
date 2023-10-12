@@ -55,7 +55,9 @@ bool FiberContainerFiniteDifference::check_collision(const Periphery &periphery,
 Eigen::MatrixXd FiberContainerFiniteDifference::periphery_force(const Periphery &shell,
                                                                 const fiber_periphery_interaction_t &fp_params) const {
     const int n_nodes = get_local_node_count();
-    Eigen::MatrixXd f_on_nodes(3, n_nodes);
+    Eigen::MatrixXd f_on_nodes = Eigen::MatrixXd::Zero(3, n_nodes);
+    if (!shell.is_active())
+        return f_on_nodes;
 
     int i_fib = 0;
     for (const auto &fib : *this) {
