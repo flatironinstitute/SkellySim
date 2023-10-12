@@ -2,6 +2,7 @@
 
 #include <body.hpp>
 #include <fiber_container_finite_difference.hpp>
+#include <periphery.hpp>
 #include <system.hpp>
 #include <utils.hpp>
 
@@ -31,6 +32,24 @@ FiberContainerFiniteDifference::FiberContainerFiniteDifference(toml::array &fibe
     init_fiber_container(fiber_tables, params);
 
     spdlog::debug("FiberContainerFiniteDifference::FiberContainerFiniteDifference return");
+}
+
+/// @bried for collision of fiber with periphery within some threshold
+bool FiberContainerFiniteDifference::check_collision(const Periphery &periphery, double threshold) const {
+    bool collided = false;
+    for (const auto &fiber : *this) {
+        if (fiber.is_minus_clamped()) {
+            if (!collided && periphery.check_collision(fiber.x_.block(0, 1, 3, fiber.n_nodes_ - 1), threshold)) {
+                collided = true;
+            }
+        } else {
+            if (!collided && periphery.check_collision(fiber.x_, threshold)) {
+                collided = true;
+            }
+        }
+    }
+
+    return collided;
 }
 
 // @brief Calculate max error from active fibers

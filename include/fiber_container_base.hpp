@@ -141,9 +141,14 @@ class FiberContainerBase {
         throw std::runtime_error("get_rhs undefined on base FiberContainer class\n");
     }
 
-    // @brief Calculate max fiber "error" (if relevant)
+    /// @brief Calculate max fiber "error" (if relevant)
     virtual double fiber_error_local() const {
         throw std::runtime_error("fiber_error undefined on base FiberContainer class\n");
+    }
+
+    /// @brief check any fiber collision with periphery
+    virtual bool check_collision(const Periphery &, double threshold) const {
+        throw std::runtime_error("check_collision undefined on base FiberContainer class\n");
     }
 
     //@}

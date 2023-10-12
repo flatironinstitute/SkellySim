@@ -52,9 +52,7 @@ struct properties_t properties {
 };
 
 /// @brief Get current system-wide properties (time, timestep, etc.)
-struct properties_t &get_properties() {
-    return properties;
-};
+struct properties_t &get_properties() { return properties; };
 
 /// @brief Get current MPI-rank local solution vector
 Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
@@ -670,36 +668,18 @@ void run() {
 ///
 /// @return true if any collision detected, false otherwise
 bool check_collision() {
-    const BodyContainer &bc = bc_;
-    // const FiberContainer &fc = fc_;
-    // const FiberContainerBase &fc = *fc_;
-    const Periphery &shell = *shell_;
     const double threshold = 0.0;
     using Eigen::VectorXd;
 
     char collided = false;
-    for (const auto &body : bc.bodies)
-        if (!collided && body->check_collision(shell, threshold))
+    for (const auto &body : bc_.bodies)
+        if (!collided && body->check_collision(*shell_, threshold))
             collided = true;
 
-    // XXX FIXME Touch fibers directly, make sure through container rather than here
-    if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        const FiberContainerFiniteDifference *fc_fd = static_cast<const FiberContainerFiniteDifference *>(fc_.get());
-        for (const auto &fiber : fc_fd->fibers_) {
-            if (fiber.is_minus_clamped()) {
-                if (!collided && shell.check_collision(fiber.x_.block(0, 1, 3, fiber.n_nodes_ - 1), threshold)) {
-                    collided = true;
-                }
-            } else {
-                if (!collided && shell.check_collision(fiber.x_, threshold)) {
-                    collided = true;
-                }
-            }
-        }
-    }
+    collided = collided || fc_->check_collision(*shell_, threshold);
 
-    for (auto &body1 : bc.bodies)
-        for (auto &body2 : bc.bodies)
+    for (auto &body1 : bc_.bodies)
+        for (auto &body2 : bc_.bodies)
             if (!collided && body1 != body2 && body1->check_collision(*body2, threshold))
                 collided = true;
 

@@ -106,6 +106,8 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
 
     double fiber_error_local() const override;
 
+    bool check_collision(const Periphery &periphery, double threshold) const override;
+
     //@}
 
     //! \name Public member variables
