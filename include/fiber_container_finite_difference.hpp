@@ -91,6 +91,19 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
         return ActiveIterator<FiberFiniteDifference>(fibers_.size(), const_cast<decltype(fibers_) &>(fibers_));
     }
 
+    int get_local_fiber_count() const override {
+        // FIXME: DI: Doesn't account for inactive fibers.
+        return fibers_.size();
+    }
+    int get_local_node_count() const override {
+        // FIXME: Should cache this. Also won't work for DI (just change to fib: *this)
+        int node_count = 0;
+        for (auto &fib: *this)
+            node_count += fib.n_nodes_;
+        return node_count;
+    }
+    int get_local_solution_size() const override { return get_local_node_count() * 4; }
+
     //@}
 
     //! \name Public member variables

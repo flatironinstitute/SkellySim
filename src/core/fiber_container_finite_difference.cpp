@@ -17,8 +17,6 @@ FiberContainerFiniteDifference::FiberContainerFiniteDifference() {
 
     // This just exists to set the fiber type
     fiber_type_ = FIBERTYPE::FiniteDifference;
-    // We need to make sure we do what init_fiber_container might set in terms of variables
-    set_local_fiber_numbers(fibers_.size(), 0, 0);
 
     spdlog::debug("FiberContainerFiniteDifference::FiberContainerFiniteDifference (empty) return");
 }
@@ -66,13 +64,6 @@ void FiberContainerFiniteDifference::init_fiber_container(toml::array &fiber_tab
                 ->debug("FiberFiniteDifference {}: {} {} {}", i_fib, fib.n_nodes_, fib.bending_rigidity_, fib.length_);
         }
     }
-
-    // Set the local nubmer of fibers, node count, and solution size
-    int node_tot = 0;
-    for (auto &fib : fibers_) {
-        node_tot += fib.n_nodes_;
-    }
-    set_local_fiber_numbers(fibers_.size(), node_tot, node_tot * 4);
 
     // Update the node positions
     update_local_node_positions();
@@ -129,7 +120,7 @@ MatrixXd FiberContainerFiniteDifference::flow(const MatrixRef &r_trg, const Matr
 
     const size_t n_src = fib_forces.cols();
     const size_t n_trg = r_trg.cols();
-    if (!get_global_fiber_number())
+    if (!get_global_fiber_count())
         return Eigen::MatrixXd::Zero(3, n_trg);
 
     MatrixXd weighted_forces(3, n_src);

@@ -6,7 +6,6 @@
 
 /// @brief Constructor
 FiberContainerBase::FiberContainerBase(toml::array &fiber_tables, Params &params) {
-
     spdlog::debug("FiberContainerBase::FiberContainerBase");
 
     MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
@@ -34,8 +33,8 @@ void FiberContainerBase::set_evaluator(const std::string &evaluator) {
 }
 
 /// @brief Get the global number of fibers in all MPI ranks
-int FiberContainerBase::get_global_fiber_number() const {
-    const int local_fib_count = get_local_fiber_number();
+int FiberContainerBase::get_global_fiber_count() const {
+    const int local_fib_count = get_local_fiber_count();
     int global_fib_count;
 
     MPI_Allreduce(&local_fib_count, &global_fib_count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -58,11 +57,4 @@ int FiberContainerBase::get_global_solution_size() const {
 
     MPI_Allreduce(&local_solution_size, &global_solution_size, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     return global_solution_size;
-}
-
-/// @brief Set the local variables for fiber number, etc
-void FiberContainerBase::set_local_fiber_numbers(int n_fibers, int n_local_nodes, int n_local_solution_size) {
-    n_local_fibers_ = n_fibers;
-    n_local_node_count_ = n_local_nodes;
-    n_local_solution_size_ = n_local_solution_size;
 }

@@ -207,7 +207,7 @@ Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, Vecto
     auto &bc = bc_;
 
     // Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
-    Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc->get_local_fiber_number());
+    Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc->get_local_fiber_count());
 
     MatrixXd body_velocities(6, bc.spherical_bodies.size());
     int index = 0;

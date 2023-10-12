@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
         double t = 0.0;
         while (t < t_final) {
             times.push_back(t);
-            n_fibers.push_back(fc_fd->get_global_fiber_number());
+            n_fibers.push_back(fc_fd->get_global_fiber_count());
             double length =
                 std::accumulate(fc_fd->fibers_.begin(), fc_fd->fibers_.end(), 0.0,
                                 [](const double &a, const FiberFiniteDifference &b) { return a + b.length_; });

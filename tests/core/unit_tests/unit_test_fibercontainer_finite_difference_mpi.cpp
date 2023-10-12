@@ -31,10 +31,10 @@ TEST(FiberContainerFiniteDifference, MPIConstructN10Fibers) {
     fiber_container = std::make_unique<FiberContainerFiniteDifference>(param_table.at("fibers").as_array(), params);
 
     // Test if the number of nodes, etc, in the fiber is what we expect
-    EXPECT_EQ(fiber_container->get_local_fiber_number(), 5);
+    EXPECT_EQ(fiber_container->get_local_fiber_count(), 5);
     EXPECT_EQ(fiber_container->get_local_node_count(), 160);
     EXPECT_EQ(fiber_container->get_local_solution_size(), 640);
-    EXPECT_EQ(fiber_container->get_global_fiber_number(), 10);
+    EXPECT_EQ(fiber_container->get_global_fiber_count(), 10);
     EXPECT_EQ(fiber_container->get_global_node_count(), 320);
     EXPECT_EQ(fiber_container->get_global_solution_size(), 1280);
 }

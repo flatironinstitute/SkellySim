@@ -36,25 +36,28 @@ class FiberContainerBase {
     void set_evaluator(const std::string &evaluator);
 
     /// @brief Get the local number of fibers in the container
-    int get_local_fiber_number() const { return n_local_fibers_; }
+    virtual int get_local_fiber_count() const {
+        throw std::runtime_error("get_local_fiber_number undefined on base FiberContainer class\n");
+    }
 
     /// @brief Get the local number of nodes across fibers in the container
-    int get_local_node_count() const { return n_local_node_count_; }
+    virtual int get_local_node_count() const {
+        throw std::runtime_error("get_local_node_count undefined on base FiberContainer class\n");
+    }
 
     /// @brief Get the local solution size across fibers in this container
-    int get_local_solution_size() const { return n_local_solution_size_; }
+    virtual int get_local_solution_size() const {
+        throw std::runtime_error("get_local_solution_size undefined on base FiberContainer class\n");
+    }
 
     /// @brief Get the global number of fibers in all MPI ranks
-    int get_global_fiber_number() const;
+    int get_global_fiber_count() const;
 
     /// @brief Get the global number of nodes for fibers in all MPI ranks
     int get_global_node_count() const;
 
     /// @brief Get the global solution size across fibers in all MPI ranks
     int get_global_solution_size() const;
-
-    /// @brief Set the local fiber number, node count, and solution size
-    void set_local_fiber_numbers(int n_fibers, int n_local_nodes, int n_local_solution_size);
 
     /// @brief Get the local node positions in REAL SPACE
     const Eigen::MatrixXd &get_local_node_positions() const { return r_fib_local_; }
@@ -142,11 +145,6 @@ class FiberContainerBase {
 
     //! \name Public member variables
     //@{
-
-    int n_local_fibers_ = -1;        ///< Cached number of local fibers in this container
-    int n_local_node_count_ = -1;    ///< Cached number of local nodes for fibers in this container
-    int n_local_solution_size_ = -1; ///< Cached local solution size for fibers in this container
-
     FIBERTYPE fiber_type_ = FIBERTYPE::None; ///< Fiber type (None to start with)
 
     /// Pointer to FMM object (pointer to avoid constructing stokeslet_kernel_ wtih default FiberContainer)

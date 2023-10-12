@@ -60,7 +60,7 @@ void dynamic_instability() {
     std::vector<uint8_t> occupied_flat(bc.get_global_site_count(), 0);
 
     // Get the fibers
-    int n_fib_old = fc->get_global_fiber_number();
+    int n_fib_old = fc->get_global_fiber_count();
     int n_active_old_local = 0;
     // FIXME This is specified for finite difference fibers only
     if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
@@ -188,16 +188,6 @@ void dynamic_instability() {
         }
     }
     spdlog::info("Nucleated {} fibers", new_fibers.size());
-
-    // Each rank needs to go make it's internal numbers for fiber number, local node number, and local solution size
-    if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        FiberContainerFiniteDifference *fibers_fd = static_cast<FiberContainerFiniteDifference *>(fc);
-        int node_tot = 0;
-        for (auto &fib : fibers_fd->fibers_) {
-            node_tot += fib.n_nodes_;
-        }
-        fibers_fd->set_local_fiber_numbers(fibers_fd->fibers_.size(), node_tot, node_tot * 4);
-    }
 }
 
 } // namespace System

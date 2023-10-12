@@ -31,10 +31,10 @@ TEST(FiberContainerFiniteDifference, ConstructN1Fibers) {
     fiber_container = std::make_unique<FiberContainerFiniteDifference>(param_table.at("fibers").as_array(), params);
 
     // Test if the number of nodes, etc, in the fiber is what we expect
-    EXPECT_EQ(fiber_container->get_local_fiber_number(), 1);
+    EXPECT_EQ(fiber_container->get_local_fiber_count(), 1);
     EXPECT_EQ(fiber_container->get_local_node_count(), 32);
     EXPECT_EQ(fiber_container->get_local_solution_size(), 128);
-    EXPECT_EQ(fiber_container->get_global_fiber_number(), 1);
+    EXPECT_EQ(fiber_container->get_global_fiber_count(), 1);
     EXPECT_EQ(fiber_container->get_global_node_count(), 32);
     EXPECT_EQ(fiber_container->get_global_solution_size(), 128);
 }
@@ -52,10 +52,10 @@ TEST(FiberContainerFiniteDifference, ConstructN10Fibers) {
     fiber_container = std::make_unique<FiberContainerFiniteDifference>(param_table.at("fibers").as_array(), params);
 
     // Test if the number of nodes, etc, in the fiber is what we expect
-    EXPECT_EQ(fiber_container->get_local_fiber_number(), 10);
+    EXPECT_EQ(fiber_container->get_local_fiber_count(), 10);
     EXPECT_EQ(fiber_container->get_local_node_count(), 320);
     EXPECT_EQ(fiber_container->get_local_solution_size(), 1280);
-    EXPECT_EQ(fiber_container->get_global_fiber_number(), 10);
+    EXPECT_EQ(fiber_container->get_global_fiber_count(), 10);
     EXPECT_EQ(fiber_container->get_global_node_count(), 320);
     EXPECT_EQ(fiber_container->get_global_solution_size(), 1280);
 }
