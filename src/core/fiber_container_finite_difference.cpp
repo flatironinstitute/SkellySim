@@ -52,6 +52,12 @@ bool FiberContainerFiniteDifference::check_collision(const Periphery &periphery,
     return collided;
 }
 
+std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
+FiberContainerFiniteDifference::calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies,
+                                                          const BodyContainer &bc) const {
+    return bc.calculate_link_conditions(fiber_sol, x_bodies, *this);
+}
+
 Eigen::MatrixXd FiberContainerFiniteDifference::periphery_force(const Periphery &shell,
                                                                 const fiber_periphery_interaction_t &fp_params) const {
     const int n_nodes = get_local_node_count();

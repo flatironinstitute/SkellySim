@@ -125,6 +125,12 @@ class FiberContainerBase {
         throw std::runtime_error("apply_fiber_force undefined on base FiberContainer class\n");
     }
 
+    /// @brief calculate conditions of body-fiber connections
+    virtual std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
+    calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies, const BodyContainer &bc) const {
+        throw std::runtime_error("calculate_link_conditions undefined on base FiberContainer class\n");
+    }
+
     /// @brief Perform a timestep
     virtual void step(VectorRef &fiber_sol) {
         throw std::runtime_error("step undefined on base FiberContainer class\n");

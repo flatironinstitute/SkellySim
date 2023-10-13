@@ -98,7 +98,7 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
     int get_local_node_count() const override {
         // FIXME: Should cache this. Also won't work for DI (just change to fib: *this)
         int node_count = 0;
-        for (auto &fib: *this)
+        for (auto &fib : *this)
             node_count += fib.n_nodes_;
         return node_count;
     }
@@ -108,6 +108,10 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
 
     bool check_collision(const Periphery &periphery, double threshold) const override;
     Eigen::MatrixXd periphery_force(const Periphery &, const fiber_periphery_interaction_t &) const override;
+
+    /// @brief calculate conditions of body-fiber connections
+    std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies,
+                                                                           const BodyContainer &bc) const override;
 
     //@}
 
