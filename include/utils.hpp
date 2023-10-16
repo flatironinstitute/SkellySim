@@ -9,6 +9,7 @@ using npz_t = std::map<std::string, NpyArray>;
 } // namespace cnpy
 
 namespace utils {
+Eigen::MatrixXd barycentric_matrix(ArrayRef &x, ArrayRef &y);
 Eigen::MatrixXd finite_diff(ArrayRef &s, int M, int n_s);
 Eigen::VectorXd collect_into_global(VectorRef &local_vec);
 

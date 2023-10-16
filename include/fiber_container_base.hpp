@@ -36,25 +36,28 @@ class FiberContainerBase {
     void set_evaluator(const std::string &evaluator);
 
     /// @brief Get the local number of fibers in the container
-    int get_local_fiber_number() const { return n_local_fibers_; }
+    virtual int get_local_fiber_count() const {
+        throw std::runtime_error("get_local_fiber_number undefined on base FiberContainer class\n");
+    }
 
     /// @brief Get the local number of nodes across fibers in the container
-    int get_local_node_count() const { return n_local_node_count_; }
+    virtual int get_local_node_count() const {
+        throw std::runtime_error("get_local_node_count undefined on base FiberContainer class\n");
+    }
 
     /// @brief Get the local solution size across fibers in this container
-    int get_local_solution_size() const { return n_local_solution_size_; }
+    virtual int get_local_solution_size() const {
+        throw std::runtime_error("get_local_solution_size undefined on base FiberContainer class\n");
+    }
 
     /// @brief Get the global number of fibers in all MPI ranks
-    int get_global_fiber_number() const;
+    int get_global_fiber_count() const;
 
     /// @brief Get the global number of nodes for fibers in all MPI ranks
     int get_global_node_count() const;
 
     /// @brief Get the global solution size across fibers in all MPI ranks
     int get_global_solution_size() const;
-
-    /// @brief Set the local fiber number, node count, and solution size
-    void set_local_fiber_numbers(int n_fibers, int n_local_nodes, int n_local_solution_size);
 
     /// @brief Get the local node positions in REAL SPACE
     const Eigen::MatrixXd &get_local_node_positions() const { return r_fib_local_; }
@@ -122,6 +125,12 @@ class FiberContainerBase {
         throw std::runtime_error("apply_fiber_force undefined on base FiberContainer class\n");
     }
 
+    /// @brief calculate conditions of body-fiber connections
+    virtual std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
+    calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies, const BodyContainer &bc) const {
+        throw std::runtime_error("calculate_link_conditions undefined on base FiberContainer class\n");
+    }
+
     /// @brief Perform a timestep
     virtual void step(VectorRef &fiber_sol) {
         throw std::runtime_error("step undefined on base FiberContainer class\n");
@@ -138,15 +147,25 @@ class FiberContainerBase {
         throw std::runtime_error("get_rhs undefined on base FiberContainer class\n");
     }
 
+    /// @brief Calculate max fiber "error" (if relevant)
+    virtual double fiber_error_local() const {
+        throw std::runtime_error("fiber_error undefined on base FiberContainer class\n");
+    }
+
+    /// @brief check any fiber collision with periphery
+    virtual bool check_collision(const Periphery &, double threshold) const {
+        throw std::runtime_error("check_collision undefined on base FiberContainer class\n");
+    }
+
+    /// @brief Calculate forces on fibers due to periphery
+    virtual Eigen::MatrixXd periphery_force(const Periphery &, const fiber_periphery_interaction_t &) const {
+        throw std::runtime_error("periphery_force undefined on base FiberContainer class\n");
+    }
+
     //@}
 
     //! \name Public member variables
     //@{
-
-    int n_local_fibers_ = -1;        ///< Cached number of local fibers in this container
-    int n_local_node_count_ = -1;    ///< Cached number of local nodes for fibers in this container
-    int n_local_solution_size_ = -1; ///< Cached local solution size for fibers in this container
-
     FIBERTYPE fiber_type_ = FIBERTYPE::None; ///< Fiber type (None to start with)
 
     /// Pointer to FMM object (pointer to avoid constructing stokeslet_kernel_ wtih default FiberContainer)

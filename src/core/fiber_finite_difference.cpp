@@ -4,12 +4,11 @@
 #include <stdexcept>
 #include <unordered_map>
 
-#include <fiber_finitedifference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <utils.hpp>
 
-#include <skelly_math.hpp>
 #include <toml.hpp>
 
 /// @file
@@ -540,8 +539,8 @@ std::unordered_map<int, FiberFiniteDifference::fib_mat_t> compute_matrices_finit
         mats.D_3_0 = utils::finite_diff(mats.alpha, 3, n_nodes_finite_diff + 3).transpose();
         mats.D_4_0 = utils::finite_diff(mats.alpha, 4, n_nodes_finite_diff + 4).transpose();
 
-        mats.P_X = skelly_math::barycentric_matrix(mats.alpha, mats.alpha_roots);
-        mats.P_T = skelly_math::barycentric_matrix(mats.alpha, mats.alpha_tension);
+        mats.P_X = utils::barycentric_matrix(mats.alpha, mats.alpha_roots);
+        mats.P_T = utils::barycentric_matrix(mats.alpha, mats.alpha_tension);
 
         mats.weights_0 = ArrayXd::Ones(mats.alpha.size()) * 2.0;
         mats.weights_0(0) = 1.0;

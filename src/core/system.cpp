@@ -4,13 +4,14 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 
 #include <background_source.hpp>
 #include <body.hpp>
 #include <fiber_container_base.hpp>
-#include <fiber_container_finitedifference.hpp>
-#include <fiber_finitedifference.hpp>
+#include <fiber_container_finite_difference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <io_maps.hpp>
 #include <params.hpp>
 #include <parse_util.hpp>
@@ -27,7 +28,7 @@
 
 namespace System {
 Params params_;                          ///< Simulation input parameters
-std::unique_ptr<FiberContainerBase> fc_; ///< Fibers (new)
+std::unique_ptr<FiberContainerBase> fc_; ///< Fibers
 BodyContainer bc_;                       ///< Bodies
 PointSourceContainer psc_;               ///< Point Sources
 BackgroundSource bs_;                    ///< Background flow
@@ -35,7 +36,7 @@ BackgroundSource bs_;                    ///< Background flow
 std::unique_ptr<Periphery> shell_; ///< Periphery
 Eigen::VectorXd curr_solution_;    ///< Current MPI-rank local solution vector
 
-std::unique_ptr<FiberContainerBase> fc_bak_; ///< Copy of fibers (new) for timestep reversion
+std::unique_ptr<FiberContainerBase> fc_bak_; ///< Copy of fibers for timestep reversion
 BodyContainer bc_bak_;                       ///< Copy of bodies for timestep reversion
 int rank_;                                   ///< MPI rank
 int size_;                                   ///< MPI size
@@ -52,9 +53,7 @@ struct properties_t properties {
 };
 
 /// @brief Get current system-wide properties (time, timestep, etc.)
-struct properties_t &get_properties() {
-    return properties;
-};
+struct properties_t &get_properties() { return properties; };
 
 /// @brief Get current MPI-rank local solution vector
 Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
@@ -106,7 +105,7 @@ void write(std::ofstream &ofs) {
 
     // Set up the type of FiberContainer we are going to serialize
     if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        fc_global = std::make_unique<FiberContainerFinitedifference>();
+        fc_global = std::make_unique<FiberContainerFiniteDifference>();
     } else {
         throw std::runtime_error("Fiber discretization " + std::to_string(fc_->fiber_type_) +
                                  " used in write command, which does not exist.");
@@ -148,10 +147,10 @@ void write(std::ofstream &ofs) {
             // FIXME: Get the new fiber implementation into its correct place
             if (min_state.fibers->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
                 // Cast to correct type and do the fibers
-                const FiberContainerFinitedifference *fibers_fd =
-                    static_cast<const FiberContainerFinitedifference *>(min_state.fibers.get());
-                FiberContainerFinitedifference *fc_fd_global =
-                    static_cast<FiberContainerFinitedifference *>(fc_global.get());
+                const FiberContainerFiniteDifference *fibers_fd =
+                    static_cast<const FiberContainerFiniteDifference *>(min_state.fibers.get());
+                FiberContainerFiniteDifference *fc_fd_global =
+                    static_cast<FiberContainerFiniteDifference *>(fc_global.get());
                 for (const auto &min_fib : fibers_fd->fibers_) {
                     fc_fd_global->fibers_.emplace_back(FiberFiniteDifference(min_fib, params_.eta));
                 }
@@ -192,107 +191,6 @@ void resume_from_trajectory(std::string input_file) {
     while (trajectory.read_next_frame()) {
     }
     trajectory.unpack_current_frame();
-}
-
-/// @brief Calculate forces/torques on the bodies and velocities on the fibers due to attachment constraints
-/// @param[in] fibers_xt [4 x num_fiber_nodes_local] Vector of fiber node positions and tensions on current rank.
-/// Ordering is [fib1.nodes.x, fib1.nodes.y, fib1.nodes.z, fib1.T, fib2.nodes.x, ...]
-/// @param[in] x_bodies entire body component of the solution vector (deformable+rigid)
-Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, VectorRef &x_bodies) {
-    using Eigen::ArrayXXd;
-    using Eigen::MatrixXd;
-    using Eigen::Vector3d;
-
-    auto &fc = fc_;
-    auto &bc = bc_;
-
-    // Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_count());
-    Eigen::MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc->get_local_fiber_number());
-
-    MatrixXd body_velocities(6, bc.spherical_bodies.size());
-    int index = 0;
-    for (const auto &body : bc.spherical_bodies) {
-        body_velocities.col(index) =
-            x_bodies.segment(bc.solution_offsets_.at(std::static_pointer_cast<Body>(body)) + body->n_nodes_ * 3, 6);
-    }
-
-    int xt_offset = 0;
-    int i_fib = 0;
-    for (auto &body : bc.spherical_bodies)
-        body->force_torque_.setZero();
-
-    // XXX FIXME Touch fibers directly, make sure through container rather than here
-    if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        const FiberContainerFinitedifference *fc_fd = static_cast<const FiberContainerFinitedifference *>(fc.get());
-        // for (const auto &fib : fc.fibers) {
-        for (const auto &fib : fc_fd->fibers_) {
-            const auto &fib_mats = fib.matrices_.at(fib.n_nodes_);
-            const int n_pts = fib.n_nodes_;
-
-            auto &[i_body, i_site] = fib.binding_site_;
-            if (i_body < 0)
-                continue;
-
-            auto body = std::static_pointer_cast<SphericalBody>(bc.bodies[i_body]);
-            Vector3d site_pos = bc.get_nucleation_site(i_body, i_site) - body->get_position();
-            MatrixXd x_new(3, fib.n_nodes_);
-            x_new.row(0) = fibers_xt.segment(xt_offset + 0 * fib.n_nodes_, fib.n_nodes_);
-            x_new.row(1) = fibers_xt.segment(xt_offset + 1 * fib.n_nodes_, fib.n_nodes_);
-            x_new.row(2) = fibers_xt.segment(xt_offset + 2 * fib.n_nodes_, fib.n_nodes_);
-
-            double T_new_0 = fibers_xt(xt_offset + 3 * n_pts);
-
-            Vector3d xs_0 = fib.xs_.col(0);
-            Eigen::MatrixXd xss_new = pow(2.0 / fib.length_, 2) * x_new * fib_mats.D_2_0;
-            Eigen::MatrixXd xsss_new = pow(2.0 / fib.length_, 3) * x_new * fib_mats.D_3_0;
-            Vector3d xss_new_0 = xss_new.col(0);
-            Vector3d xsss_new_0 = xsss_new.col(0);
-
-            // FIRST FROM FIBER ON-TO BODY
-            // Force by fiber on body at s = 0, Fext = -F|s=0 = -(EXsss - TXs)
-            // Bending term + Tension term:
-            Vector3d F_body = -fib.bending_rigidity_ * xsss_new_0 + xs_0 * T_new_0;
-
-            // Torque by fiber on body at s = 0
-            // Lext = (L + link_loc x F) = -E(Xss x Xs) - link_loc x (EXsss - TXs)
-            // bending contribution :
-            Vector3d L_body = -fib.bending_rigidity_ * site_pos.cross(xsss_new_0);
-
-            // tension contribution :
-            L_body += site_pos.cross(xs_0) * T_new_0;
-
-            // fiber's torque L:
-            L_body += fib.bending_rigidity_ * xs_0.cross(xss_new_0);
-
-            // Store the contribution of each fiber in this array
-            body->force_torque_.segment(0, 3) += F_body;
-            body->force_torque_.segment(3, 3) += L_body;
-
-            // SECOND FROM BODY ON-TO FIBER
-            // Translational and angular velocities at the attachment point are calculated
-            Vector3d v_body = body_velocities.block(0, i_body, 3, 1);
-            Vector3d w_body = body_velocities.block(3, i_body, 3, 1);
-
-            // dx/dt = U + Omega x link_loc (move to LHS so -U -Omega x link_loc)
-            Vector3d v_fiber = -v_body - w_body.cross(site_pos);
-
-            // tension condition = -(xs*vx + ys*vy + zs*wz)
-            double tension_condition = -xs_0.dot(v_body) + (xs_0.cross(site_pos)).dot(w_body);
-
-            // Rotational velocity condition on fiber
-            // FIXME: Fiber torque assumes body is a sphere :(
-            Vector3d w_fiber = site_pos.normalized().cross(w_body);
-
-            velocities_on_fiber.col(i_fib).segment(0, 3) = v_fiber;
-            velocities_on_fiber(3, i_fib) = tension_condition;
-            velocities_on_fiber.col(i_fib).segment(4, 3) = w_fiber;
-
-            i_fib++;
-            xt_offset += 4 * n_pts;
-        }
-    }
-
-    return velocities_on_fiber;
 }
 
 /// @brief Map Eigen Matrix node data to a three-tuple of Matrix Block references (use like view)
@@ -373,14 +271,15 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     if (rank_ == 0)
         x_bodies_global = x_bodies;
     MPI_Bcast(x_bodies_global.data(), x_bodies_global.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MatrixXd v_fib_boundary = System::calculate_body_fiber_link_conditions(x_fibers, x_bodies_global);
+    MatrixXd fiber_link_conditions, body_link_conditions;
+    std::tie(fiber_link_conditions, body_link_conditions) = fc.calculate_link_conditions(x_fibers, x_bodies_global, bc);
 
     v_all = v_fib2all;
     v_fibers += v_shell2fibbody.block(0, 0, 3, r_fibers.cols());
     v_bodies += v_shell2fibbody.block(0, r_fibers.cols(), 3, r_bodies.cols());
-    v_all += bc.flow(r_all, x_bodies, eta);
+    v_all += bc.flow(r_all, x_bodies, body_link_conditions, eta);
 
-    res_fibers = fc.matvec(x_fibers, v_fibers, v_fib_boundary);
+    res_fibers = fc.matvec(x_fibers, v_fibers, fiber_link_conditions);
     res_shell = shell.matvec(x_shell, v_shell);
     res_bodies = bc.matvec(v_bodies, x_bodies);
 
@@ -401,20 +300,8 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
     const auto &fp = params_.fiber_periphery_interaction;
 
     Eigen::MatrixXd f_on_fibers = fc_->apply_fiber_force(sol_fibers);
-    // XXX FIXME This touches the fibers directly, don't do that
-    if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        if (params_.periphery_interaction_flag) {
-            int i_fib = 0;
-            const FiberContainerFinitedifference *fc_fd =
-                static_cast<const FiberContainerFinitedifference *>(fc_.get());
-            for (const auto &fib : *fc_fd) {
-                f_on_fibers.col(i_fib) += shell_->fiber_interaction_finitediff(fib, fp);
-                i_fib++;
-            }
-        }
-    } else {
-        throw std::runtime_error("velocity_at_targets incorrect fiber type " + std::to_string(fc_->fiber_type_) + ".");
-    }
+    if (params_.periphery_interaction_flag)
+        f_on_fibers += fc_->periphery_force(*shell_, fp);
 
     // FIXME: This is likely wrong, but more right than before
     Eigen::VectorXd sol_bodies_global(bc_.get_global_solution_size());
@@ -422,22 +309,14 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
         sol_bodies_global = sol_bodies;
     MPI_Bcast(sol_bodies_global.data(), sol_bodies_global.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
     // This routine zeros out the external force. is that correct?
-    calculate_body_fiber_link_conditions(sol_fibers, sol_bodies_global);
-    for (auto &body : bc_.spherical_bodies) {
-        if (body->external_force_type_ == Body::EXTFORCE::Linear) {
-            body->force_torque_.segment(0, 3) += body->external_force_;
-        } else if (body->external_force_type_ == Body::EXTFORCE::Oscillatory) {
-            body->force_torque_.segment(0, 3) +=
-                body->extforce_oscillation_amplitude_ *
-                std::sin(body->extforce_oscillation_omega_ * properties.time - body->extforce_oscillation_phase_) *
-                body->external_force_;
-        }
-        body->force_torque_.segment(3, 3) += body->external_torque_;
-    }
+    auto [fiber_link_conditions, body_link_conditions] =
+        fc_->calculate_link_conditions(sol_fibers, sol_bodies_global, bc_);
+
+    Eigen::MatrixXd body_forces_torques = bc_.calculate_external_forces_torques(properties.time);
 
     // clang-format off
     u_trg = fc_->flow(r_trg, f_on_fibers, eta, false) + \
-        bc_.flow(r_trg, sol_bodies, eta) + \
+        bc_.flow(r_trg, sol_bodies, body_link_conditions, eta) + \
         shell_->flow(r_trg, sol_shell, eta) + \
         psc_.flow(r_trg, eta, properties.time) + \
         bs_.flow(r_trg, eta);
@@ -490,47 +369,19 @@ void prep_state_for_solver() {
                                       ? MatrixXd::Zero(3, fib_node_count)
                                       : fc_->generate_constant_force();
 
-    MatrixXd external_force_fibers = MatrixXd::Zero(3, fib_node_count);
     // Fiber-periphery forces (if periphery exists)
-    if (params_.periphery_interaction_flag && shell_->is_active()) {
-        int i_col = 0;
+    MatrixXd external_force_fibers = fc_->periphery_force(*shell_, params_.fiber_periphery_interaction);
 
-        // Make sure it's not adding any numbers, etc
-        // XXX CJE Fix this, as we touch fibers directly here and are implementation dependent
-        if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-            const FiberContainerFinitedifference *fc_fd =
-                static_cast<const FiberContainerFinitedifference *>(fc_.get());
-            for (const auto &fib : fc_fd->fibers_) {
-                external_force_fibers.block(0, i_col, 3, fib.n_nodes_) +=
-                    shell_->fiber_interaction_finitediff(fib, params_.fiber_periphery_interaction);
-                i_col += fib.n_nodes_;
-            }
-        }
-    }
     // Don't include motor forces for initial calculation (explicitly handled elsewhere)
     MatrixXd v_all = fc_->flow(r_all, external_force_fibers, params_.eta);
 
     bc_.update_cache_variables(params_.eta);
 
     // Check for an add external body forces
-    bool external_force_body = false;
-    for (auto &body : bc_.spherical_bodies) {
-        body->force_torque_.setZero();
-        // Hack so that when you sum global forces, it should sum back to the external force
-        // Also make sure we look up what kind of external force we are inducing (linear, oscillatory)
-        if (body->external_force_type_ == Body::EXTFORCE::Linear) {
-            body->force_torque_.segment(0, 3) = body->external_force_ / size_;
-        } else if (body->external_force_type_ == Body::EXTFORCE::Oscillatory) {
-            body->force_torque_.segment(0, 3) =
-                body->extforce_oscillation_amplitude_ *
-                std::sin(body->extforce_oscillation_omega_ * properties.time - body->extforce_oscillation_phase_) *
-                body->external_force_ / size_;
-        }
-        body->force_torque_.segment(3, 3) = body->external_torque_ / size_;
-        external_force_body = external_force_body || body->external_force_.any() || body->external_torque_.any();
-    }
+    // FIXME: Calculates local forces/torques to each rank. all-reduced during flow, so hackishly predivide here
+    MatrixXd body_forces_torques = bc_.calculate_external_forces_torques(properties.time) / size_;
 
-    if (external_force_body) {
+    if (body_forces_torques.any()) {
         const int total_node_count = fib_node_count + shell_node_count + body_node_count;
         MatrixXd r_all(3, total_node_count);
         auto [r_fibers, r_shell, r_bodies] = get_node_maps(r_all);
@@ -538,7 +389,8 @@ void prep_state_for_solver() {
         r_shell = shell_->get_local_node_positions();
         r_bodies = bc_.get_local_node_positions(bc_.bodies);
 
-        v_all += bc_.flow(r_all, Eigen::VectorXd::Zero(bc_.get_local_solution_size()), params_.eta);
+        v_all +=
+            bc_.flow(r_all, Eigen::VectorXd::Zero(bc_.get_local_solution_size()), body_forces_torques, params_.eta);
     }
 
     v_all += psc_.flow(r_all, params_.eta, properties.time);
@@ -619,18 +471,7 @@ void run() {
         // Run the system timestep and store convergence
         bool converged = System::step();
         // Maximum error in the fiber derivative
-        double fiber_error = 0.0;
-        // XXX FIXME Touch fibers directly, make sure through container rather than here
-        if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-            const FiberContainerFinitedifference *fc_fd =
-                static_cast<const FiberContainerFinitedifference *>(fc_.get());
-            for (const auto &fib : fc_fd->fibers_) {
-                const auto &mats = fib.matrices_.at(fib.n_nodes_);
-                const Eigen::MatrixXd xs = std::pow(2.0 / fib.length_, 1) * fib.x_ * mats.D_1_0;
-                for (int i = 0; i < fib.n_nodes_; ++i)
-                    fiber_error = std::max(fabs(xs.col(i).norm() - 1.0), fiber_error);
-            }
-        }
+        double fiber_error = fc_->fiber_error_local();
         MPI_Allreduce(MPI_IN_PLACE, &fiber_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
         double dt_new = properties.dt;
@@ -682,36 +523,18 @@ void run() {
 ///
 /// @return true if any collision detected, false otherwise
 bool check_collision() {
-    const BodyContainer &bc = bc_;
-    // const FiberContainer &fc = fc_;
-    // const FiberContainerBase &fc = *fc_;
-    const Periphery &shell = *shell_;
     const double threshold = 0.0;
     using Eigen::VectorXd;
 
     char collided = false;
-    for (const auto &body : bc.bodies)
-        if (!collided && body->check_collision(shell, threshold))
+    for (const auto &body : bc_.bodies)
+        if (!collided && body->check_collision(*shell_, threshold))
             collided = true;
 
-    // XXX FIXME Touch fibers directly, make sure through container rather than here
-    if (fc_->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
-        const FiberContainerFinitedifference *fc_fd = static_cast<const FiberContainerFinitedifference *>(fc_.get());
-        for (const auto &fiber : fc_fd->fibers_) {
-            if (fiber.is_minus_clamped()) {
-                if (!collided && shell.check_collision(fiber.x_.block(0, 1, 3, fiber.n_nodes_ - 1), threshold)) {
-                    collided = true;
-                }
-            } else {
-                if (!collided && shell.check_collision(fiber.x_, threshold)) {
-                    collided = true;
-                }
-            }
-        }
-    }
+    collided = collided || fc_->check_collision(*shell_, threshold);
 
-    for (auto &body1 : bc.bodies)
-        for (auto &body2 : bc.bodies)
+    for (auto &body1 : bc_.bodies)
+        for (auto &body2 : bc_.bodies)
             if (!collided && body1 != body2 && body1->check_collision(*body2, threshold))
                 collided = true;
 
@@ -781,9 +604,9 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     spdlog::trace("Creating FiberContainerBase");
     if (param_table_.contains("fibers")) {
         if (params_.fiber_type == "FiniteDifference") {
-            fc_ = std::make_unique<FiberContainerFinitedifference>(param_table_.at("fibers").as_array(), params_);
+            fc_ = std::make_unique<FiberContainerFiniteDifference>(param_table_.at("fibers").as_array(), params_);
             // Create the empty version of this too for the backup
-            fc_bak_ = std::make_unique<FiberContainerFinitedifference>();
+            fc_bak_ = std::make_unique<FiberContainerFiniteDifference>();
         } else if (params_.fiber_type == "None") {
             throw std::runtime_error("Fibers found but no fiber discretization specified.");
         } else {
@@ -791,12 +614,12 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
                                      " specified.");
         }
     } else {
-        spdlog::trace("  Creating an empty FiberContainerFinitedifference (no fibers)");
+        spdlog::trace("  Creating an empty FiberContainerFiniteDifference (no fibers)");
         // Default will be an empty finite difference fiber setup, as the base class doesn't know anything, and may
         // error if compiled in and run
-        fc_ = std::make_unique<FiberContainerFinitedifference>();
+        fc_ = std::make_unique<FiberContainerFiniteDifference>();
         // Backup version
-        fc_bak_ = std::make_unique<FiberContainerFinitedifference>();
+        fc_bak_ = std::make_unique<FiberContainerFiniteDifference>();
     }
 
     if (param_table_.contains("periphery")) {

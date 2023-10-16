@@ -93,8 +93,8 @@ class Periphery {
     };
 
     // FIXME XXX: Fix this to be more clever in terms of taking in and spitting out fibers (containers?)
-    virtual Eigen::MatrixXd fiber_interaction_finitediff(const FiberFiniteDifference &fiber,
-                                                         const fiber_periphery_interaction_t &fp_params) const {
+    virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
+                                              const fiber_periphery_interaction_t &fp_params) const {
         throw std::runtime_error("fiber_interaction_finitediff undefined on base Periphery class\n");
     }
 
@@ -126,8 +126,8 @@ class SphericalPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd fiber_interaction_finitediff(const FiberFiniteDifference &fiber,
-                                                         const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
+                                              const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {radius_, radius_, radius_}; };
 };
 
@@ -146,8 +146,8 @@ class EllipsoidalPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd fiber_interaction_finitediff(const FiberFiniteDifference &fiber,
-                                                         const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
+                                              const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
 };
 
@@ -168,8 +168,8 @@ class GenericPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd fiber_interaction_finitediff(const FiberFiniteDifference &fiber,
-                                                         const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
+                                              const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
 };
 

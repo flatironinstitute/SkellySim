@@ -1,8 +1,8 @@
-#ifndef FIBER_CONTAINER_FINITEDIFFERENCE_HPP
-#define FIBER_CONTAINER_FINITEDIFFERENCE_HPP
+#ifndef FIBER_CONTAINER_FINITE_DIFFERENCE_HPP
+#define FIBER_CONTAINER_FINITE_DIFFERENCE_HPP
 
 #include <fiber_container_base.hpp>
-#include <fiber_finitedifference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <kernels.hpp>
 #include <params.hpp>
 #include <skelly_sim.hpp>
@@ -12,7 +12,7 @@ class BodyContainer;
 
 /// Finite difference fiber container class
 
-class FiberContainerFinitedifference : public FiberContainerBase {
+class FiberContainerFiniteDifference : public FiberContainerBase {
   public:
     //! \name Constructors and destructors
     //@{
@@ -20,10 +20,10 @@ class FiberContainerFinitedifference : public FiberContainerBase {
     /// Almost empty container for list initializations
     ///
     /// Need this for initializaitons of an empty container, but we need to have the FIBERTYPE set
-    FiberContainerFinitedifference();
+    FiberContainerFiniteDifference();
 
     /// Constructor using TOML and params
-    FiberContainerFinitedifference(toml::array &fiber_tables, Params &params);
+    FiberContainerFiniteDifference(toml::array &fiber_tables, Params &params);
 
     //@}
 
@@ -90,6 +90,28 @@ class FiberContainerFinitedifference : public FiberContainerBase {
     ActiveIterator<FiberFiniteDifference> end() const {
         return ActiveIterator<FiberFiniteDifference>(fibers_.size(), const_cast<decltype(fibers_) &>(fibers_));
     }
+
+    int get_local_fiber_count() const override {
+        // FIXME: DI: Doesn't account for inactive fibers.
+        return fibers_.size();
+    }
+    int get_local_node_count() const override {
+        // FIXME: Should cache this. Also won't work for DI (just change to fib: *this)
+        int node_count = 0;
+        for (auto &fib : *this)
+            node_count += fib.n_nodes_;
+        return node_count;
+    }
+    int get_local_solution_size() const override { return get_local_node_count() * 4; }
+
+    double fiber_error_local() const override;
+
+    bool check_collision(const Periphery &periphery, double threshold) const override;
+    Eigen::MatrixXd periphery_force(const Periphery &, const fiber_periphery_interaction_t &) const override;
+
+    /// @brief calculate conditions of body-fiber connections
+    std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies,
+                                                                           const BodyContainer &bc) const override;
 
     //@}
 
