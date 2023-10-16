@@ -10,13 +10,14 @@
 class Periphery;
 class SphericalBody;
 class DeformableBody;
+class FiberContainerFiniteDifference;
 
 /// Class for "small" bodies such as MTOCs
 class Body {
   public:
-    enum EXTFORCE { Linear, Oscillatory };  ///< Type of external force [Linear, Oscillatory]
-    static const std::string EXTFORCE_name[];     ///< String name of external force
-    int n_nodes_; ///< Number of nodes representing the body surface
+    enum EXTFORCE { Linear, Oscillatory };    ///< Type of external force [Linear, Oscillatory]
+    static const std::string EXTFORCE_name[]; ///< String name of external force
+    int n_nodes_;                             ///< Number of nodes representing the body surface
 
     Eigen::VectorXd RHS_;                ///< Current 'right-hand-side' for matrix formulation of solver
     Eigen::MatrixXd node_positions_;     ///< [ 3 x n_nodes ] node positions in lab frame
@@ -115,6 +116,12 @@ class BodyContainer {
     template <typename T>
     std::pair<Eigen::MatrixXd, Eigen::MatrixXd> get_global_forces_torques(const T &body_vec) const;
 
+    Eigen::MatrixXd calculate_external_forces_torques(double time) const;
+
+    std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
+    calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies,
+                              const FiberContainerFiniteDifference &fc) const;
+
     /// @brief Get total number of nodes associated with body
     ///
     /// See BodyContainer::get_local_solution_size for notes about how this is distributed
@@ -147,9 +154,11 @@ class BodyContainer {
 
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const;
     Eigen::VectorXd apply_preconditioner(VectorRef &X) const;
-    Eigen::MatrixXd flow(MatrixRef &r_trg, VectorRef &body_solutions, double eta) const;
-    Eigen::MatrixXd flow_spherical(MatrixRef &r_trg, VectorRef &body_solution, double eta) const;
-    Eigen::MatrixXd flow_deformable(MatrixRef &r_trg, VectorRef &body_solution, double eta) const;
+    Eigen::MatrixXd flow(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions, double eta) const;
+    Eigen::MatrixXd flow_spherical(MatrixRef &r_trg, VectorRef &body_solution, MatrixRef &link_conditions,
+                                   double eta) const;
+    Eigen::MatrixXd flow_deformable(MatrixRef &r_trg, VectorRef &body_solution, MatrixRef &link_conditions,
+                                    double eta) const;
     void step(VectorRef &body_sol, double dt) const;
     void set_evaluator(const std::string &evaluator);
 
@@ -223,14 +232,15 @@ class SphericalBody : public Body {
     Eigen::MatrixXd ey_; ///< [ 3 x num_nodes ] Singularity subtraction vector along y
     Eigen::MatrixXd ez_; ///< [ 3 x num_nodes ] Singularity subtraction vector along z
     Eigen::MatrixXd K_;  ///< [ 3*num_nodes x 6 ] matrix that helps translate body info to nodes
-    Eigen::Vector3d external_force_{0.0, 0.0, 0.0}; ///< [3] vector of external force on body in lab frame (can be oscillatory)
+    Eigen::Vector3d external_force_{0.0, 0.0,
+                                    0.0}; ///< [3] vector of external force on body in lab frame (can be oscillatory)
     Eigen::Vector3d external_torque_{0.0, 0.0, 0.0}; ///< [3] vector of constant external torque on body in lab frame
 
     // Parameters controlling the type of externally prescribed force
-    EXTFORCE external_force_type_ = EXTFORCE::Linear;   ///< External force type [Linear, Oscillatory]
-    double extforce_oscillation_amplitude_ = 0.0;       ///< External force amplitude (if Oscillatory)
-    double extforce_oscillation_omega_ = 0.0;           ///< External force angular frequency (if Oscillatory)
-    double extforce_oscillation_phase_ = 0.0;           ///< External force phase shift (if Oscillatory)
+    EXTFORCE external_force_type_ = EXTFORCE::Linear; ///< External force type [Linear, Oscillatory]
+    double extforce_oscillation_amplitude_ = 0.0;     ///< External force amplitude (if Oscillatory)
+    double extforce_oscillation_omega_ = 0.0;         ///< External force angular frequency (if Oscillatory)
+    double extforce_oscillation_phase_ = 0.0;         ///< External force phase shift (if Oscillatory)
 
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner

@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
-#include <fiber.hpp>
+#include <fiber_finite_difference.hpp>
 #include <kernels.hpp>
 #include <periphery.hpp>
 #include <utils.hpp>
@@ -12,7 +12,7 @@
 #include <toml.hpp>
 
 /// @file
-/// @brief Implement Fiber and FiberContainer classes and associated functions
+/// @brief Implement FiberFiniteDifference class and associated functions
 
 using Eigen::ArrayXd;
 using Eigen::ArrayXXd;
@@ -20,15 +20,16 @@ using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
 
-const std::string Fiber::BC_name[] = {"Force", "Torque", "Velocity", "AngularVelocity", "Position", "Angle"};
+const std::string FiberFiniteDifference::BC_name[] = {"Force",           "Torque",   "Velocity",
+                                                      "AngularVelocity", "Position", "Angle"};
 
-/// @brief Fiber constructor. Duh.
+/// @brief FiberFiniteDifference constructor. Duh.
 /// This is the preferred way to initialize a fiber.
 ///
 /// @param[in] fiber_table TOML table with associated fiber values
 /// @param[in] eta Fluid viscosity
-/// @return Fiber object. Cache values are _not_ calculated.
-Fiber::Fiber(toml::value &fiber_table, double eta) {
+/// @return FiberFiniteDifference object. Cache values are _not_ calculated.
+FiberFiniteDifference::FiberFiniteDifference(toml::value &fiber_table, double eta) {
     std::vector<double> x_array = toml::find<std::vector<double>>(fiber_table, "x");
     n_nodes_ = x_array.size() / 3;
     x_ = Eigen::Map<Eigen::MatrixXd>(x_array.data(), 3, n_nodes_);
@@ -48,16 +49,17 @@ Fiber::Fiber(toml::value &fiber_table, double eta) {
 }
 
 /// @brief Update stokeslet for points along fiber
-/// Calls kernels::oseen_tensor_direct with Fiber::x_ as source/target
+/// Calls kernels::oseen_tensor_direct with FiberFiniteDifference::x_ as source/target
 ///
-/// Updates: Fiber::stokeslet_
+/// Updates: FiberFiniteDifference::stokeslet_
 /// @param[in] eta fluid viscosity
-void Fiber::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_direct(x_, x_, eta); }
+void FiberFiniteDifference::update_stokeslet(double eta) { stokeslet_ = kernels::oseen_tensor_direct(x_, x_, eta); }
 
 /// @brief Update all of the derivative internal cache variables
 ///
-/// Updates: Fiber::xs_, Fiber::xss_, Fiber::xsss_, Fiber::xssss_
-void Fiber::update_derivatives() {
+/// Updates: FiberFiniteDifference::xs_, FiberFiniteDifference::xss_, FiberFiniteDifference::xsss_,
+/// FiberFiniteDifference::xssss_
+void FiberFiniteDifference::update_derivatives() {
     auto &fib_mats = matrices_.at(n_nodes_);
     xs_ = std::pow(2.0 / length_prev_, 1) * x_ * fib_mats.D_1_0;
     xss_ = std::pow(2.0 / length_prev_, 2) * x_ * fib_mats.D_2_0;
@@ -67,32 +69,36 @@ void Fiber::update_derivatives() {
 
 /// @brief Check if fiber is within some threshold distance of the cortex attachment radius
 ///
-/// Updates: Fiber::bc_minus_, Fiber::bc_plus_
+/// Updates: FiberFiniteDifference::bc_minus_, FiberFiniteDifference::bc_plus_
 /// @param[in] Periphery object
-void Fiber::update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
-    bc_minus_ = is_minus_clamped() ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::AngularVelocity) // Clamped to body
-                                   : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);            // Free
+void FiberFiniteDifference::update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) {
+    bc_minus_ = is_minus_clamped()
+                    ? std::make_pair(FiberFiniteDifference::BC::Velocity,
+                                     FiberFiniteDifference::BC::AngularVelocity) // Clamped to body
+                    : std::make_pair(FiberFiniteDifference::BC::Force, FiberFiniteDifference::BC::Torque); // Free
 
     double angle = std::acos(x_.col(x_.cols() - 1).normalized()[2]);
     bool near_periphery = (periphery_binding.active) && (angle >= periphery_binding.polar_angle_start) &&
                           (angle <= periphery_binding.polar_angle_end) &&
                           shell.check_collision(x_, periphery_binding.threshold);
-    bc_plus_ = near_periphery ? std::make_pair(Fiber::BC::Velocity, Fiber::BC::Torque) // Hinge at cortex
-                              : std::make_pair(Fiber::BC::Force, Fiber::BC::Torque);   // Free
+    bc_plus_ =
+        near_periphery
+            ? std::make_pair(FiberFiniteDifference::BC::Velocity, FiberFiniteDifference::BC::Torque) // Hinge at cortex
+            : std::make_pair(FiberFiniteDifference::BC::Force, FiberFiniteDifference::BC::Torque);   // Free
     spdlog::get("SkellySim global")
-        ->debug("Set BC on Fiber {}: [{}, {}], [{}, {}]", (void *)this, BC_name[bc_minus_.first],
+        ->debug("Set BC on FiberFiniteDifference {}: [{}, {}], [{}, {}]", (void *)this, BC_name[bc_minus_.first],
                 BC_name[bc_minus_.second], BC_name[bc_plus_.first], BC_name[bc_plus_.second]);
 }
 
 /// @brief Updates the linear operator A_ that defines the linear system
 ///
 /// \f[ A * (X^{n+1}, T^{n+1}) = \textrm{RHS} \f]
-/// Updates: Fiber::A_
-void Fiber::update_linear_operator(double dt, double eta) {
+/// Updates: FiberFiniteDifference::A_
+void FiberFiniteDifference::update_linear_operator(double dt, double eta) {
     int n_nodes_up = n_nodes_;
     int n_nodes_down = n_nodes_;
 
-    const Fiber::fib_mat_t &mats = matrices_.at(n_nodes_);
+    const FiberFiniteDifference::fib_mat_t &mats = matrices_.at(n_nodes_);
     ArrayXXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);
     ArrayXXd D_2 = mats.D_2_0.transpose() * std::pow(2.0 / length_, 2);
     ArrayXXd D_3 = mats.D_3_0.transpose() * std::pow(2.0 / length_, 3);
@@ -185,11 +191,11 @@ void Fiber::update_linear_operator(double dt, double eta) {
 /// \f[ A * (X^{n+1}, T^{n+1}) = \textrm{RHS} \f]
 /// where
 /// \f[ \textrm{RHS} = (X^n / dt + \textrm{flow} + \textrm{Mobility} * \textrm{force\_external}, ...) \f]
-/// Updates: Fiber::RHS_
+/// Updates: FiberFiniteDifference::RHS_
 /// @param[in] dt timestep size
 /// @param[in] flow [ 3 x n_nodes_ ] matrix of flow field sampled at the fiber points
 /// @param[in] f_external [ 3 x n_nodes_ ] matrix of external forces on the fiber points
-void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
+void FiberFiniteDifference::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
@@ -267,7 +273,7 @@ void Fiber::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
     }
 }
 
-VectorXd Fiber::matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const {
+VectorXd FiberFiniteDifference::matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const {
     auto &mats = matrices_.at(n_nodes_);
     const int np = n_nodes_;
     const int bc_start_i = 4 * np - 14;
@@ -299,7 +305,7 @@ VectorXd Fiber::matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const {
     if (v_boundary.size() > 0)
         y_BC.segment(bc_start_i + 0, 7) = v_boundary;
 
-    if (bc_plus_.first == Fiber::Velocity)
+    if (bc_plus_.first == FiberFiniteDifference::Velocity)
         xs_vT(bc_start_i + 10) = v.col(plus_node).dot(xs_.col(plus_node));
 
     return A_ * x - vT_in + xs_vT + y_BC;
@@ -307,8 +313,8 @@ VectorXd Fiber::matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const {
 
 /// @brief Calculate the force operator cache variable
 ///
-/// Updates: Fiber::force_operator_
-void Fiber::update_force_operator() {
+/// Updates: FiberFiniteDifference::force_operator_
+void FiberFiniteDifference::update_force_operator() {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
 
@@ -329,16 +335,16 @@ void Fiber::update_force_operator() {
 }
 
 /// @brief Update the preconditioner.
-/// Make sure that your Fiber::A_ is current @see Fiber::update_linear_operator
-/// Updates: Fiber::A_LU_
-void Fiber::update_preconditioner() { A_LU_.compute(A_); }
+/// Make sure that your FiberFiniteDifference::A_ is current @see FiberFiniteDifference::update_linear_operator
+/// Updates: FiberFiniteDifference::A_LU_
+void FiberFiniteDifference::update_preconditioner() { A_LU_.compute(A_); }
 
 /// @brief Update linear operator and RHS due to boundary conditions
-/// Updates: Fiber::A_, Fiber::RHS_
+/// Updates: FiberFiniteDifference::A_, FiberFiniteDifference::RHS_
 /// @param[in] dt current timestep size
 /// @param[in] v_on_fiber [3 x n_nodes_] matrix of velocities on fiber nodes
 /// @param[in] f_on_fiber [3 x n_nodes_] matrix of forces on fiber nodes
-void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber) {
+void FiberFiniteDifference::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber) {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);
@@ -506,41 +512,12 @@ void Fiber::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_
     }
 }
 
-/// @brief Return resampling matrix P_{N,-m}.
-/// @param[in] x [N] vector of points x_k.
-/// @param[in] y [N-m] vector
-/// @return Resampling matrix P_{N, -m}
-MatrixXd barycentric_matrix(ArrayRef &x, ArrayRef &y) {
-    int N = x.size();
-    int M = y.size();
-
-    ArrayXd w = ArrayXd::Ones(N);
-    for (int i = 1; i < N; i += 2)
-        w(i) = -1.0;
-    w(0) = 0.5;
-    w(N - 1) = -0.5 * std::pow(-1, N);
-
-    MatrixXd P = MatrixXd::Zero(M, N);
-    for (int j = 0; j < M; ++j) {
-        double S = 0.0;
-        for (int k = 0; k < N; ++k) {
-            S += w(k) / (y(j) - x(k));
-        }
-        for (int k = 0; k < N; ++k) {
-            if (std::fabs(y(j) - x(k)) > std::numeric_limits<double>::epsilon())
-                P(j, k) = w(k) / (y(j) - x(k)) / S;
-            else
-                P(j, k) = 1.0;
-        }
-    }
-    return P;
-}
-
-/// @brief Helper function to initialize Fiber::matrices_
+/// @brief Helper function to initialize FiberFiniteDifference::matrices_
 /// @tparam n_nodes_finite_diff Number of neighboring points to use in finite difference approximation
-/// @return map of Fiber::fib_mat_t initialized for various numbers of points, where the key will be Fiber::n_nodes_
-std::unordered_map<int, Fiber::fib_mat_t> compute_matrices(int n_nodes_finite_diff) {
-    std::unordered_map<int, Fiber::fib_mat_t> res;
+/// @return map of FiberFiniteDifference::fib_mat_t initialized for various numbers of points, where the key will be
+/// FiberFiniteDifference::n_nodes_
+std::unordered_map<int, FiberFiniteDifference::fib_mat_t> compute_matrices_finitediff(int n_nodes_finite_diff) {
+    std::unordered_map<int, FiberFiniteDifference::fib_mat_t> res;
 
     for (auto n_nodes : {8, 16, 24, 32, 48, 64, 96, 128}) {
         auto &mats = res[n_nodes];
@@ -562,8 +539,8 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices(int n_nodes_finite_di
         mats.D_3_0 = utils::finite_diff(mats.alpha, 3, n_nodes_finite_diff + 3).transpose();
         mats.D_4_0 = utils::finite_diff(mats.alpha, 4, n_nodes_finite_diff + 4).transpose();
 
-        mats.P_X = barycentric_matrix(mats.alpha, mats.alpha_roots);
-        mats.P_T = barycentric_matrix(mats.alpha, mats.alpha_tension);
+        mats.P_X = utils::barycentric_matrix(mats.alpha, mats.alpha_roots);
+        mats.P_T = utils::barycentric_matrix(mats.alpha, mats.alpha_tension);
 
         mats.weights_0 = ArrayXd::Ones(mats.alpha.size()) * 2.0;
         mats.weights_0(0) = 1.0;
@@ -581,4 +558,5 @@ std::unordered_map<int, Fiber::fib_mat_t> compute_matrices(int n_nodes_finite_di
 }
 
 // FIXME: Make this an input parameter
-const std::unordered_map<int, Fiber::fib_mat_t> Fiber::matrices_ = compute_matrices(4);
+const std::unordered_map<int, FiberFiniteDifference::fib_mat_t> FiberFiniteDifference::matrices_ =
+    compute_matrices_finitediff(4);

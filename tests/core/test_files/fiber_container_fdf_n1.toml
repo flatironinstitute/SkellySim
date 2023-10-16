@@ -1,0 +1,54 @@
+[[fibers]]
+n_nodes = 32
+parent_body = -1
+parent_site = -1
+force_scale = 0.0
+bending_rigidity = 20.0
+radius = 0.01
+length = 20.0
+minus_clamped = false
+x = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.6451612903225806, 0.0, 0.0, 1.2903225806451613, 0.0, 0.0, 1.935483870967742, 0.0, 0.0, 2.5806451612903225, 0.0, 0.0, 3.225806451612903, 0.0, 0.0, 3.870967741935484, 0.0, 0.0, 4.516129032258064, 0.0, 0.0, 5.161290322580645, 0.0, 0.0, 5.806451612903226, 0.0, 0.0, 6.451612903225806, 0.0, 0.0, 7.096774193548388, 0.0, 0.0, 7.741935483870968, 0.0, 0.0, 8.387096774193548, 0.0, 0.0, 9.032258064516128, 0.0, 0.0, 9.67741935483871, 0.0, 0.0, 10.32258064516129, 0.0, 0.0, 10.96774193548387, 0.0, 0.0, 11.612903225806452, 0.0, 0.0, 12.258064516129032, 0.0, 0.0, 12.903225806451612, 0.0, 0.0, 13.548387096774192, 0.0, 0.0, 14.193548387096776, 0.0, 0.0, 14.838709677419356, 0.0, 0.0, 15.483870967741936, 0.0, 0.0, 16.129032258064516, 0.0, 0.0, 16.774193548387096, 0.0, 0.0, 17.419354838709676, 0.0, 0.0, 18.064516129032256, 0.0, 0.0, 18.709677419354836, 0.0, 0.0, 19.35483870967742, 0.0, 0.0, 20.0,]
+
+[params]
+eta = 1.0
+dt_initial = 0.01
+dt_min = 1e-5
+dt_max = 1.0
+dt_write = 0.01
+t_final = 10.0
+gmres_tol = 1e-8
+fiber_error_tol = 0.1
+seed = 130319
+implicit_motor_activation_delay = 0.0
+periphery_interaction_flag = false
+adaptive_timestep_flag = true
+pair_evaluator = "FMM"
+
+[background]
+components = [ 0, 0, 0,]
+scale_factor = [ 0.0, 0.0, 0.0,]
+uniform = [ 0.0, 0.0, 0.0,]
+
+[periphery]
+n_nodes = 6000
+precompute_file = "periphery_precompute.npz"
+shape = "sphere"
+radius = 6.0
+
+[params.dynamic_instability]
+n_nodes = 0
+v_growth = 0.0
+f_catastrophe = 0.0
+v_grow_collision_scale = 0.5
+f_catastrophe_collision_scale = 2.0
+nucleation_rate = 0.0
+radius = 0.025
+min_length = 0.5
+bending_rigidity = 0.0025
+min_separation = 0.1
+
+[params.periphery_binding]
+active = false
+polar_angle_start = 0.0
+polar_angle_end = 1.5707963267948966
+threshold = 0.75

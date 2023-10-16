@@ -408,6 +408,9 @@ class Params():
         Type of evaluator to use for kernels (stokeslet, stokes double layer, etc)
         Valid values: "CPU", "FMM"
     periphery_binding : PeripheryBinding, default: :obj:`PeripheryBinding()`
+    fiber_type : str, default: :obj:`"FiniteDifference"`
+        Type of fiber implementation to use
+        Valid values: "FiniteDifference"
     """
     eta: float = 1.0
     dt_initial: float = 0.025
@@ -424,6 +427,7 @@ class Params():
     periphery_interaction_flag: bool = False
     adaptive_timestep_flag: bool = True
     pair_evaluator: str = "FMM"
+    fiber_type: str = "FiniteDifference"
 
 
 @dataclass

@@ -3,7 +3,9 @@
 #include <numeric>
 
 #include <body.hpp>
-#include <fiber.hpp>
+#include <fiber_container_base.hpp>
+#include <fiber_container_finite_difference.hpp>
+#include <fiber_finite_difference.hpp>
 #include <params.hpp>
 #include <rng.hpp>
 #include <system.hpp>
@@ -23,7 +25,7 @@ void dynamic_instability() {
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 
     const double dt = System::get_properties().dt;
-    FiberContainer &fc = *System::get_fiber_container();
+    FiberContainerBase *fc = System::get_fiber_container();
     BodyContainer &bc = *System::get_body_container();
     Params &params = *System::get_params();
     if (params.dynamic_instability.n_nodes == 0)
@@ -57,29 +59,37 @@ void dynamic_instability() {
     // Array of occupied sites across all bodies
     std::vector<uint8_t> occupied_flat(bc.get_global_site_count(), 0);
 
-    int n_fib_old = fc.get_global_count();
-    auto fib = fc.fibers.begin();
+    // Get the fibers
+    int n_fib_old = fc->get_global_fiber_count();
     int n_active_old_local = 0;
-    while (fib != fc.fibers.end()) {
-        fib->v_growth_ = params.dynamic_instability.v_growth;
-        double f_cat = params.dynamic_instability.f_catastrophe;
-        if (fib->is_plus_pinned()) {
-            fib->v_growth_ *= params.dynamic_instability.v_grow_collision_scale;
-            f_cat *= params.dynamic_instability.f_catastrophe_collision_scale;
-        }
-        if (fib->attached_to_body())
-            n_active_old_local++;
-
-        // Remove fiber if catastrophe event
-        if (RNG::uniform() > exp(-dt * f_cat)) {
-            fib = fc.fibers.erase(fib);
-        } else {
+    // FIXME This is specified for finite difference fibers only
+    if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
+        FiberContainerFiniteDifference *fibers_fd = static_cast<FiberContainerFiniteDifference *>(fc);
+        auto fib = fibers_fd->fibers_.begin();
+        while (fib != fibers_fd->fibers_.end()) {
+            fib->v_growth_ = params.dynamic_instability.v_growth;
+            double f_cat = params.dynamic_instability.f_catastrophe;
+            if (fib->is_plus_pinned()) {
+                fib->v_growth_ *= params.dynamic_instability.v_grow_collision_scale;
+                f_cat *= params.dynamic_instability.f_catastrophe_collision_scale;
+            }
             if (fib->attached_to_body())
-                occupied_flat[site_index(fib->binding_site_)] = 1;
-            fib->length_prev_ = fib->length_;
-            fib->length_ += dt * fib->v_growth_;
-            fib++;
+                n_active_old_local++;
+
+            // Remove fiber if catastrophe event
+            if (RNG::uniform() > exp(-dt * f_cat)) {
+                fib = fibers_fd->fibers_.erase(fib);
+            } else {
+                if (fib->attached_to_body())
+                    occupied_flat[site_index(fib->binding_site_)] = 1;
+                fib->length_prev_ = fib->length_;
+                fib->length_ += dt * fib->v_growth_;
+                fib++;
+            }
         }
+    } else {
+        throw std::runtime_error("dynamic_instability (grow_remove) fiber type " + std::to_string(fc->fiber_type_) +
+                                 " not implemented");
     }
     int n_active_old = 0;
     MPI_Reduce(&n_active_old_local, &n_active_old, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -113,7 +123,15 @@ void dynamic_instability() {
     }
 
     // Total number of (current) fibers on this rank
-    int n_fibers = fc.fibers.size();
+    int n_fibers = 0;
+    // FIXME Again, do this specifically for the finite difference fibers
+    if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
+        const FiberContainerFiniteDifference *fibers_fd = static_cast<const FiberContainerFiniteDifference *>(fc);
+        n_fibers = fibers_fd->fibers_.size();
+    } else {
+        throw std::runtime_error("dynamic_instability (n_fibers) fiber type " + std::to_string(fc->fiber_type_) +
+                                 " not implemented");
+    }
     // Total number of (current) fibers across ranks
     std::vector<int> fiber_counts(mpi_rank == 0 ? mpi_size : 0);
     MPI_Gather(&n_fibers, 1, MPI_INT, fiber_counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -145,23 +163,28 @@ void dynamic_instability() {
     // Nucleate the fibers
     for (const auto &min_fib : new_fibers) {
         if (min_fib.rank == mpi_rank) {
-            Fiber fib(params.dynamic_instability.n_nodes, params.dynamic_instability.radius,
-                      params.dynamic_instability.min_length, params.dynamic_instability.bending_rigidity, params.eta);
-            fib.v_growth_ = 0.0;
-            fib.binding_site_ = min_fib.binding_site;
+            // FIXME finite difference fibers only for now
+            if (fc->fiber_type_ == FiberContainerBase::FIBERTYPE::FiniteDifference) {
+                FiberContainerFiniteDifference *fibers_fd = static_cast<FiberContainerFiniteDifference *>(fc);
+                FiberFiniteDifference fib(params.dynamic_instability.n_nodes, params.dynamic_instability.radius,
+                                          params.dynamic_instability.min_length,
+                                          params.dynamic_instability.bending_rigidity, params.eta);
+                fib.v_growth_ = 0.0;
+                fib.binding_site_ = min_fib.binding_site;
 
-            Eigen::MatrixXd x(3, fib.n_nodes_);
-            Eigen::ArrayXd s = Eigen::ArrayXd::LinSpaced(fib.n_nodes_, 0, fib.length_).transpose();
-            Eigen::Vector3d origin = bc.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second);
-            Eigen::Vector3d u = (origin - bc.bodies[fib.binding_site_.first]->get_position()).normalized();
+                Eigen::MatrixXd x(3, fib.n_nodes_);
+                Eigen::ArrayXd s = Eigen::ArrayXd::LinSpaced(fib.n_nodes_, 0, fib.length_).transpose();
+                Eigen::Vector3d origin = bc.get_nucleation_site(fib.binding_site_.first, fib.binding_site_.second);
+                Eigen::Vector3d u = (origin - bc.bodies[fib.binding_site_.first]->get_position()).normalized();
 
-            for (int i = 0; i < 3; ++i)
-                fib.x_.row(i) = origin(i) + u(i) * s;
+                for (int i = 0; i < 3; ++i)
+                    fib.x_.row(i) = origin(i) + u(i) * s;
 
-            fc.fibers.push_back(fib);
-            spdlog::get("SkellySim global")
-                ->debug("Inserted fiber on rank {} at site [{}, {}]", mpi_rank, min_fib.binding_site.first,
-                        min_fib.binding_site.second);
+                fibers_fd->fibers_.push_back(fib);
+                spdlog::get("SkellySim global")
+                    ->debug("Inserted fiber on rank {} at site [{}, {}]", mpi_rank, min_fib.binding_site.first,
+                            min_fib.binding_site.second);
+            }
         }
     }
     spdlog::info("Nucleated {} fibers", new_fibers.size());

@@ -16,6 +16,7 @@ Params::Params(toml::value &pt) {
     implicit_motor_activation_delay = toml::find_or(pt, "implicit_motor_activation_delay", 0.0);
     periphery_interaction_flag = toml::find_or(pt, "periphery_interaction_flag", false);
     pair_evaluator = toml::find_or(pt, "pair_evaluator", "FMM");
+    fiber_type = toml::find_or(pt, "fiber_type", "None");
 
     if (pt.contains("dynamic_instability")) {
         const auto &di = pt.at("dynamic_instability");
@@ -97,4 +98,5 @@ void Params::print() {
     spdlog::info("implicit_motor_activation_delay   = {}", implicit_motor_activation_delay);
     spdlog::info("periphery_interaction_flag        = {}", periphery_interaction_flag);
     spdlog::info("pair_evaluator                    = {}", pair_evaluator);
+    spdlog::info("fiber_type                        = {}", fiber_type);
 }

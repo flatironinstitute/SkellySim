@@ -11,7 +11,7 @@
 
 class SphericalBody;
 class DeformableBody;
-class Fiber;
+class FiberFiniteDifference;
 
 /// Class to represent the containing boundary of the simulated system
 ///
@@ -92,9 +92,10 @@ class Periphery {
         throw std::runtime_error("Collision undefined on base Periphery class\n");
     };
 
-    virtual Eigen::MatrixXd fiber_interaction(const Fiber &fiber,
+    // FIXME XXX: Fix this to be more clever in terms of taking in and spitting out fibers (containers?)
+    virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
                                               const fiber_periphery_interaction_t &fp_params) const {
-        throw std::runtime_error("fiber_interaction undefined on base Periphery class\n");
+        throw std::runtime_error("fiber_interaction_finitediff undefined on base Periphery class\n");
     }
 
     virtual std::tuple<double, double, double> get_dimensions() {
@@ -118,15 +119,15 @@ class Periphery {
 class SphericalPeriphery : public Periphery {
   public:
     double radius_;
-    SphericalPeriphery(const toml::value &periphery_table, const Params &params)
-        : Periphery(periphery_table, params) {
+    SphericalPeriphery(const toml::value &periphery_table, const Params &params) : Periphery(periphery_table, params) {
         radius_ = toml::find_or<double>(periphery_table, "radius", 0.0);
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd fiber_interaction(const Fiber &fiber, const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
+                                              const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {radius_, radius_, radius_}; };
 };
 
@@ -145,7 +146,8 @@ class EllipsoidalPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd fiber_interaction(const Fiber &fiber, const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
+                                              const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
 };
 
@@ -154,8 +156,7 @@ class GenericPeriphery : public Periphery {
     double a_;
     double b_;
     double c_;
-    GenericPeriphery(const toml::value &periphery_table, const Params &params)
-        : Periphery(periphery_table, params) {
+    GenericPeriphery(const toml::value &periphery_table, const Params &params) : Periphery(periphery_table, params) {
         double a = node_pos_.row(0).array().abs().maxCoeff();
         double b = node_pos_.row(1).array().abs().maxCoeff();
         double c = node_pos_.row(2).array().abs().maxCoeff();
@@ -167,7 +168,8 @@ class GenericPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
-    virtual Eigen::MatrixXd fiber_interaction(const Fiber &fiber, const fiber_periphery_interaction_t &fp_params) const;
+    virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
+                                              const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
 };
 
