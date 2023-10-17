@@ -6,6 +6,7 @@
 /// Class containing input parameters for the simulated system
 class Params {
   public:
+    int skellysim_trajectory_version;
     double eta;
     double dt_initial;
     double beta_up;

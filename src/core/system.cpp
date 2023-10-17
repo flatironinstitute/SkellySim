@@ -53,7 +53,9 @@ struct properties_t properties {
 };
 
 /// @brief Get current system-wide properties (time, timestep, etc.)
-struct properties_t &get_properties() { return properties; };
+struct properties_t &get_properties() {
+    return properties;
+};
 
 /// @brief Get current MPI-rank local solution vector
 Eigen::VectorXd &get_curr_solution() { return curr_solution_; }
@@ -181,6 +183,38 @@ void write_config(const std::string &config_file) {
     auto trajectory_open_mode = std::ofstream::binary | std::ofstream::out;
     auto ofs = std::ofstream(config_file, trajectory_open_mode);
     write(ofs);
+}
+
+/// @brief Write a header that contains the trajectory version information
+///
+/// @param[in] ofs output stream to write to
+void write_header(std::ofstream &ofs) {
+    spdlog::trace("System::write_header");
+
+    // We just need the header file information
+    auto now = std::chrono::system_clock::now();
+    std::time_t current_time = std::chrono::system_clock::to_time_t(now);
+    auto simdate = std::ctime(&current_time);
+    // FIXME XXX This only works on linux machines, but I don't think anybody is going to be using SkellySim on windows
+    // anytime soon...
+    char c_hostname[1024];
+    gethostname(c_hostname, sizeof(c_hostname));
+    std::string hostname = c_hostname;
+    const header_map_t to_write{params_.skellysim_trajectory_version,
+                                size_,
+                                (int)fc_->fiber_type_,
+                                SKELLYSIM_VERSION,
+                                SKELLYSIM_COMMIT,
+                                simdate,
+                                hostname};
+
+    // Make sure we are just on rank 0 for the output
+    if (rank_ == 0) {
+        msgpack::pack(ofs, to_write);
+        ofs.flush();
+    }
+
+    spdlog::trace("System::write_header return");
 }
 
 /// @brief Set system state to last state found in trajectory files
@@ -652,8 +686,13 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
         resume_from_trajectory(filename);
         trajectory_open_mode = trajectory_open_mode | std::ofstream::app;
     }
-    if (rank_ == 0)
+    if (rank_ == 0) {
         ofs_ = std::ofstream(filename, trajectory_open_mode);
+        // If we are not a resume, then dump the header information into the trajectory file
+        if (!resume_flag) {
+            write_header(ofs_);
+        }
+    }
 
     write_config("skelly_sim.initial_config");
 

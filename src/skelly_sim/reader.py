@@ -207,6 +207,8 @@ class TrajectoryReader:
         Global toml data associated with the simulation
     fiber_type : int
         Fiber type associated with the simulation
+    trajectory_version : int
+        SkellySim trajectory version (if defined, otherwise, 0)
     """
 
     def __init__(self, toml_file: str = 'skelly_config.toml'):
@@ -220,11 +222,14 @@ class TrajectoryReader:
         """
 
         self._fh = None
+        self._unpacker = None               # Internal unpacker for the header and index routines
         self._fpos: List[int] = []
         self._frame_data: dict = None
         self.times: List[float] = []
         self.config_data: dict = {}
+        self.header_data: dict = {}
         self.fiber_type: int = 0
+        self.trajectory_version: int = 0
 
         with open(toml_file, 'r') as f:
             self.config_data = toml.load(f)
@@ -234,6 +239,9 @@ class TrajectoryReader:
         mtime = int(os.stat(traj_file).st_mtime)
         index_file = traj_file + '.cindex'
         self._fh = open(traj_file, "rb")
+
+        # Try to unpack the first object in the file, as it may be a header, or might not be
+        self._read_header()
 
         if os.path.isfile(index_file):
             with open(index_file, 'rb') as f:
@@ -262,6 +270,26 @@ class TrajectoryReader:
         self._fh.seek(self._fpos[frameno])
         self._frame_data = msgpack.Unpacker(self._fh, raw=False, object_hook=_eigen_to_numpy).unpack()
 
+    def _read_header(self):
+        """
+        Read the header (if it exists) in the file, or detect if we cannot do this, to make sur ethe file
+        is set appropriately.
+        """
+        self._unpacker = msgpack.Unpacker(self._fh, raw=False)
+        header_data = next(self._unpacker)
+        # Check to see if we have old data, or new data (does the header exist)
+        if 'skellysim_trajversion' in header_data:
+            # Good news, we have a header!
+            self.header_data = header_data
+            self.trajectory_version = self.header_data['skellysim_trajversion']
+            self.fiber_type = self.header_data['fiber_type']
+        else:
+            # Bad news, we do not have a header!
+            self.trajectory_version = 0
+            self.fiber_type = 0
+            # Reset the file pointer for the _build_index routine
+            self._fh.seek(0)
+
     def _build_index(self, mtime: float, index_file: str):
         """
         Reads through the loaded trajectory, storing file position offsets and simulation times of each frame.
@@ -274,21 +302,19 @@ class TrajectoryReader:
         index_file : str
             Path to index file we wish to create
         """
-        unpacker = msgpack.Unpacker(self._fh, raw=False)
-
         self._fpos = []
         self.times = []
 
         while True:
             try:
-                self._fpos.append(unpacker.tell())
-                n_keys = unpacker.read_map_header()
+                self._fpos.append(self._unpacker.tell())
+                n_keys = self._unpacker.read_map_header()
                 for key in range(n_keys):
-                    key = unpacker.unpack()
+                    key = self._unpacker.unpack()
                     if key == 'time':
-                        self.times.append(unpacker.unpack())
+                        self.times.append(self._unpacker.unpack())
                     else:
-                        unpacker.skip()
+                        self._unpacker.skip()
 
             except msgpack.exceptions.OutOfData:
                 self._fpos.pop()
@@ -303,13 +329,16 @@ class TrajectoryReader:
             msgpack.dump(index, f)
 
     def __getitem__(self, key):
-        if key == 'bodies':
+        if self.trajectory_version < 1:
+            if key == 'bodies' or key == 'fibers':
+                return self._frame_data[key][0]
             return self._frame_data[key][0]
-        elif key == 'fibers':
-            # Need to put down what kind of fiber we are...
-            self.fiber_type = self._frame_data[key][0]
-            return self._frame_data[key][1]
-        return self._frame_data[key]
+        else:
+            if key == 'bodies':
+                return self._frame_data[key][0]
+            elif key == 'fibers':
+                return self._frame_data[key][1]
+            return self._frame_data[key]
 
     def __iter__(self):
         return iter(self._frame_data)

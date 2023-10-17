@@ -34,7 +34,27 @@ TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_fl
     lstat(input_file.c_str(), &s);
     mtime = s.st_mtime;
 
+    // Try to load the header information
+    read_header();
+
     load_index(input_file);
+}
+
+void TrajectoryReader::read_header() {
+    spdlog::trace("TrajectoryReader::read_header");
+
+    int size, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    msgpack::unpack(oh_, addr_, buflen_, offset_);
+    msgpack::object obj = oh_.get();
+
+    header_map_t const &header_info = obj.as<header_map_t>();
+
+    // Check to see what is going on in the header
+
+    spdlog::trace("TrajectoryReader::read_header return");
 }
 
 void TrajectoryReader::load_index(const std::string &traj_file) {
@@ -160,8 +180,8 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
         for (int i = 0; i < bc.deformable_bodies.size(); ++i)
             bc.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
         if (size > min_state.rng_state.size() && resume_flag_) {
-            spdlog::error(
-                "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
+            spdlog::error("More MPI ranks provided than previous run for resume. This is currently unsupported for "
+                          "RNG reasons.");
             MPI_Finalize();
             exit(1);
         } else if (size < min_state.rng_state.size() && !silence_output && resume_flag_) {

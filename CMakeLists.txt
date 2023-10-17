@@ -9,7 +9,8 @@ execute_process(
 )
 
 set(SKELLYSIM_VERSION "0.9.12")
-message("SkellySim version: v${SKELLYSIM_VERSION} (${SKELLYSIM_COMMIT})")
+set(SKELLYSIM_TRAJECTORY_VERSION "1")
+message("SkellySim version: v${SKELLYSIM_VERSION} (${SKELLYSIM_COMMIT}) (Trajectory: ${SKELLYSIM_TRAJECTORY_VERSION})")
 
 project(
   skelly_sim
@@ -43,6 +44,7 @@ add_compile_options("$<$<CONFIG:RELEASE>:-g>")
 
 add_definitions("-DSKELLYSIM_VERSION=\"${SKELLYSIM_VERSION}\"")
 add_definitions("-DSKELLYSIM_COMMIT=\"${SKELLYSIM_COMMIT}\"")
+add_definitions("-DSKELLYSIM_TRAJECTORY_VERSION=${SKELLYSIM_TRAJECTORY_VERSION}")
 
 # required compiler features
 find_package(MPI REQUIRED)
