@@ -689,12 +689,15 @@ void init(const std::string &input_file, bool resume_flag, bool listen_flag) {
     if (rank_ == 0) {
         ofs_ = std::ofstream(filename, trajectory_open_mode);
         // If we are not a resume, then dump the header information into the trajectory file
-        if (!resume_flag) {
+        if (!resume_flag && !listen_flag) {
             write_header(ofs_);
         }
     }
 
-    write_config("skelly_sim.initial_config");
+    // Do not write out an initial config if listening!
+    if (!listen_flag) {
+        write_config("skelly_sim.initial_config");
+    }
 
     spdlog::trace("System::init return");
 }
