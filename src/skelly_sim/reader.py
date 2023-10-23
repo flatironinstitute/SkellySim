@@ -278,10 +278,10 @@ class TrajectoryReader:
         self._unpacker = msgpack.Unpacker(self._fh, raw=False)
         header_data = next(self._unpacker)
         # Check to see if we have old data, or new data (does the header exist)
-        if 'skellysim_trajversion' in header_data:
+        if 'trajversion' in header_data:
             # Good news, we have a header!
             self.header_data = header_data
-            self.trajectory_version = self.header_data['skellysim_trajversion']
+            self.trajectory_version = self.header_data['trajversion']
             self.fiber_type = self.header_data['fiber_type']
         else:
             # Bad news, we do not have a header!

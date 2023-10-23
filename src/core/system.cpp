@@ -200,7 +200,7 @@ void write_header(std::ofstream &ofs) {
     char c_hostname[1024];
     gethostname(c_hostname, sizeof(c_hostname));
     std::string hostname = c_hostname;
-    const header_map_t to_write{params_.skellysim_trajectory_version,
+    const header_map_t to_write{SKELLYSIM_TRAJECTORY_VERSION,
                                 size_,
                                 (int)fc_->fiber_type_,
                                 SKELLYSIM_VERSION,

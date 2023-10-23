@@ -57,7 +57,7 @@ void TrajectoryReader::read_header() {
     header_map_t const &header_info = obj.as<header_map_t>();
 
     // Check to see what is going on in the header
-    spdlog::debug("  Trajectory Header::trajectory_version: {}", header_info.skellysim_trajversion);
+    spdlog::debug("  Trajectory Header::trajectory_version: {}", header_info.trajversion);
     spdlog::debug("  Trajectory Header::number_mpi_ranks: {}", header_info.number_mpi_ranks);
     spdlog::debug("  Trajectory Header::fiber_type: {}", header_info.fiber_type);
     spdlog::debug("  Trajectory Header::skellysim_version: {}", header_info.skellysim_version);
@@ -68,9 +68,8 @@ void TrajectoryReader::read_header() {
     // FIXME XXX If we detect a header that is of version 0, throw an error, as we don't support backward compatibility
     // for the reading and writing of trajectory files to the previous version. Probably want to update this for full
     // backward compatibility in the future.
-    if (header_info.skellysim_trajversion < 1) {
-        throw std::runtime_error("Trajectory version " + std::to_string(header_info.skellysim_trajversion) +
-                                 " not supported.");
+    if (header_info.trajversion < 1) {
+        throw std::runtime_error("Trajectory version " + std::to_string(header_info.trajversion) + " not supported.");
     }
 
     spdlog::trace("TrajectoryReader::read_header return");

@@ -43,15 +43,15 @@ typedef struct output_map_t {
 /// Contains all of the header information for the simulation
 typedef struct header_map_t {
     // Make sure that the trajectory version always comes first!!!!!
-    int skellysim_trajversion;     ///< SKELLYSIM_TRAJECTORY_VERSION
+    int trajversion;               ///< SKELLYSIM_TRAJECTORY_VERSION
     int number_mpi_ranks;          ///< System::rank_
     int fiber_type;                ///< System::fc_->fiber_type_
     std::string skellysim_version; ///< SKELLYSIM_VERSION
     std::string skellysim_commit;  ///< SKELLYSIM_COMMIT
     std::string simdate;           ///< Date of simulation from chrono and ctime
     std::string hostname;          ///< Hostnames of the simulation
-    MSGPACK_DEFINE_MAP(skellysim_trajversion, number_mpi_ranks, fiber_type, skellysim_version, skellysim_commit,
-                       simdate, hostname);
+    MSGPACK_DEFINE_MAP(trajversion, number_mpi_ranks, fiber_type, skellysim_version, skellysim_commit, simdate,
+                       hostname);
 } header_map_t;
 
 #endif

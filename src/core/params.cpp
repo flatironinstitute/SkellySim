@@ -1,8 +1,6 @@
 #include <params.hpp>
 
 Params::Params(toml::value &pt) {
-    // Trajectory version is ready from the executable file build, unless overwritten
-    skellysim_trajectory_version = (int)SKELLYSIM_TRAJECTORY_VERSION;
 
     eta = toml::find_or(pt, "eta", 1.0);
     dt_initial = toml::find_or(pt, "dt_initial", 1E-2);
@@ -85,7 +83,6 @@ void Params::print() {
     // Print out the information that we have on the system (only one, don't do it to global)
     // XXX: Whenever you add a new variable, make sure to also add a print statement here!
     spdlog::info("****** SkellySim {} ({}) ******", SKELLYSIM_VERSION, SKELLYSIM_COMMIT);
-    spdlog::info("trajectory version                = {}", skellysim_trajectory_version);
     spdlog::info("******    Parameters     ******");
     spdlog::info("eta                               = {}", eta);
     spdlog::info("dt_initial                        = {}", dt_initial);
