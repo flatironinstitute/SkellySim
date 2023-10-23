@@ -1,12 +1,13 @@
 #include <skelly_sim.hpp>
 
 #include <body.hpp>
+#include <body_deformable.hpp>
+#include <body_spherical.hpp>
 #include <cnpy.hpp>
 #include <kernels.hpp>
 #include <parse_util.hpp>
 #include <periphery.hpp>
 #include <utils.hpp>
-
 
 void DeformableBody::min_copy(const std::shared_ptr<DeformableBody> &other) {}
 void DeformableBody::update_RHS(MatrixRef &v_on_body) {}

@@ -1,13 +1,13 @@
 #include <skelly_sim.hpp>
 
 #include <body.hpp>
+#include <body_deformable.hpp>
+#include <body_spherical.hpp>
 #include <cnpy.hpp>
 #include <kernels.hpp>
 #include <parse_util.hpp>
 #include <periphery.hpp>
 #include <utils.hpp>
-
-const std::string Body::EXTFORCE_name[] = {"Linear", "Oscillatory"};
 
 void SphericalBody::step(double dt, VectorRef &body_solution) {
     int sol_offset = 3 * n_nodes_;
@@ -248,17 +248,19 @@ SphericalBody::SphericalBody(const toml::value &body_table, const Params &params
         } else if (external_force_type_str == "Oscillatory") {
             external_force_type_ = EXTFORCE::Oscillatory;
             extforce_oscillation_amplitude_ = toml::find<double>(body_table, "external_oscillation_force_amplitude");
-            extforce_oscillation_omega_ = 2.0 * M_PI * toml::find<double>(body_table, "external_oscillation_force_frequency");
+            extforce_oscillation_omega_ =
+                2.0 * M_PI * toml::find<double>(body_table, "external_oscillation_force_frequency");
             extforce_oscillation_phase_ = toml::find<double>(body_table, "external_oscillation_force_phase");
         }
     }
 
     // Print functionality (TODO)
     spdlog::info("  body external force type        = {}", EXTFORCE_name[external_force_type_]);
-    spdlog::info("  body external force director    = [ {}, {}, {} ]", external_force_[0], external_force_[1], external_force_[2]);
+    spdlog::info("  body external force director    = [ {}, {}, {} ]", external_force_[0], external_force_[1],
+                 external_force_[2]);
     if (external_force_type_ == EXTFORCE::Oscillatory) {
         spdlog::info("  body external oscillatory force amplitutde  = {}", extforce_oscillation_amplitude_);
-        spdlog::info("  body external oscillatory force frequency   = {}", extforce_oscillation_omega_/(2.0 * M_PI));
+        spdlog::info("  body external oscillatory force frequency   = {}", extforce_oscillation_omega_ / (2.0 * M_PI));
         spdlog::info("  body external oscillatory force phase       = {}", extforce_oscillation_phase_);
     }
 

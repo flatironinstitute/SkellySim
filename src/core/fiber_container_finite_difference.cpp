@@ -1,6 +1,7 @@
 #include <skelly_sim.hpp>
 
 #include <body.hpp>
+#include <body_container.hpp>
 #include <fiber_container_finite_difference.hpp>
 #include <periphery.hpp>
 #include <system.hpp>

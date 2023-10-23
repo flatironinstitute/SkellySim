@@ -3,6 +3,9 @@
 #include <numeric>
 
 #include <body.hpp>
+#include <body_container.hpp>
+#include <body_deformable.hpp>
+#include <body_spherical.hpp>
 #include <fiber_container_base.hpp>
 #include <fiber_container_finite_difference.hpp>
 #include <fiber_finite_difference.hpp>

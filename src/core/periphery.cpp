@@ -1,4 +1,6 @@
 #include <body.hpp>
+#include <body_deformable.hpp>
+#include <body_spherical.hpp>
 #include <cnpy.hpp>
 #include <fiber_container_finite_difference.hpp>
 #include <fiber_finite_difference.hpp>
