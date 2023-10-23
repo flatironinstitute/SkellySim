@@ -14,12 +14,13 @@ class TrajectoryReader {
     std::size_t get_n_frames() const { return index.offsets.size(); }
 
   private:
-    int fd_;                           ///< File descriptor
-    std::size_t buflen_;               ///< size of our file
-    char *addr_;                       ///< mmap address
-    std::size_t offset_;               ///< current byte location in trajectory
-    msgpack::object_handle oh_;        ///< handle to last read frame
-    bool resume_flag_;                 ///< Reader being used to load resume data
+    int fd_;                    ///< File descriptor
+    std::size_t buflen_;        ///< size of our file
+    char *addr_;                ///< mmap address
+    std::size_t offset_;        ///< current byte location in trajectory
+    std::size_t header_offset_; ///< header offset size in trajectory
+    msgpack::object_handle oh_; ///< handle to last read frame
+    bool resume_flag_;          ///< Reader being used to load resume data
     long int mtime;
 
     struct {
@@ -29,6 +30,7 @@ class TrajectoryReader {
         MSGPACK_DEFINE_MAP(mtime, offsets, times);
     } index;
 
+    void read_header();
     void load_index(const std::string &traj_file);
     void build_index(const std::string &index_file);
 };

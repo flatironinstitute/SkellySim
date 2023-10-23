@@ -16,6 +16,8 @@
 
 TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_flag)
     : offset_(0), resume_flag_(resume_flag) {
+    spdlog::trace("TrajectoryReader::TrajectoryReader");
+
     fd_ = open(input_file.c_str(), O_RDONLY);
     if (fd_ == -1)
         throw std::runtime_error("Unable to open trajectory file " + input_file + " for resume.");
@@ -34,7 +36,43 @@ TrajectoryReader::TrajectoryReader(const std::string &input_file, bool resume_fl
     lstat(input_file.c_str(), &s);
     mtime = s.st_mtime;
 
+    // Try to load the header information
+    read_header();
+
     load_index(input_file);
+
+    spdlog::trace("TrajectoryReader::TrajectoryReader return");
+}
+
+void TrajectoryReader::read_header() {
+    spdlog::trace("TrajectoryReader::read_header");
+
+    // Basically the same functionality as in build_index
+    offset_ = 0;
+    read_next_frame();
+
+    // read_next_frame has already unpacked the object
+    msgpack::object obj = oh_.get();
+
+    header_map_t const &header_info = obj.as<header_map_t>();
+
+    // Check to see what is going on in the header
+    spdlog::debug("  Trajectory Header::trajectory_version: {}", header_info.trajversion);
+    spdlog::debug("  Trajectory Header::number_mpi_ranks: {}", header_info.number_mpi_ranks);
+    spdlog::debug("  Trajectory Header::fiber_type: {}", header_info.fiber_type);
+    spdlog::debug("  Trajectory Header::skellysim_version: {}", header_info.skellysim_version);
+    spdlog::debug("  Trajectory Header::skellysim_commit: {}", header_info.skellysim_commit);
+    spdlog::debug("  Trajectory Header::simdate: {}", header_info.simdate);
+    spdlog::debug("  Trajectory Header::hostname: {}", header_info.hostname);
+
+    // FIXME XXX If we detect a header that is of version 0, throw an error, as we don't support backward compatibility
+    // for the reading and writing of trajectory files to the previous version. Probably want to update this for full
+    // backward compatibility in the future.
+    if (header_info.trajversion < 1) {
+        throw std::runtime_error("Trajectory version " + std::to_string(header_info.trajversion) + " not supported.");
+    }
+
+    spdlog::trace("TrajectoryReader::read_header return");
 }
 
 void TrajectoryReader::load_index(const std::string &traj_file) {
@@ -56,11 +94,15 @@ void TrajectoryReader::load_index(const std::string &traj_file) {
 }
 
 std::size_t TrajectoryReader::TrajectoryReader::read_next_frame() {
+    spdlog::trace("TrajectoryReader::read_next_frame");
+
     if (offset_ >= buflen_)
         return 0;
 
     std::size_t old_offset = offset_;
     msgpack::unpack(oh_, addr_, buflen_, offset_);
+
+    spdlog::trace("TrajectoryReader::read_next_frame return");
     return offset_ - old_offset;
 }
 
@@ -160,8 +202,8 @@ void TrajectoryReader::unpack_current_frame(bool silence_output) {
         for (int i = 0; i < bc.deformable_bodies.size(); ++i)
             bc.deformable_bodies[i]->min_copy(min_state.bodies.deformable_bodies[i]);
         if (size > min_state.rng_state.size() && resume_flag_) {
-            spdlog::error(
-                "More MPI ranks provided than previous run for resume. This is currently unsupported for RNG reasons.");
+            spdlog::error("More MPI ranks provided than previous run for resume. This is currently unsupported for "
+                          "RNG reasons.");
             MPI_Finalize();
             exit(1);
         } else if (size < min_state.rng_state.size() && !silence_output && resume_flag_) {

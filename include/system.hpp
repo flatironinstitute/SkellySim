@@ -38,6 +38,7 @@ bool step();
 void run();
 void write();
 void write(std::ofstream &);
+void write_header(std::ofstream &);
 bool check_collision();
 void backup();
 void restore();
