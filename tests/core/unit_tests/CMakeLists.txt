@@ -3,6 +3,7 @@ set(TEST_LIST
   unit_test_fiber_finite_difference
   unit_test_fibercontainer_finite_difference
   unit_test_serialization
+  unit_test_body_ellipsoidal
 )
 
 # Setup the MPI testing environment for the MPI tests

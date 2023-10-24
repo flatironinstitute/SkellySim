@@ -3,6 +3,7 @@
 #include <body.hpp>
 #include <body_container.hpp>
 #include <body_deformable.hpp>
+#include <body_ellipsoidal.hpp>
 #include <body_spherical.hpp>
 #include <fiber_container_finite_difference.hpp>
 #include <kernels.hpp>
@@ -494,6 +495,8 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
             bodies.emplace_back(new SphericalBody(body_table, params));
         else if (shape == std::string("deformable")) {
             bodies.emplace_back(new DeformableBody(body_table, params));
+        } else if (shape == std::string("ellipsoidal")) {
+            bodies.emplace_back(new EllipsoidalBody(body_table, params));
         } else {
             throw std::runtime_error("Unknown body shape: " + shape);
         }

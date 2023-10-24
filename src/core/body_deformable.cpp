@@ -2,6 +2,7 @@
 
 #include <body.hpp>
 #include <body_deformable.hpp>
+#include <body_ellipsoidal.hpp>
 #include <body_spherical.hpp>
 #include <cnpy.hpp>
 #include <kernels.hpp>
@@ -32,5 +33,9 @@ bool DeformableBody::check_collision(const SphericalBody &body, double threshold
 }
 bool DeformableBody::check_collision(const DeformableBody &body, double threshold) const {
     spdlog::warn("check_collision not defined for DeformableBody->DeformableBody");
+    return false;
+}
+bool DeformableBody::check_collision(const EllipsoidalBody &body, double threshold) const {
+    spdlog::warn("check_collision not defined for DeformableBody->EllipsoidalBody");
     return false;
 }

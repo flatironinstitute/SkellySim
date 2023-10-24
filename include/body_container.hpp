@@ -5,6 +5,7 @@
 
 #include <Eigen/LU>
 #include <body_deformable.hpp>
+#include <body_ellipsoidal.hpp>
 #include <body_spherical.hpp>
 #include <kernels.hpp>
 #include <params.hpp>
@@ -24,6 +25,7 @@ class BodyContainer {
     std::vector<std::shared_ptr<Body>> bodies;
     std::vector<std::shared_ptr<SphericalBody>> spherical_bodies;
     std::vector<std::shared_ptr<DeformableBody>> deformable_bodies;
+    std::vector<std::shared_ptr<EllipsoidalBody>> ellipsoidal_bodies;
     std::unordered_map<std::shared_ptr<Body>, int> solution_offsets_;
     std::unordered_map<std::shared_ptr<Body>, int> node_offsets_;
 
@@ -151,7 +153,7 @@ class BodyContainer {
     }
 
     /// @brief msgpack serialization routine
-    MSGPACK_DEFINE(spherical_bodies, deformable_bodies);
+    MSGPACK_DEFINE(spherical_bodies, deformable_bodies, ellipsoidal_bodies);
 };
 
 #endif

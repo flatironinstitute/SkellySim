@@ -10,6 +10,7 @@
 class Periphery;
 class SphericalBody;
 class DeformableBody;
+class EllipsoidalBody;
 class FiberContainerFiniteDifference;
 
 /// Class for "small" bodies such as MTOCs
@@ -60,6 +61,9 @@ class Body {
 
     /// @brief dummy method to be overriden by derived classes
     virtual bool check_collision(const DeformableBody &body, double threshold) const = 0;
+
+    /// @brief dummy method to be overriden by derived classes
+    virtual bool check_collision(const EllipsoidalBody &body, double threshold) const = 0;
 
     /// For structures with fixed size Eigen::Vector types, this ensures alignment if the
     /// structure is allocated via `new`

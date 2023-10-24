@@ -10,6 +10,7 @@
 
 class Periphery;
 class SphericalBody;
+class EllipsoidalBody;
 class FiberContainerFiniteDifference;
 
 /// @brief Spherical Body...
@@ -40,6 +41,7 @@ class DeformableBody : public Body {
     bool check_collision(const Body &body, double threshold) const override;
     bool check_collision(const SphericalBody &body, double threshold) const override;
     bool check_collision(const DeformableBody &body, double threshold) const override;
+    bool check_collision(const EllipsoidalBody &body, double threshold) const override;
 
     MSGPACK_DEFINE_MAP(node_positions_, node_normals_, solution_vec_);
 };

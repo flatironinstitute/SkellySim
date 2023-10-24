@@ -1,5 +1,5 @@
-#ifndef BODY_SPHERICAL_HPP
-#define BODY_SPHERICAL_HPP
+#ifndef BODY_ELLIPSOIDAL_HPP
+#define BODY_ELLIPSOIDAL_HPP
 
 #include <skelly_sim.hpp>
 
@@ -10,20 +10,20 @@
 
 class Periphery;
 class DeformableBody;
-class EllipsoidalBody;
+class SphericalBody;
 class FiberContainerFiniteDifference;
 
-/// @brief Spherical Body...
-class SphericalBody : public Body {
+/// @brief Ellipsoidal Body...
+class EllipsoidalBody : public Body {
   public:
     /// @brief Construct spherical body. @see Body
     /// @param[in] body_table Parsed TOML body table. Must have 'radius' key defined.
     /// @param[in] params Initialized Params object
-    SphericalBody(const toml::value &body_table, const Params &params);
-    SphericalBody() = default;
+    EllipsoidalBody(const toml::value &body_table, const Params &params);
+    EllipsoidalBody() = default;
 
-    /// Duplicate SphericalBody object
-    std::shared_ptr<Body> clone() const override { return std::make_shared<SphericalBody>(*this); };
+    /// Duplicate EllipsoidalBody object
+    std::shared_ptr<Body> clone() const override { return std::make_shared<EllipsoidalBody>(*this); };
 
     // Parameters unique to spherical body
     double radius_;                  ///< Radius of body
@@ -56,7 +56,7 @@ class SphericalBody : public Body {
     void update_preconditioner(double eta) override;
     void load_precompute_data(const std::string &input_file) override;
     void step(double dt, VectorRef &body_solution) override;
-    void min_copy(const std::shared_ptr<SphericalBody> &other);
+    void min_copy(const std::shared_ptr<EllipsoidalBody> &other);
 
     int get_solution_size() const override { return n_nodes_ * 3 + 6; };
     Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;

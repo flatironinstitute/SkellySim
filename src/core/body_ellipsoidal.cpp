@@ -10,7 +10,7 @@
 #include <periphery.hpp>
 #include <utils.hpp>
 
-void SphericalBody::step(double dt, VectorRef &body_solution) {
+void EllipsoidalBody::step(double dt, VectorRef &body_solution) {
     int sol_offset = 3 * n_nodes_;
 
     velocity_ = body_solution.segment(sol_offset, 3);
@@ -34,9 +34,9 @@ void SphericalBody::step(double dt, VectorRef &body_solution) {
     }
 }
 
-Eigen::VectorXd SphericalBody::apply_preconditioner(VectorRef &x) const { return A_LU_.solve(x); }
+Eigen::VectorXd EllipsoidalBody::apply_preconditioner(VectorRef &x) const { return A_LU_.solve(x); }
 
-Eigen::VectorXd SphericalBody::matvec(MatrixRef &v_body, VectorRef &x_body) const {
+Eigen::VectorXd EllipsoidalBody::matvec(MatrixRef &v_body, VectorRef &x_body) const {
     Eigen::VectorXd res(get_solution_size());
 
     CMatrixMap d(x_body.data(), 3, n_nodes_);      // Body 'densities'
@@ -62,16 +62,16 @@ Eigen::VectorXd SphericalBody::matvec(MatrixRef &v_body, VectorRef &x_body) cons
     return res;
 }
 
-void SphericalBody::min_copy(const std::shared_ptr<SphericalBody> &other) {
+void EllipsoidalBody::min_copy(const std::shared_ptr<EllipsoidalBody> &other) {
     this->position_ = other->position_;
     this->orientation_ = other->orientation_;
     this->place(this->position_, this->orientation_);
     this->solution_vec_ = other->solution_vec_;
 }
 
-/// @brief Update internal SphericalBody::K_ matrix variable
+/// @brief Update internal EllipsoidalBody::K_ matrix variable
 /// @see update_preconditioner
-void SphericalBody::update_K_matrix() {
+void EllipsoidalBody::update_K_matrix() {
     K_.resize(3 * n_nodes_, 6);
     K_.setZero();
     for (int i = 0; i < n_nodes_; ++i) {
@@ -85,13 +85,13 @@ void SphericalBody::update_K_matrix() {
     }
 }
 
-/// @brief Update internal variables that need to be recomputed only once after calling SphericalBody::move
+/// @brief Update internal variables that need to be recomputed only once after calling EllipsoidalBody::move
 ///
 /// @see update_singularity_subtraction_vecs
 /// @see update_K_matrix
 /// @see update_preconditioner
 /// @param[in] eta fluid viscosity
-void SphericalBody::update_cache_variables(double eta) {
+void EllipsoidalBody::update_cache_variables(double eta) {
     update_singularity_subtraction_vecs(eta);
     update_K_matrix();
     update_preconditioner(eta);
@@ -99,9 +99,9 @@ void SphericalBody::update_cache_variables(double eta) {
 
 /// @brief Update the preconditioner and associated linear operator
 ///
-/// Updates: SphericalBody::A_, SphericalBody::_LU_
+/// Updates: EllipsoidalBody::A_, EllipsoidalBody::_LU_
 /// @param[in] eta
-void SphericalBody::update_preconditioner(double eta) {
+void EllipsoidalBody::update_preconditioner(double eta) {
     A_.resize(3 * n_nodes_ + 6, 3 * n_nodes_ + 6);
     A_.setZero();
 
@@ -128,10 +128,10 @@ void SphericalBody::update_preconditioner(double eta) {
 
 /// @brief Calculate the current RHS_, given the current velocity on the body's nodes
 ///
-/// Updates only SphericalBody::RHS_
+/// Updates only EllipsoidalBody::RHS_
 /// \f[ \textrm{RHS} = -\left[{\bf v}_0, {\bf v}_1, ..., {\bf v}_N \right] \f]
 /// @param[in] v_on_body [ 3 x n_nodes ] matrix representing the velocity on each node
-void SphericalBody::update_RHS(MatrixRef &v_on_body) {
+void EllipsoidalBody::update_RHS(MatrixRef &v_on_body) {
     RHS_.resize(n_nodes_ * 3 + 6);
     RHS_.segment(0, n_nodes_ * 3) = -CVectorMap(v_on_body.data(), v_on_body.size());
     RHS_.segment(n_nodes_ * 3, 6).setZero();
@@ -139,11 +139,11 @@ void SphericalBody::update_RHS(MatrixRef &v_on_body) {
 
 /// @brief Move body to new position with new orientation
 ///
-/// Updates: SphericalBody::position_, SphericalBody::orientation_, SphericalBody::node_positions_,
-/// SphericalBody::node_normals_, SphericalBody::nucleation_sites_
+/// Updates: EllipsoidalBody::position_, EllipsoidalBody::orientation_, EllipsoidalBody::node_positions_,
+/// EllipsoidalBody::node_normals_, EllipsoidalBody::nucleation_sites_
 /// @param[in] new_pos new lab frame position to move the body centroid
 /// @param[in] new_orientation new orientation of the body
-void SphericalBody::place(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation) {
+void EllipsoidalBody::place(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation) {
     position_ = new_pos;
     orientation_ = new_orientation;
 
@@ -160,12 +160,12 @@ void SphericalBody::place(const Eigen::Vector3d &new_pos, const Eigen::Quaternio
 
 /// @brief Calculate/cache the internal 'singularity subtraction vectors', used in linear operator application
 ///
-/// Need to call after calling SphericalBody::move.
+/// Need to call after calling EllipsoidalBody::move.
 /// @see update_preconditioner
 ///
-/// Updates: SphericalBody::ex_, SphericalBody::ey_, SphericalBody::ez_
+/// Updates: EllipsoidalBody::ex_, EllipsoidalBody::ey_, EllipsoidalBody::ez_
 /// @param[in] eta viscosity of fluid
-void SphericalBody::update_singularity_subtraction_vecs(double eta) {
+void EllipsoidalBody::update_singularity_subtraction_vecs(double eta) {
     Eigen::MatrixXd e = Eigen::MatrixXd::Zero(3, n_nodes_);
 
     e.row(0) = node_weights_.transpose();
@@ -183,10 +183,10 @@ void SphericalBody::update_singularity_subtraction_vecs(double eta) {
 /// @brief Helper function that loads precompute data.
 ///
 /// Data is loaded on _every_ MPI rank, and should be identical.
-/// Updates: SphericalBody::node_positions_ref_, SphericalBody::node_normals_ref_, SphericalBody::node_weights_
+/// Updates: EllipsoidalBody::node_positions_ref_, EllipsoidalBody::node_normals_ref_, EllipsoidalBody::node_weights_
 ///   @param[in] precompute_file path to file containing precompute data in npz format (from numpy.save). See associated
 ///   utility precompute script `utils/make_precompute_data.py`
-void SphericalBody::load_precompute_data(const std::string &precompute_file) {
+void EllipsoidalBody::load_precompute_data(const std::string &precompute_file) {
     cnpy::npz_t precomp = cnpy::npz_load(precompute_file);
     auto load_mat = [](cnpy::npz_t &npz, const char *var) {
         return Eigen::Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0]).matrix();
@@ -210,7 +210,7 @@ void SphericalBody::load_precompute_data(const std::string &precompute_file) {
 ///   surface).
 ///   @return Body object that has been appropriately rotated. Other internal cache variables are _not_ updated.
 /// @see update_cache_variables
-SphericalBody::SphericalBody(const toml::value &body_table, const Params &params) : Body(body_table, params) {
+EllipsoidalBody::EllipsoidalBody(const toml::value &body_table, const Params &params) : Body(body_table, params) {
     using parse_util::convert_array;
     using namespace parse_util;
     using std::string;
@@ -276,7 +276,7 @@ SphericalBody::SphericalBody(const toml::value &body_table, const Params &params
 /// @param[in] periphery Reference to Periphery object to check against
 /// @param[in] threshold Minimum between surfaces to consider it a collision
 /// @return true if collision detected, false otherwise
-bool SphericalBody::check_collision(const Periphery &periphery, double threshold) const {
+bool EllipsoidalBody::check_collision(const Periphery &periphery, double threshold) const {
     return periphery.check_collision(*this, threshold);
 }
 
@@ -286,42 +286,42 @@ bool SphericalBody::check_collision(const Periphery &periphery, double threshold
 /// @param[in] body Reference to Body object to check against
 /// @param[in] threshold Minimum between surfaces to consider it a collision
 /// @return true if collision detected, false otherwise
-bool SphericalBody::check_collision(const Body &body, double threshold) const {
+bool EllipsoidalBody::check_collision(const Body &body, double threshold) const {
     return body.check_collision(*this, threshold);
 }
 
-/// @brief Check for collision with SphericalBody and another SphericalBody.
+/// @brief Check for collision with EllipsoidalBody and another SphericalBody.
 /// This routine is the end result of the double dispatch call on a generic Body callee that is actually a
-/// SphericalBody.
+/// EllipsoidalBody.
 ///
 /// @param[in] body Reference to SphericalBody object to check against
 /// @param[in] threshold Minimum between surfaces to consider it a collision
 /// @return true if collision detected, false otherwise
-bool SphericalBody::check_collision(const SphericalBody &body, double threshold) const {
-    const double dr2 = (this->position_ - body.position_).squaredNorm();
-    return (dr2 < pow(this->radius_ + body.radius_ + threshold, 2));
-}
-
-/// @brief Check for collision with SphericalBody another DeformableBody.
-/// This routine is the end result of the double dispatch call on a generic Body callee that is actually a
-/// SphericalBody.
-///
-/// @param[in] body Reference to SphericalBody object to check against
-/// @param[in] threshold Minimum between surfaces to consider it a collision
-/// @return true if collision detected, false otherwise
-bool SphericalBody::check_collision(const DeformableBody &body, double threshold) const {
-    spdlog::warn("check_collision not defined for SphericalBody->DeformableBody");
+bool EllipsoidalBody::check_collision(const SphericalBody &body, double threshold) const {
+    spdlog::warn("check_collision not defined for EllipsoidalBody->SphericalBody");
     return false;
 }
 
-/// @brief Check for collision with SphericalBody another EllipsoidalBody.
+/// @brief Check for collision with EllipsoidalBody another DeformableBody.
 /// This routine is the end result of the double dispatch call on a generic Body callee that is actually a
-/// SphericalBody.
+/// EllipsoidalBody.
 ///
 /// @param[in] body Reference to EllipsoidalBody object to check against
 /// @param[in] threshold Minimum between surfaces to consider it a collision
 /// @return true if collision detected, false otherwise
-bool SphericalBody::check_collision(const EllipsoidalBody &body, double threshold) const {
-    spdlog::warn("check_collision not defined for SphericalBody->EllipsoidalBody");
+bool EllipsoidalBody::check_collision(const DeformableBody &body, double threshold) const {
+    spdlog::warn("check_collision not defined for EllipsoidalBody->DeformableBody");
+    return false;
+}
+
+/// @brief Check for collision with EllipsoidalBody another DeformableBody.
+/// This routine is the end result of the double dispatch call on a generic Body callee that is actually a
+/// EllipsoidalBody.
+///
+/// @param[in] body Reference to EllipsoidalBody object to check against
+/// @param[in] threshold Minimum between surfaces to consider it a collision
+/// @return true if collision detected, false otherwise
+bool EllipsoidalBody::check_collision(const EllipsoidalBody &body, double threshold) const {
+    spdlog::warn("check_collision not defined for EllipsoidalBody->EllipsoidalBody");
     return false;
 }
