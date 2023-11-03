@@ -1,0 +1,60 @@
+[[bodies]]
+n_nucleation_sites = 0
+position = [ 0.0, 0.0, 0.0,]
+orientation = [ 0.0, 0.0, 0.0, 1.0,]
+shape = "ellipsoid"
+radius = 1.0
+n_nodes = 400
+axis_length = [ 0.4, 0.4, 0.5,]
+precompute_file = "body_precompute_body_ellipsoid_n1.npz"
+external_force_type = "Oscillatory"
+external_force = [ 0.0, 0.0, 1.0,]
+external_torque = [ 0.0, 0.0, 0.0,]
+external_oscillation_force_amplitude = 2.0
+external_oscillation_force_frequency = 1.0
+external_oscillation_force_phase = 0.0
+
+[params]
+eta = 1.0
+dt_initial = 0.05
+dt_min = 0.0001
+dt_max = 0.05
+dt_write = 0.05
+t_final = 5.0
+gmres_tol = 1e-8
+fiber_error_tol = 0.1
+seed = 130319
+implicit_motor_activation_delay = 0.0
+periphery_interaction_flag = false
+adaptive_timestep_flag = true
+pair_evaluator = "FMM"
+fiber_type = "FiniteDifference"
+
+[background]
+components = [ 0, 0, 0,]
+scale_factor = [ 0.0, 0.0, 0.0,]
+uniform = [ 0.0, 0.0, 0.0,]
+
+[periphery]
+n_nodes = 2000
+precompute_file = "periphery_precompute.npz"
+shape = "sphere"
+radius = 3.846153846153846
+
+[params.dynamic_instability]
+n_nodes = 0
+v_growth = 0.0
+f_catastrophe = 0.0
+v_grow_collision_scale = 0.5
+f_catastrophe_collision_scale = 2.0
+nucleation_rate = 0.0
+radius = 0.025
+min_length = 0.5
+bending_rigidity = 0.0025
+min_separation = 0.1
+
+[params.periphery_binding]
+active = false
+polar_angle_start = 0.0
+polar_angle_end = 1.5707963267948966
+threshold = 0.75

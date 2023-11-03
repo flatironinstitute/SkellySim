@@ -25,8 +25,8 @@ class EllipsoidalBody : public Body {
     /// Duplicate EllipsoidalBody object
     std::shared_ptr<Body> clone() const override { return std::make_shared<EllipsoidalBody>(*this); };
 
-    // Parameters unique to spherical body
-    double radius_;                  ///< Radius of body
+    // Parameters unique to ellipsoidal body
+    Eigen::Vector3d radius_;         ///< Axis lengths of body
     Eigen::Vector3d position_;       ///< Instantaneous lab frame position of body, usually the centroid
     Eigen::Quaterniond orientation_; ///< Instantaneous orientation of body
     Eigen::Quaterniond orientation_ref_ = {1.0, 0.0, 0.0, 0.0}; ///< Reference orientation of body

@@ -2,13 +2,17 @@
 #define EIGEN_QUATERNION_PLUGIN_H
 
 inline void msgpack_unpack(msgpack::object o) {
-    if(o.type != msgpack::type::ARRAY) { throw msgpack::type_error(); }
+    if (o.type != msgpack::type::ARRAY) {
+        throw msgpack::type_error();
+    }
 
-    msgpack::object * p = o.via.array.ptr;
+    msgpack::object *p = o.via.array.ptr;
 
     std::string type;
     *p >> type;
-    if (type != "__eigen__") { throw msgpack::type_error(); }
+    if (type != "__quat__") {
+        throw msgpack::type_error();
+    }
 
     ++p;
     *p >> this->w();
@@ -21,9 +25,9 @@ inline void msgpack_unpack(msgpack::object o) {
 }
 
 template <typename Packer>
-inline void msgpack_pack(Packer& pk) const {
+inline void msgpack_pack(Packer &pk) const {
     pk.pack_array(5);
-    pk.pack(std::string("__eigen__"));
+    pk.pack(std::string("__quat__"));
 
     pk.pack(this->w());
     pk.pack(this->x());
@@ -32,6 +36,6 @@ inline void msgpack_pack(Packer& pk) const {
 }
 
 template <typename MSGPACK_OBJECT>
-inline void msgpack_object(MSGPACK_OBJECT* o, msgpack::zone* z) const { }
+inline void msgpack_object(MSGPACK_OBJECT *o, msgpack::zone *z) const {}
 
 #endif

@@ -106,6 +106,8 @@ class BodyContainer {
     Eigen::MatrixXd flow(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions, double eta) const;
     Eigen::MatrixXd flow_spherical(MatrixRef &r_trg, VectorRef &body_solution, MatrixRef &link_conditions,
                                    double eta) const;
+    Eigen::MatrixXd flow_ellipsoidal(MatrixRef &r_trg, VectorRef &body_solution, MatrixRef &link_conditions,
+                                     double eta) const;
     Eigen::MatrixXd flow_deformable(MatrixRef &r_trg, VectorRef &body_solution, MatrixRef &link_conditions,
                                     double eta) const;
     void step(VectorRef &body_sol, double dt) const;

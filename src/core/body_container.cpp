@@ -171,13 +171,22 @@ BodyContainer::calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodi
     using Eigen::Vector3d;
 
     MatrixXd velocities_on_fiber = MatrixXd::Zero(7, fc.get_local_fiber_count());
-    MatrixXd body_forces_torques = MatrixXd::Zero(6, spherical_bodies.size());
+    MatrixXd body_forces_torques =
+        MatrixXd::Zero(6, spherical_bodies.size() + deformable_bodies.size() + ellipsoidal_bodies.size());
 
-    MatrixXd body_velocities(6, spherical_bodies.size());
+    MatrixXd body_velocities(6, spherical_bodies.size() + deformable_bodies.size() + ellipsoidal_bodies.size());
     int index = 0;
+    // FIXME XXX Again, this will bite us, as duplicated code (and deformable bodies shouldn't be here anyway for now)
     for (const auto &body : spherical_bodies) {
         body_velocities.col(index) =
             x_bodies.segment(solution_offsets_.at(std::static_pointer_cast<Body>(body)) + body->n_nodes_ * 3, 6);
+        index++;
+    }
+    index += deformable_bodies.size();
+    for (const auto &body : ellipsoidal_bodies) {
+        body_velocities.col(index) =
+            x_bodies.segment(solution_offsets_.at(std::static_pointer_cast<Body>(body)) + body->n_nodes_ * 3, 6);
+        index++;
     }
 
     int xt_offset = 0;
@@ -190,6 +199,8 @@ BodyContainer::calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodi
         if (i_body < 0)
             continue;
 
+        // FIXME XXX Eventually this will come to bite us, as the ellipsoidal bodies also could have fibers they just
+        // don't for now.
         auto body = std::static_pointer_cast<SphericalBody>(bodies[i_body]);
         Vector3d site_pos = get_nucleation_site(i_body, i_site) - body->get_position();
         MatrixXd x_new(3, fib.n_nodes_);
@@ -253,10 +264,12 @@ BodyContainer::calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodi
 
 MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions,
                                        double eta) const {
-    spdlog::debug("Started body flow");
+    spdlog::debug("Started body (spherical) flow");
     utils::LoggerRedirect redirect(std::cout);
-    if (!spherical_bodies.size())
+    if (!spherical_bodies.size()) {
+        spdlog::debug("Finished body (spherical) flow (no spherical bodies)");
         return MatrixXd::Zero(3, r_trg.cols());
+    }
 
     const VectorXd spherical_solution = get_local_solution(spherical_bodies, body_solutions);
     const MatrixXd node_positions = get_local_node_positions(spherical_bodies);
@@ -283,12 +296,12 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
             for (int j = 0; j < 3; ++j)
                 f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node) * eta;
 
-    spdlog::debug("body_stresslet");
+    spdlog::debug("  body_stresslet");
     MatrixXd v_bdy2all = stresslet_kernel_(null_matrix, r_dl, r_trg, null_matrix, f_dl, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Section: Oseen kernel
-    spdlog::debug("body_oseen");
+    spdlog::debug("  body_oseen");
     MatrixXd center_positions =
         get_local_center_positions(spherical_bodies); //< Distributed center positions for FMM calls
 
@@ -302,19 +315,98 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
     // rank gets the body centers and calculates the center->target rotlet
-    spdlog::debug("body_rotlet");
+    spdlog::debug("  body_rotlet");
     center_positions = get_global_center_positions(spherical_bodies);
 
     v_bdy2all += kernels::rotlet(center_positions, r_trg, torques, eta);
 
-    spdlog::debug("Finished body flow");
+    spdlog::debug("Finished body (spherical) flow");
+    return v_bdy2all;
+}
+
+MatrixXd BodyContainer::flow_ellipsoidal(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions,
+                                         double eta) const {
+    spdlog::debug("Started body (ellipsoidal) flow");
+    utils::LoggerRedirect redirect(std::cout);
+    if (!ellipsoidal_bodies.size()) {
+        spdlog::debug("Finished body (ellipsoidal) flow (no ellipsoidal bodies)");
+        return MatrixXd::Zero(3, r_trg.cols());
+    }
+
+    const VectorXd ellipsoidal_solution = get_local_solution(ellipsoidal_bodies, body_solutions);
+    const MatrixXd node_positions = get_local_node_positions(ellipsoidal_bodies);
+    const MatrixXd node_normals = get_local_node_normals(ellipsoidal_bodies);
+    const int n_nodes = node_positions.cols();
+    MatrixXd densities(3, n_nodes);
+    int node_offset = 0;
+    if (world_rank_ == 0) {
+        for (auto &body : ellipsoidal_bodies) {
+            densities.block(0, node_offset, 3, body->n_nodes_) =
+                CMatrixMap(body_solutions.data() + solution_offsets_.at(body), 3, body->n_nodes_);
+            node_offset += body->n_nodes_;
+        }
+    }
+    const MatrixXd null_matrix; //< Empty matrix for dummy arguments to kernels
+
+    // Section: Stresslet kernel
+    const MatrixXd &r_dl = node_positions; //< "double layer" positions for stresslet kernel
+    MatrixXd f_dl(9, n_nodes);             //< "double layer" "force" for stresslet kernel
+
+    // double layer density is 2 * outer product of normals with density
+    for (int node = 0; node < n_nodes; ++node)
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+                f_dl(i * 3 + j, node) = 2.0 * node_normals(i, node) * densities(j, node) * eta;
+
+    spdlog::debug("  body_stresslet");
+    MatrixXd v_bdy2all = stresslet_kernel_(null_matrix, r_dl, r_trg, null_matrix, f_dl, eta);
+    redirect.flush(spdlog::level::debug, "STKFMM");
+
+    // Section: Oseen kernel
+    spdlog::debug("  body_oseen");
+    MatrixXd center_positions =
+        get_local_center_positions(ellipsoidal_bodies); //< Distributed center positions for FMM calls
+
+    auto [forces, torques] = get_global_forces_torques(link_conditions);
+
+    // We actually only need the summed forces on the first rank
+    if (world_rank_)
+        forces.resize(3, 0);
+    v_bdy2all += stokeslet_kernel_(center_positions, null_matrix, r_trg, forces, null_matrix, eta);
+    redirect.flush(spdlog::level::debug, "STKFMM");
+
+    // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
+    // rank gets the body centers and calculates the center->target rotlet
+    spdlog::debug("  body_rotlet");
+    center_positions = get_global_center_positions(ellipsoidal_bodies);
+
+    v_bdy2all += kernels::rotlet(center_positions, r_trg, torques, eta);
+
+    spdlog::debug("Finished body (ellipsoidal) flow");
     return v_bdy2all;
 }
 
 Eigen::MatrixXd BodyContainer::calculate_external_forces_torques(double time) const {
-    MatrixXd forces_torques = MatrixXd::Zero(6, spherical_bodies.size());
+    // Total body sizes that we know about
+    MatrixXd forces_torques =
+        MatrixXd::Zero(6, spherical_bodies.size() + deformable_bodies.size() + ellipsoidal_bodies.size());
     int i_body = 0;
     for (auto &body : spherical_bodies) {
+        if (body->external_force_type_ == Body::EXTFORCE::Linear) {
+            forces_torques.col(i_body).segment(0, 3) += body->external_force_;
+        } else if (body->external_force_type_ == Body::EXTFORCE::Oscillatory) {
+            forces_torques.col(i_body).segment(0, 3) +=
+                body->extforce_oscillation_amplitude_ *
+                std::sin(body->extforce_oscillation_omega_ * time - body->extforce_oscillation_phase_) *
+                body->external_force_;
+        }
+        forces_torques.col(i_body).segment(3, 3) += body->external_torque_;
+        i_body++;
+    }
+
+    // FIXME This shouldn't be duplicated, come back later and abstract
+    i_body += deformable_bodies.size();
+    for (auto &body : ellipsoidal_bodies) {
         if (body->external_force_type_ == Body::EXTFORCE::Linear) {
             forces_torques.col(i_body).segment(0, 3) += body->external_force_;
         } else if (body->external_force_type_ == Body::EXTFORCE::Oscillatory) {
@@ -356,7 +448,8 @@ MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions, Matrix
                              double eta) const {
     MatrixXd v_spherical = flow_spherical(r_trg, body_solutions, link_conditions, eta);
     MatrixXd v_deformable = flow_deformable(r_trg, body_solutions, link_conditions, eta);
-    return v_spherical + v_deformable;
+    MatrixXd v_ellipsoidal = flow_ellipsoidal(r_trg, body_solutions, link_conditions, eta);
+    return v_spherical + v_deformable + v_ellipsoidal;
 }
 
 /// @brief Apply body portion of matrix-free operator given densities/velocities
@@ -407,6 +500,7 @@ void BodyContainer::populate_sublists() {
     using std::static_pointer_cast;
     spherical_bodies.clear();
     deformable_bodies.clear();
+    ellipsoidal_bodies.clear();
     solution_offsets_.clear();
     node_offsets_.clear();
     int solution_offset = 0;
@@ -416,6 +510,8 @@ void BodyContainer::populate_sublists() {
             spherical_bodies.push_back(static_pointer_cast<SphericalBody>(body));
         } else if (dynamic_cast<DeformableBody *>(body.get())) {
             deformable_bodies.push_back(static_pointer_cast<DeformableBody>(body));
+        } else if (dynamic_cast<EllipsoidalBody *>(body.get())) {
+            ellipsoidal_bodies.push_back(static_pointer_cast<EllipsoidalBody>(body));
         }
 
         solution_offsets_[body] = solution_offset;
@@ -495,7 +591,7 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
             bodies.emplace_back(new SphericalBody(body_table, params));
         else if (shape == std::string("deformable")) {
             bodies.emplace_back(new DeformableBody(body_table, params));
-        } else if (shape == std::string("ellipsoidal")) {
+        } else if (shape == std::string("ellipsoid")) {
             bodies.emplace_back(new EllipsoidalBody(body_table, params));
         } else {
             throw std::runtime_error("Unknown body shape: " + shape);
@@ -503,7 +599,7 @@ BodyContainer::BodyContainer(toml::array &body_tables, Params &params) {
 
         auto &body = bodies.back();
         auto position = body->get_position();
-        spdlog::info("Body {}: [ {}, {}, {} ]", i_body, position[0], position[1], position[2]);
+        spdlog::info("  Created body {}: [ {}, {}, {} ]", i_body, position[0], position[1], position[2]);
     }
 
     populate_sublists();

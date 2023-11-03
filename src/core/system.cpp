@@ -364,6 +364,17 @@ Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
             if (dx.norm() < body->radius_)
                 u_trg.col(i) = body->velocity_ + body->angular_velocity_.cross(dx);
         }
+        // FIXME: There would be something here if we had flow for deformable bodies
+        for (auto &body : bc_.ellipsoidal_bodies) {
+            Eigen::Vector3d dx = r_trg.col(i) - body->position_;
+            // Actually have to calculate the real dx inside the ellipsoid
+            if (dx[0] * dx[0] / body->radius_[0] / body->radius_[0] +
+                    dx[1] * dx[1] / body->radius_[1] / body->radius_[1] +
+                    dx[2] * dx[2] / body->radius_[2] / body->radius_[2] <
+                1.0) {
+                u_trg.col(i) = body->velocity_ + body->angular_velocity_.cross(dx);
+            }
+        }
     }
 
     return u_trg;

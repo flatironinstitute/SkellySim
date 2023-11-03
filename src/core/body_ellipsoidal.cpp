@@ -146,6 +146,9 @@ void EllipsoidalBody::update_RHS(MatrixRef &v_on_body) {
 void EllipsoidalBody::place(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation) {
     position_ = new_pos;
     orientation_ = new_orientation;
+    spdlog::trace("  updating position    = [{}, {}, {}]", position_[0], position_[1], position_[2]);
+    spdlog::trace("  updating orientation = [{}, {}, {}, {}]", orientation_.w(), orientation_.x(), orientation_.y(),
+                  orientation_.z());
 
     Eigen::Matrix3d rot = orientation_.toRotationMatrix();
     for (int i = 0; i < n_nodes_; ++i)
@@ -217,7 +220,11 @@ EllipsoidalBody::EllipsoidalBody(const toml::value &body_table, const Params &pa
     string precompute_file = toml::find<string>(body_table, "precompute_file");
     load_precompute_data(precompute_file);
 
-    radius_ = toml::find_or<double>(body_table, "radius", 0.0);
+    // radius_ = toml::find_or<double>(body_table, "radius", 0.0);
+    std::vector<double> r_array = toml::find<std::vector<double>>(body_table, "axis_length");
+    radius_[0] = r_array[0];
+    radius_[1] = r_array[1];
+    radius_[2] = r_array[2];
 
     // TODO: add body assertions so that input file and precompute data necessarily agree
     if (body_table.contains("position"))
@@ -256,6 +263,10 @@ EllipsoidalBody::EllipsoidalBody(const toml::value &body_table, const Params &pa
     }
 
     // Print functionality (TODO)
+    spdlog::info("EllipsoidalBody constructed");
+    spdlog::info("  position                        = [{}, {}, {}]", position_[0], position_[1], position_[2]);
+    spdlog::info("  orientation                     = [{}, {}, {}, {}]", orientation_.w(), orientation_.x(),
+                 orientation_.y(), orientation_.z());
     spdlog::info("  body external force type        = {}", EXTFORCE_name[external_force_type_]);
     spdlog::info("  body external force director    = [ {}, {}, {} ]", external_force_[0], external_force_[1],
                  external_force_[2]);
