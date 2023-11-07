@@ -11,6 +11,8 @@
 #include <tuple>
 #include <utils.hpp>
 
+#include <spdlog/fmt/ostr.h>
+
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
@@ -124,9 +126,11 @@ VectorXd BodyContainer::get_local_solution(const T &body_vec, VectorRef &body_so
 /// @return pair<[3 x n_bodies_local], [3 x n_bodies_local]> matrices of body forces/torques
 template <typename T>
 std::pair<MatrixXd, MatrixXd> BodyContainer::get_global_forces_torques(const T &link_conditions) const {
+    spdlog::trace("BodyContainer::get_global_forces_torques");
     MatrixXd forces_torques = link_conditions;
     MPI_Allreduce(MPI_IN_PLACE, forces_torques.data(), forces_torques.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
+    spdlog::trace("BodyContainer::get_global_forces_torques return");
     return std::make_pair(forces_torques.block(0, 0, 3, bodies.size()), forces_torques.block(3, 0, 3, bodies.size()));
 }
 
@@ -275,6 +279,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
     const MatrixXd node_positions = get_local_node_positions(spherical_bodies);
     const MatrixXd node_normals = get_local_node_normals(spherical_bodies);
     const int n_nodes = node_positions.cols();
+    spdlog::trace("  spherical n_nodes: {}", n_nodes);
     MatrixXd densities(3, n_nodes);
     int node_offset = 0;
     if (world_rank_ == 0) {
@@ -307,10 +312,19 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
 
     auto [forces, torques] = get_global_forces_torques(link_conditions);
 
+    // Slice the forces and torques to get just the spherical bodies (comes first)
+    auto forces_spherical = forces.block(0, 0, 3, spherical_bodies.size());
+    auto torques_spherical = torques.block(0, 0, 3, spherical_bodies.size());
+
     // We actually only need the summed forces on the first rank
     if (world_rank_)
         forces.resize(3, 0);
-    v_bdy2all += stokeslet_kernel_(center_positions, null_matrix, r_trg, forces, null_matrix, eta);
+    spdlog::trace("  center_positions (spherical):    {}", center_positions);
+    spdlog::trace("  forces (spherical):              {}", forces);
+    spdlog::trace("  torques (spherical):             {}", torques);
+    spdlog::trace("  forces_spherical:                {}", forces_spherical);
+    spdlog::trace("  torques_spherical:               {}", torques_spherical);
+    v_bdy2all += stokeslet_kernel_(center_positions, null_matrix, r_trg, forces_spherical, null_matrix, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
@@ -318,7 +332,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
     spdlog::debug("  body_rotlet");
     center_positions = get_global_center_positions(spherical_bodies);
 
-    v_bdy2all += kernels::rotlet(center_positions, r_trg, torques, eta);
+    v_bdy2all += kernels::rotlet(center_positions, r_trg, torques_spherical, eta);
 
     spdlog::debug("Finished body (spherical) flow");
     return v_bdy2all;
@@ -337,6 +351,7 @@ MatrixXd BodyContainer::flow_ellipsoidal(MatrixRef &r_trg, VectorRef &body_solut
     const MatrixXd node_positions = get_local_node_positions(ellipsoidal_bodies);
     const MatrixXd node_normals = get_local_node_normals(ellipsoidal_bodies);
     const int n_nodes = node_positions.cols();
+    spdlog::trace("  ellipsoidal n_nodes: {}", n_nodes);
     MatrixXd densities(3, n_nodes);
     int node_offset = 0;
     if (world_rank_ == 0) {
@@ -369,10 +384,19 @@ MatrixXd BodyContainer::flow_ellipsoidal(MatrixRef &r_trg, VectorRef &body_solut
 
     auto [forces, torques] = get_global_forces_torques(link_conditions);
 
+    // Slice the forces and torques to get just the spherical bodies (comes first)
+    auto forces_ellipsoidal = forces.block(0, spherical_bodies.size(), 3, ellipsoidal_bodies.size());
+    auto torques_ellipsoidal = torques.block(0, spherical_bodies.size(), 3, ellipsoidal_bodies.size());
+
     // We actually only need the summed forces on the first rank
     if (world_rank_)
         forces.resize(3, 0);
-    v_bdy2all += stokeslet_kernel_(center_positions, null_matrix, r_trg, forces, null_matrix, eta);
+    spdlog::trace("  center_positions (ellipsoidal):  {}", center_positions);
+    spdlog::trace("  forces (ellipsoidal):            {}", forces);
+    spdlog::trace("  torques (ellipsoidal):           {}", torques);
+    spdlog::trace("  forces_ellipsoidal:              {}", forces_ellipsoidal);
+    spdlog::trace("  torques_ellipsoidal:             {}", torques_ellipsoidal);
+    v_bdy2all += stokeslet_kernel_(center_positions, null_matrix, r_trg, forces_ellipsoidal, null_matrix, eta);
     redirect.flush(spdlog::level::debug, "STKFMM");
 
     // Since rotlet isn't handled via an FMM we don't distribute the nodes, but instead each
@@ -380,7 +404,7 @@ MatrixXd BodyContainer::flow_ellipsoidal(MatrixRef &r_trg, VectorRef &body_solut
     spdlog::debug("  body_rotlet");
     center_positions = get_global_center_positions(ellipsoidal_bodies);
 
-    v_bdy2all += kernels::rotlet(center_positions, r_trg, torques, eta);
+    v_bdy2all += kernels::rotlet(center_positions, r_trg, torques_ellipsoidal, eta);
 
     spdlog::debug("Finished body (ellipsoidal) flow");
     return v_bdy2all;
@@ -519,6 +543,9 @@ void BodyContainer::populate_sublists() {
 
         node_offsets_[body] = node_offset;
         node_offset += body->n_nodes_;
+
+        spdlog::trace("  solution_offsets_[{}]: {}", body, solution_offsets_[body]);
+        spdlog::trace("  node_offsets_[{}]: {}", body, node_offsets_[body]);
     }
 }
 

@@ -267,6 +267,8 @@ Eigen::VectorXd apply_preconditioner(VectorRef &x) {
 /// @param [in] x [local_solution_size] Vector to apply matvec on
 /// @return [local_solution_size] Vector y, the result of the operator applied to x.
 Eigen::VectorXd apply_matvec(VectorRef &x) {
+    spdlog::trace("System::apply_matvec");
+
     using Eigen::Block;
     using Eigen::MatrixXd;
     const FiberContainerBase &fc = *fc_;
@@ -317,6 +319,7 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
     res_shell = shell.matvec(x_shell, v_shell);
     res_bodies = bc.matvec(v_bodies, x_bodies);
 
+    spdlog::trace("System::apply_matvec return");
     return res;
 }
 
@@ -393,6 +396,7 @@ void set_evaluator(const std::string &evaluator) {
 ///
 /// @note Modifies anything that evolves in time.
 void prep_state_for_solver() {
+    spdlog::trace("System::prep_state_for_solver");
     using Eigen::MatrixXd;
 
     // Since DI can change size of fiber containers, must call first.
@@ -449,6 +453,8 @@ void prep_state_for_solver() {
     fc_->apply_bcs(properties.dt, v_all.block(0, 0, 3, fib_node_count), external_force_fibers);
 
     shell_->update_RHS(v_all.block(0, fib_node_count, 3, shell_node_count));
+
+    spdlog::trace("System::prep_state_for_solver return");
 }
 
 /// @brief Calculate solution vector given current configuration

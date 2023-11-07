@@ -256,6 +256,10 @@ SphericalBody::SphericalBody(const toml::value &body_table, const Params &params
     }
 
     // Print functionality (TODO)
+    spdlog::info("SphericalBody constructed");
+    spdlog::info("  position                        = [{}, {}, {}]", position_[0], position_[1], position_[2]);
+    spdlog::info("  orientation                     = [{}, {}, {}, {}]", orientation_.w(), orientation_.x(),
+                 orientation_.y(), orientation_.z());
     spdlog::info("  body external force type        = {}", EXTFORCE_name[external_force_type_]);
     spdlog::info("  body external force director    = [ {}, {}, {} ]", external_force_[0], external_force_[1],
                  external_force_[2]);
