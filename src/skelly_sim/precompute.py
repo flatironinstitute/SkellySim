@@ -194,16 +194,26 @@ def main():
         precompute_file = body['precompute_file']
         n_nodes = body['n_nodes']
 
-        # FIXME XXX Ask Robert what this does, and what it would be for an ellipse
-        #radius = body['radius']
-        #if radius < body_quadrature_radius_threshold:
-        #    radius -= body_quadrature_radius_offset_low
-        #else:
-        #    radius -= body_quadrature_radius_offset_high
+        # Look at each radius independently for an ellipsoid
+        radius = body['axis_length']
+        if radius[0] < body_quadrature_radius_threshold:
+            radius[0] -= body_quadrature_radius_offset_low
+        else:
+            radius[0] -= body_quadrature_radius_offset_high
 
-        body_a = body['axis_length'][0]
-        body_b = body['axis_length'][1]
-        body_c = body['axis_length'][2]
+        if radius[1] < body_quadrature_radius_threshold:
+            radius[1] -= body_quadrature_radius_offset_low
+        else:
+            radius[1] -= body_quadrature_radius_offset_high
+
+        if radius[2] < body_quadrature_radius_threshold:
+            radius[2] -= body_quadrature_radius_offset_low
+        else:
+            radius[2] -= body_quadrature_radius_offset_high
+
+        body_a = radius[0]
+        body_b = radius[1]
+        body_c = radius[2]
         boundary = ShapeGallery(
             'ellipsoid',
             n_nodes,
