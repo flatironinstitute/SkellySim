@@ -345,6 +345,21 @@ ax2.quiver(x[:,0], x[:,1], x[:,2], v[:,0], v[:,1], v[:,2])
 fig2.savefig('test_velocityfield.pdf', dpi = fig2.dpi)
 ```
 
+### Analysis (Bodies)
+
+Here is the information stored for the bodies in each frame. Assuming a body index `ibody` in the sequence of multiple bodies. This is just the information written to the trajectory at time `times = traj.times`.
+
+```python
+# Center of mass position [3x1 vector]
+position: traj['bodies'][ibody]['position_']
+# Orientation quanterion [4x1 quaternion]
+orientation: traj['bodies'][ibody]['orientation_']
+# Complete solution vector [3*n_nodes densities, 3x1 velocity, 3x1 angular velocity]
+solution_vec: traj['bodies'][ibody]['solution_vec_']
+velocity: traj['bodies'][ibody]['solution_vec_'][-6:-3]
+angular_velocity: traj['bodies'][ibody]['solution_vec_'][-3:]
+```
+
 
 ## Installing the previous version (def3f80c) (5/9/2023) (maybe deprecated 11/9/2023)
 
