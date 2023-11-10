@@ -44,8 +44,10 @@ def velocity(path: Path=Path('.')):
         # need beginning/end positions to calculate average velocity
         traj.load_frame(0)
         z_initial = traj['bodies'][0]['position_'][2]
+        v_initial = traj['bodies'][0]['solution_vec_'][-4]
         traj.load_frame(len(traj) - 1)
         z_final = traj['bodies'][0]['position_'][2]
+        v_final = traj['bodies'][0]['solution_vec_'][-4]
 
         dt = traj.times[-1] - traj.times[0]
 
@@ -67,6 +69,8 @@ def velocity(path: Path=Path('.')):
         error = abs(1 - v_measured / v_theoretical)
 
         print("Measured velocity:    {}".format(v_measured))
+        print("v_initial:            {}".format(v_initial))
+        print("v_final:              {}".format(v_final))
         print("Theoretical velocity: {}".format(v_theoretical))
         print("Error |1 - v/v0|:     {}".format(error))
 

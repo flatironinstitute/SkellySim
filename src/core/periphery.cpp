@@ -10,6 +10,8 @@
 #include <system.hpp>
 #include <utils.hpp>
 
+#include <spdlog/fmt/ostr.h>
+
 /// @brief Apply preconditioner for Periphery component of 'x'.  While local input is supplied,
 /// the preconditioner result requires the 'global' set of 'x' across all ranks, so an
 /// Allgatherv is required
@@ -442,6 +444,10 @@ Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
     n_nodes_global_ = n_nodes;
 
     MPI_Type_free(&mpi_matrix_row_t);
+
+    // Print functionality
+    spdlog::info("Periphery constructed");
+    spdlog::info("  Periphery type: {}", toml::find(periphery_table, "shape"));
 
     spdlog::info("Done initializing base periphery");
 }

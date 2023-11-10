@@ -130,6 +130,7 @@ class SphericalPeriphery : public Periphery {
     double radius_;
     SphericalPeriphery(const toml::value &periphery_table, const Params &params) : Periphery(periphery_table, params) {
         radius_ = toml::find_or<double>(periphery_table, "radius", 0.0);
+        spdlog::info("  Spherical periphery radius: {}", radius_);
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
@@ -151,6 +152,7 @@ class EllipsoidalPeriphery : public Periphery {
         a_ = toml::find_or<double>(periphery_table, "a", 0.0);
         b_ = toml::find_or<double>(periphery_table, "b", 0.0);
         c_ = toml::find_or<double>(periphery_table, "c", 0.0);
+        spdlog::info("  Ellipsoidal periphery a,b,c: {}, {}, {}", a_, b_, c_);
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
