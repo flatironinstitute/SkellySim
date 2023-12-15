@@ -1,6 +1,7 @@
 #include <skelly_sim.hpp>
 
 #include <body.hpp>
+#include <body_container.hpp>
 #include <fiber_container_finite_difference.hpp>
 #include <periphery.hpp>
 #include <system.hpp>
@@ -170,7 +171,7 @@ MatrixXd FiberContainerFiniteDifference::generate_constant_force() const {
 /// @brief Fiber flow
 MatrixXd FiberContainerFiniteDifference::flow(const MatrixRef &r_trg, const MatrixRef &fib_forces, double eta,
                                               bool subtract_self) const {
-    spdlog::debug("FiberContainerFinitediffere::flow starting");
+    spdlog::debug("FiberContainerFiniteDifference::flow starting");
 
     const size_t n_src = fib_forces.cols();
     const size_t n_trg = r_trg.cols();
@@ -208,7 +209,7 @@ MatrixXd FiberContainerFiniteDifference::flow(const MatrixRef &r_trg, const Matr
         }
     }
 
-    spdlog::debug("FiberContainerFinitediffere::flow finished");
+    spdlog::debug("FiberContainerFiniteDifference::flow finished");
     return vel;
 }
 

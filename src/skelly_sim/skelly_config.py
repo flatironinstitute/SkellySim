@@ -729,9 +729,11 @@ class Body():
     orientation : List[float], default: :obj:`[0.0, 0.0, 0.0, 1.0]`
         Orientation quaternion of the body. Not worth changing
     shape : str, default: :obj:`'sphere'`
-        Shape of the body. Sphere is currently only supported option
+        Shape of the body. [Sphere and Ellipsoid] are currently only supported options
     radius : float, default: :obj:`1.0`, units: :obj:`μm`
         Radius of the body. This is the attachment radius for nucleation sites, the hydrodynamic radius is a bit smaller
+    axis_length : float, default: :obj: `[0.0, 0.0, 0.0]`, units: :obj:`μm`
+        Length of axes for ellipsoidal body
     n_nodes : int, default: :obj:`600`
         Number of nodes to represent surface. WARNING: MAKE NEW PRECOMPUTE DATA WHEN CHANGING or you will regret it.
     precompute_file : str, default: :obj:`'body_precompute.npz'`
@@ -756,6 +758,7 @@ class Body():
     shape: str = 'sphere'
     radius: float = 1.0
     n_nodes: int = 600
+    axis_length: List[float] = field(default_factory=_default_vector)
     precompute_file: str = 'body_precompute.npz'
     external_force_type: str = 'Linear'
     external_force: List[float] = field(default_factory=_default_vector)
@@ -783,6 +786,9 @@ class Body():
         tuple(np.array, np.array)
             position vector and its normalized version
         """
+        if self.shape != 'sphere':
+            print("ERROR: Fibers not yet implemented for bodies other than Sphere, exiting!")
+            sys.exit(1)
         com = np.array(self.position)
         while (True):
             u0 = _get_random_point_on_sphere()
@@ -816,6 +822,9 @@ class Body():
         tuple(np.array, np.array)
             position vector and its normalized version
         """
+        if self.shape != 'sphere':
+            print("ERROR: Fibers not yet implemented for bodies other than Sphere, exiting!")
+            sys.exit(1)
         com = np.array(self.position)
         ds_min2 = ds_min * ds_min
 
@@ -852,6 +861,9 @@ class Body():
         verbose : bool, default: :obj:`True`
             If true, print a progress message
         """
+        if self.shape != 'sphere':
+            print("ERROR: Fibers not yet implemented for bodies other than Sphere, exiting!")
+            sys.exit(1)
         print("Inserting fibers")
         for i in range(len(fibers)):
             (x0, u0) = self.find_binding_site(fibers[0:i], ds_min)

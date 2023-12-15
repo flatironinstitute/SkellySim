@@ -11,6 +11,7 @@
 
 class SphericalBody;
 class DeformableBody;
+class EllipsoidalBody;
 class FiberFiniteDifference;
 
 /// Class to represent the containing boundary of the simulated system
@@ -75,7 +76,7 @@ class Periphery {
             return false;
         // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
         // you make this a pure virtual function, so instead we just throw an error.
-        throw std::runtime_error("Collision undefined on base Periphery class\n");
+        throw std::runtime_error("Collision (DeformableBody) undefined on base Periphery class\n");
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const {
@@ -83,7 +84,15 @@ class Periphery {
             return false;
         // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
         // you make this a pure virtual function, so instead we just throw an error.
-        throw std::runtime_error("Collision undefined on base Periphery class\n");
+        throw std::runtime_error("Collision (SphericalBody) undefined on base Periphery class\n");
+    };
+
+    virtual bool check_collision(const EllipsoidalBody &body, double threshold) const {
+        if (!n_nodes_global_)
+            return false;
+        // FIXME: there is probably a way to make our objects abstract base classes, but it makes the containers weep if
+        // you make this a pure virtual function, so instead we just throw an error.
+        throw std::runtime_error("Collision (EllipsoidalBody) undefined on base Periphery class\n");
     };
 
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const {
@@ -121,10 +130,12 @@ class SphericalPeriphery : public Periphery {
     double radius_;
     SphericalPeriphery(const toml::value &periphery_table, const Params &params) : Periphery(periphery_table, params) {
         radius_ = toml::find_or<double>(periphery_table, "radius", 0.0);
+        spdlog::info("  Spherical periphery radius: {}", radius_);
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
+    virtual bool check_collision(const EllipsoidalBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
     virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
                                               const fiber_periphery_interaction_t &fp_params) const;
@@ -141,10 +152,12 @@ class EllipsoidalPeriphery : public Periphery {
         a_ = toml::find_or<double>(periphery_table, "a", 0.0);
         b_ = toml::find_or<double>(periphery_table, "b", 0.0);
         c_ = toml::find_or<double>(periphery_table, "c", 0.0);
+        spdlog::info("  Ellipsoidal periphery a,b,c: {}, {}, {}", a_, b_, c_);
     };
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
+    virtual bool check_collision(const EllipsoidalBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
     virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
                                               const fiber_periphery_interaction_t &fp_params) const;
@@ -167,6 +180,7 @@ class GenericPeriphery : public Periphery {
 
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
+    virtual bool check_collision(const EllipsoidalBody &body, double threshold) const;
     virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
     virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
                                               const fiber_periphery_interaction_t &fp_params) const;

@@ -1,4 +1,7 @@
 #include <body.hpp>
+#include <body_deformable.hpp>
+#include <body_ellipsoidal.hpp>
+#include <body_spherical.hpp>
 #include <cnpy.hpp>
 #include <fiber_container_finite_difference.hpp>
 #include <fiber_finite_difference.hpp>
@@ -6,6 +9,8 @@
 #include <periphery.hpp>
 #include <system.hpp>
 #include <utils.hpp>
+
+#include <spdlog/fmt/ostr.h>
 
 /// @brief Apply preconditioner for Periphery component of 'x'.  While local input is supplied,
 /// the preconditioner result requires the 'global' set of 'x' across all ranks, so an
@@ -101,6 +106,16 @@ bool SphericalPeriphery::check_collision(const DeformableBody &body, double thre
     return false;
 }
 
+/// @brief STUB Check for collision between SphericalPeriphery and EllipsoidalBody
+///
+/// @param[in] body EllipsoidalBody to check collision
+/// @param[in] threshold signed threshold to check collision
+/// @return always false because it's not implemented
+bool SphericalPeriphery::check_collision(const EllipsoidalBody &body, double threshold) const {
+    spdlog::warn("check_collision not implemented for SphericalPeriphery->EllipsoidalBody");
+    return false;
+}
+
 /// @brief Check for collision between SphericalPeriphery and a point cloud
 /// If any point lies outside R=(this->radius_ - threshold), return true
 /// Useful for collision detection between fibers and the periphery, but could be primitively used for a DeformableBody
@@ -167,6 +182,16 @@ bool EllipsoidalPeriphery::check_collision(const SphericalBody &body, double thr
 /// @return always false
 bool EllipsoidalPeriphery::check_collision(const DeformableBody &body, double threshold) const {
     spdlog::warn("check_collision not implemented for EllipsoidalPeriphery->DeformableBody");
+    return false;
+}
+
+/// @brief STUB Check for collision between EllipsoidalPeriphery and EllipsoidalBody
+///
+/// @param[in] body EllipsoidalBody to check collision
+/// @param[in] threshold signed threshold to check collision
+/// @return always false
+bool EllipsoidalPeriphery::check_collision(const EllipsoidalBody &body, double threshold) const {
+    spdlog::warn("check_collision not implemented for EllipsoidalPeriphery->EllipsoidalBody");
     return false;
 }
 
@@ -260,6 +285,20 @@ bool GenericPeriphery::check_collision(const DeformableBody &body, double thresh
     static bool first_call = true;
     if (!world_rank_ && first_call) {
         spdlog::warn("check_collision not implemented for GenericPeriphery->DeformableBody");
+        first_call = false;
+    }
+    return false;
+}
+
+/// @brief STUB Check for collision between GenericPeriphery and EllipsoidalBody
+///
+/// @param[in] body EllipsoidalBody to check collision
+/// @param[in] threshold signed threshold to check collision
+/// @return always false
+bool GenericPeriphery::check_collision(const EllipsoidalBody &body, double threshold) const {
+    static bool first_call = true;
+    if (!world_rank_ && first_call) {
+        spdlog::warn("check_collision not implemented for GenericPeriphery->EllipsoidalBody");
         first_call = false;
     }
     return false;
@@ -405,6 +444,10 @@ Periphery::Periphery(const toml::value &periphery_table, const Params &params) {
     n_nodes_global_ = n_nodes;
 
     MPI_Type_free(&mpi_matrix_row_t);
+
+    // Print functionality
+    spdlog::info("Periphery constructed");
+    spdlog::info("  Periphery type: {}", toml::find(periphery_table, "shape"));
 
     spdlog::info("Done initializing base periphery");
 }

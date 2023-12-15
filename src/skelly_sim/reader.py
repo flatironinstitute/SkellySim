@@ -40,9 +40,6 @@ def _eigen_to_numpy(d):
     """
     if isinstance(d, list):
         if d and d[0] == '__eigen__':
-            if isinstance(d[1], float):
-                # quaternion. not the cleanest, but eh
-                return np.array(d[1:])
             if d[1] == 1 or d[2] == 1:
                 # 1d array. just keep it that way
                 return np.array(d[3:])
@@ -53,6 +50,9 @@ def _eigen_to_numpy(d):
             else:
                 # keep same ordering of matrices as C++ otherwise
                 return np.array(d[3:]).reshape((d[2], d[1])).transpose()
+        elif d and d[0] == '__quat__':
+            # Quaternion, return the array
+            return np.array(d[1:])
         else:
             return [_eigen_to_numpy(subd) for subd in d]
     elif isinstance(d, dict):
@@ -335,8 +335,12 @@ class TrajectoryReader:
             return self._frame_data[key][0]
         else:
             if key == 'bodies':
-                return self._frame_data[key][0]
+                # There are number types of bodies, flatten them (since we are in python and heterogeneous types
+                # aren't a problem) and return
+                flattened_bodies = [item for sublist in self._frame_data[key] for item in sublist]
+                return flattened_bodies
             elif key == 'fibers':
+                # Fibers are kept one level below due to abstraction
                 return self._frame_data[key][1]
             return self._frame_data[key]
 
