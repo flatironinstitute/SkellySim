@@ -43,12 +43,16 @@ def main():
         # Build shape
         if periphery_type == 'sphere':
             n_periphery = config['periphery']['n_nodes']
+            np.set_printoptions(precision=16)
             periphery_radius = config['periphery']['radius'] * periphery_node_scale_factor
+            print(f"CJE: Internal radius in precompute.py for sphere: {periphery_radius}")
             boundary = ShapeGallery(
                 periphery_type,
                 n_periphery,
                 radius=periphery_radius,
             )
+            print(f"CJE:boundary.nodes:     {boundary.nodes}")
+            print(f"CJE:boundary.normals:   {boundary.node_normals}")
         elif periphery_type == 'ellipsoid':
             n_periphery = config['periphery']['n_nodes']
             periphery_a = config['periphery']['a'] * periphery_node_scale_factor
@@ -71,6 +75,14 @@ def main():
                 scale_factor=periphery_node_scale_factor,
             )
             config['periphery']['n_nodes'] = boundary.nodes.shape[0]
+        elif periphery_type == 'triangulated_surface':
+            triangulated_filename  = config['periphery']['triangulated_filename']
+            boundary = ShapeGallery(
+                periphery_type,
+                0,
+                triangulated_filename=triangulated_filename,
+            )
+            config['periphery']['n_nodes'] = boundary.nodes.shape[0]
         else:
             print("Invalid periphery: '" + periphery_type + "'")
             sys.exit()
@@ -81,6 +93,9 @@ def main():
 
         hull_periphery = ConvexHull(nodes_periphery)
         triangles_periphery = hull_periphery.simplices
+
+        print(f"CJE:hull_periphery.points:      {hull_periphery.points}")
+        print(f"CJE:hull_periphery.simplices:   {hull_periphery.simplices}")
         # Get quadratures
         print('Building Quadrature Weights (Periphery)')
 

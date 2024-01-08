@@ -717,6 +717,36 @@ class RevolutionPeriphery(Periphery):
 
 
 @dataclass
+class TriangulatedPeriphery(Periphery):
+    """dataclass representing a triangulated surface handed in from the outside in 'STL' format. The 'skelly_precompute' utility
+    is the one responsible for reading in the triangulated surface and creating the precompute file, this function just keeps
+    track of the file that we want to read in.
+
+    At present this does not provide an envelope function 'h(x)' (see skelly_sim.shape_gallery.Envelope), so cannot be used for collision
+    detection.
+
+    .. highlight:: python
+    .. code-block:: python
+
+        # Example usage:
+        config.periphery.triangulated_filename = 'skellysim_triangulated_surface.stl'
+
+
+    Attributes
+    ----------
+    n_nodes : int, default: :obj:`0`
+        Number of nodes to represent Periphery object. This will be set by the read-in file.
+    shape : str, default: :obj:`triangulated_surface`
+        Shape of the periphery. Don't modify it!
+    triangulated_filename : str, default: :obj:`skellysim_triangulated_surface.stl`
+    """
+
+    shape: str = 'triangulated_surface'
+    n_nodes: int = 0
+    triangulated_filename: str = 'skellysim_triangulated_surface.stl'
+
+
+@dataclass
 class Body():
     """dataclass for a single body and its parameters
 
@@ -1034,3 +1064,24 @@ class ConfigRevolution(Config):
         Periphery represented by a surface of revolution
     """
     periphery: RevolutionPeriphery = field(default_factory=RevolutionPeriphery)
+
+
+@dataclass
+class ConfigTriangulated(Config):
+    """
+    dataclass for a SkellySim config with a 'triangulated surface' periphery
+
+    Attributes
+    ----------
+    params : Params, default: :obj:`Params()`
+        System parameters
+    bodies : List[Body], default: :obj:`[]`
+        List of bodies
+    fibers : List[Fiber], default: :obj:`[]`
+        List of fibers
+    point_sources : List[Point], default: :obj:`[]`
+        List of point sources
+    periphery : TriangulatedPeriphery, default: :obj:`TriangulatedPeriphery()`
+        Periphery represented by a triangulation
+    """
+    periphery: TriangulatedPeriphery = field(default_factory=TriangulatedPeriphery)
