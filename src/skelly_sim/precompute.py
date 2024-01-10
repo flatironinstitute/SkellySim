@@ -45,14 +45,11 @@ def main():
             n_periphery = config['periphery']['n_nodes']
             np.set_printoptions(precision=16)
             periphery_radius = config['periphery']['radius'] * periphery_node_scale_factor
-            print(f"CJE: Internal radius in precompute.py for sphere: {periphery_radius}")
             boundary = ShapeGallery(
                 periphery_type,
                 n_periphery,
                 radius=periphery_radius,
             )
-            print(f"CJE:boundary.nodes:     {boundary.nodes}")
-            print(f"CJE:boundary.normals:   {boundary.node_normals}")
         elif periphery_type == 'ellipsoid':
             n_periphery = config['periphery']['n_nodes']
             periphery_a = config['periphery']['a'] * periphery_node_scale_factor
@@ -91,11 +88,14 @@ def main():
         nodes_periphery = boundary.nodes
         normals_periphery = -boundary.node_normals
 
-        hull_periphery = ConvexHull(nodes_periphery)
-        triangles_periphery = hull_periphery.simplices
+        # XXX CJE probably a better way to control that triangulates surfaces act differently than nasty if/else conditions
+        if periphery_type == 'triangulated_surface':
+            # Grab the simplices directly
+            triangles_periphery = boundary.simplices
+        else:
+            hull_periphery = ConvexHull(nodes_periphery)
+            triangles_periphery = hull_periphery.simplices
 
-        print(f"CJE:hull_periphery.points:      {hull_periphery.points}")
-        print(f"CJE:hull_periphery.simplices:   {hull_periphery.simplices}")
         # Get quadratures
         print('Building Quadrature Weights (Periphery)')
 
@@ -103,10 +103,17 @@ def main():
         # to ignore as to not scare the crap out of the uninformed user
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore')
-            quadrature_weights_periphery = \
-                quadlib.Smooth_Closed_Surface_Quadrature_RBF(
-                    nodes_periphery, triangles_periphery, boundary.h, boundary.gradh
-                )
+            # XXX Again, see if we can avoid the difference when using a triangulated mesh
+            if periphery_type == 'triangulated_surface':
+                quadrature_weights_periphery = \
+                    quadlib.Smooth_Closed_Surface_Quadrature_RBF(
+                        nodes_periphery, triangles_periphery
+                    )
+            else:
+                quadrature_weights_periphery = \
+                    quadlib.Smooth_Closed_Surface_Quadrature_RBF(
+                        nodes_periphery, triangles_periphery, boundary.h, boundary.gradh
+                    )
         print('Finished building Quadrature Weights (Periphery)')
 
         print('Creating periphery object')

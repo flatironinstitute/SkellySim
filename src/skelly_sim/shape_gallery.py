@@ -1,4 +1,5 @@
 import numpy as np
+import trimesh
 from functools import partial
 from function_generator import FunctionGenerator
 from argparse import Namespace
@@ -212,3 +213,27 @@ class ShapeGallery:
             self.h = h
             self.gradh = gradh
             self.envelope = envelope
+
+        elif shape == 'triangulated_surface':
+            triangulated_filename = kwargs.get('triangulated_filename')
+            print(f"Loading triangulates surface file from file: '{triangulated_filename}'.")
+            mesh = trimesh.load(triangulated_filename)
+
+            print(f"WARNING: Triangulated surfaces do not currently support a height function 'h(x)' or its gradient!")
+
+            # Figure out the number of nodes
+            N_nodes = len(mesh.vertices)
+            # Nodes should be directly useable from trimesh
+            nodes = mesh.vertices
+            # Vertex normals the same
+            node_normals = mesh.vertex_normals
+            # Simplices information is encoded in the faces of a trimesh
+            simplices = mesh.faces
+
+            # Wrap up everything to return
+            self.nodes = nodes
+            self.node_normals = node_normals
+            self.h = None
+            self.gradh = None
+            self.simplices = simplices
+
