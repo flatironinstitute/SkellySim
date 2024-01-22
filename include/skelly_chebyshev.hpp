@@ -212,7 +212,7 @@ Eigen::VectorXd NthDerivativeOfChebyshevTn(const unsigned int n, const unsigned 
 
 /// @brief Spectral derivative matrix
 Eigen::MatrixXd DerivativeMatrix(const unsigned int n, const unsigned int D, REPR in_type = REPR::c,
-                                 REPR out_type = REPR::c, double scale_factor = 1.0) {
+                                 REPR out_type = REPR::c, const double scale_factor = 1.0) {
     Eigen::MatrixXd DM = Eigen::MatrixXd::Zero(n - D, n);
 
     // Start at column D
@@ -223,6 +223,18 @@ Eigen::MatrixXd DerivativeMatrix(const unsigned int n, const unsigned int D, REP
     // Scale by scale_factor to the power of the number of derivatives
     DM = DM * pow(scale_factor, D);
     return ToggleRepresentation(DM, REPR::c, REPR::c, in_type, out_type);
+}
+
+/// @brief Spectral integration matrix
+Eigen::MatrixXd IntegrationMatrix(const unsigned int order, REPR in_type = REPR::c, REPR out_type = REPR::c,
+                                  const double scale_factor = 1.0) {
+    Eigen::MatrixXd DMat = DerivativeMatrix(order, 1, REPR::c, REPR::c, scale_factor);
+    Eigen::MatrixXd VM = VandermondeMatrix(order, Eigen::VectorXd{{-1.0}});
+    Eigen::MatrixXd A(DMat.rows() + VM.rows(), DMat.cols());
+    // vcat operation
+    A << DMat, VM;
+
+    return ToggleRepresentation(A.inverse(), REPR::c, REPR::c, in_type, out_type);
 }
 
 } // namespace skelly_chebyshev
