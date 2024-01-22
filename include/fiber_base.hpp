@@ -42,7 +42,22 @@ class FiberBase {
     Eigen::MatrixXd IMT_;
 
     // State vectors
-    Eigen::VectorXd XX_; ///< concatenated entire state of system
+    //
+    // Include all of the derivatives, as we usually want to keep them around
+    Eigen::VectorXd XX_;     ///< concatenated entire state of system
+    Eigen::VectorXd XssssC_; ///< Fourth derivative of X components in coefficient space
+    Eigen::VectorXd XsssC_;  ///< Third derivative of X components in coefficient space
+    Eigen::VectorXd XssC_;   ///< Second derivative of X components in coefficient space
+    Eigen::VectorXd XsC_;    ///< First derivative of X components in coefficient space
+    Eigen::VectorXd XC_;     ///< Zeroth derivative of X components in coefficient space
+    Eigen::VectorXd YssssC_; ///< Fourth derivative of Y components in coefficient space
+    Eigen::VectorXd YsssC_;  ///< Third derivative of Y components in coefficient space
+    Eigen::VectorXd YssC_;   ///< Second derivative of Y components in coefficient space
+    Eigen::VectorXd YsC_;    ///< First derivative of Y components in coefficient space
+    Eigen::VectorXd YC_;     ///< Zeroth derivative of Y components in coefficient space
+    Eigen::VectorXd TssC_;   ///< Second derivative of T components in coefficient space
+    Eigen::VectorXd TsC_;    ///< First derivative of T components in coefficient space
+    Eigen::VectorXd TC_;     ///< Zeroth derivative of T components in coefficient space
 
     /// @brief Construct a fiber of a given discretizaiton
     FiberBase(int n_nodes, int n_nodes_tension, int n_equations, int n_equations_tension)
@@ -69,12 +84,23 @@ class FiberBase {
     // Views
     //
     // Eigen is lame and we can't keep around a view as an object forever without knowing it's size, it seems. So,
-    // instead, just have a function we always call to get the segment out of the main state vector. Icky.
+    // instead, just have a function we always call to get the segment out of the main state vector. Icky. This
+    // is done here via the 'Ref' constructor, but could also use 'VectorBlock', except later when composing
+    // operations together.
     //
     // Get the different spatial and tension components of the state vector
-    Eigen::VectorBlock<Eigen::VectorXd> XW() { return XX_.segment(0, n_nodes_); }
-    Eigen::VectorBlock<Eigen::VectorXd> YW() { return XX_.segment(n_nodes_, n_nodes_); }
-    Eigen::VectorBlock<Eigen::VectorXd> TW() { return XX_.segment(2 * n_nodes_, n_nodes_tension_); }
+    Eigen::Ref<Eigen::VectorXd> XW() { return XX_.segment(0, n_nodes_); }
+    Eigen::Ref<Eigen::VectorXd> YW() { return XX_.segment(n_nodes_, n_nodes_); }
+    Eigen::Ref<Eigen::VectorXd> TW() { return XX_.segment(2 * n_nodes_, n_nodes_tension_); }
+
+    // SplitXN an Eigen::Ref into different components (don't tie to std::pair for return)
+    //
+    // We keep these separate as I'm not sure how Eigen's automatic operation magic works through tying
+    // to something like std::pair
+    Eigen::Ref<Eigen::VectorXd> SplitX1(Eigen::Ref<Eigen::VectorXd> x, unsigned int n) { return x.segment(0, n); }
+    Eigen::Ref<Eigen::VectorXd> SplitX2(Eigen::Ref<Eigen::VectorXd> x, unsigned int n) {
+        return x.segment(n, x.size() - n);
+    }
 };
 
 #endif // FIBER_BASE_HPP_

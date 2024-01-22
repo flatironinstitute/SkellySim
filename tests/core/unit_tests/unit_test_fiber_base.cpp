@@ -72,6 +72,17 @@ TEST(FiberBase, views) {
     EXPECT_TRUE(initXX.segment(0, 8).isApprox(FS.XW()));
     EXPECT_TRUE(initXX.segment(8, 8).isApprox(FS.YW()));
     EXPECT_TRUE(initXX.segment(16, 5).isApprox(FS.TW()));
+
+    // Try views into the split_at function
+    auto s1 = FS.SplitX1(FS.XW(), 4);
+    auto s2 = FS.SplitX2(FS.XW(), 4);
+    EXPECT_TRUE(s1.isApprox(initXX.segment(0, 4)));
+    EXPECT_TRUE(s2.isApprox(initXX.segment(4, 4)));
+
+    // Can we edit into the double-ref?
+    s1[3] = 599;
+    Eigen::VectorXd s1_new{{1, 2, 3, 599}};
+    EXPECT_TRUE(s1_new.isApprox(s1));
 }
 
 // Test views into the arrays of the fiber (divide and construct)
@@ -93,9 +104,9 @@ TEST(FiberBase, divide_and_construct) {
                             0.9854863423547627, 0.1300696339820414, 0.4064240831808379, 0.13709530013691218,
                             0.8522195831731575, 0.10551693315332411, 0.35052090551564186, 0.6938329801718334,
                             0.5987492088519557}};
-    // std::cout << "XX_\n" << FS.XX_ << std::endl;
 
     // concatenate vectors
     Eigen::VectorXd XX(init_X.size() + init_Y.size() + init_T.size());
     XX << init_X, init_Y, init_T;
+    FS.XX_ = XX;
 }
