@@ -1,6 +1,6 @@
 
-/// \file unit_test_serialization.cpp
-/// \brief Unit tests for serialization via msgpack (single MPI rank)
+/// \file unit_test_skelly_chebyshev.cpp
+/// \brief Unit tests for Chebyshev polynomial helper functions
 
 // C++ includes
 #include <iostream>
