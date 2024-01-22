@@ -85,11 +85,45 @@ TEST(FiberBase, views) {
     EXPECT_TRUE(s1_new.isApprox(s1));
 }
 
-// Test views into the arrays of the fiber (divide and construct)
+// Test divide and construct abilities
 TEST(FiberBase, divide_and_construct) {
+    int N = 8;
+    FiberBase FS(N, N - 3, N - 4, N - 4);
+
+    // Create a canned state vector
+    Eigen::VectorXd initXX{
+        {1, 2, 3, 4, 5, 6, 7, 8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.01, 0.02, 0.03, 0.04, 0.05}};
+    FS.XX_ = initXX;
+
+    // Call divide and construct, even though some of the values are bogus, to see if they are constructed internally
+    // correctly
+    FS.DivideAndConstruct(0.5);
+    EXPECT_TRUE(FS.XssssC_.isApprox(initXX.segment(0, 4)));
+    EXPECT_TRUE(FS.YssssC_.isApprox(initXX.segment(8, 4)));
+    EXPECT_TRUE(FS.TsC_.isApprox(initXX.segment(16, 4)));
+
+    // Check the integrations in XC
+    Eigen::VectorXd XsssC_true{{48.0, -0.125, 0.125, 0.125}};
+    Eigen::VectorXd XssC_true{{14.0, 11.984375, -0.0078125, 0.005208333333333333}};
+    Eigen::VectorXd XsC_true{{6.0, 3.5009765625, 0.7490234375, -0.0003255208333333333}};
+    Eigen::VectorXd XC_true{{5.0, 1.4063720703125, 0.21881103515625, 0.031209309895833332}};
+
+    EXPECT_TRUE(XsssC_true.isApprox(FS.XsssC_));
+    EXPECT_TRUE(XssC_true.isApprox(FS.XssC_));
+    EXPECT_TRUE(XsC_true.isApprox(FS.XsC_));
+    EXPECT_TRUE(XC_true.isApprox(FS.XC_));
+
+    // Check the integrations in T
+    Eigen::VectorXd TC_true{{0.05, -0.00125, 0.00125, 0.00125}};
+    EXPECT_TRUE(TC_true.isApprox(FS.TC_));
+}
+
+// Test views into the arrays of the fiber (divide and construct)
+TEST(FiberBase, integration) {
     // Create a fiber base object to store data
     int N = 16;
     FiberBase FS(N, N - 3, N - 4, N - 4);
+    double L = 0.1;
 
     // initialization conditions taken from julia to compare
     Eigen::VectorXd init_X{{0.9997588300226782, 0.9058773132192033, 0.6972363395327937, 0.05311960018683659,
@@ -109,4 +143,22 @@ TEST(FiberBase, divide_and_construct) {
     Eigen::VectorXd XX(init_X.size() + init_Y.size() + init_T.size());
     XX << init_X, init_Y, init_T;
     FS.XX_ = XX;
+
+    // Run divide and construct
+    FS.DivideAndConstruct(L);
+
+    // Test the tension component
+    auto IMT = FS.IMT_ * (L / 2.0);
+    Eigen::MatrixXd TsM(FS.n_equations_tension_, FS.n_equations_tension_ + 1);
+    TsM << Eigen::MatrixXd::Identity(FS.n_equations_tension_, FS.n_equations_tension_),
+        Eigen::MatrixXd::Zero(FS.n_equations_tension_, 1);
+    Eigen::VectorXd colvec(FS.n_equations_tension_);
+    colvec << 1.0, Eigen::VectorXd::Zero(FS.n_equations_tension_ - 1);
+    Eigen::MatrixXd TM(IMT.rows(), IMT.cols() + 1);
+    TM << IMT, colvec;
+    auto TsC_raw = TsM * init_T;
+    auto TC_raw = TM * init_T;
+
+    EXPECT_TRUE(TC_raw.isApprox(FS.TC_));
+    EXPECT_TRUE(TsC_raw.isApprox(FS.TsC_));
 }

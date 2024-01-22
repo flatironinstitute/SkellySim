@@ -89,6 +89,8 @@ class FiberBase {
     // operations together.
     //
     // Get the different spatial and tension components of the state vector
+    //
+    // XXX could probably just be helper functions ane not in the class
     Eigen::Ref<Eigen::VectorXd> XW() { return XX_.segment(0, n_nodes_); }
     Eigen::Ref<Eigen::VectorXd> YW() { return XX_.segment(n_nodes_, n_nodes_); }
     Eigen::Ref<Eigen::VectorXd> TW() { return XX_.segment(2 * n_nodes_, n_nodes_tension_); }
@@ -97,9 +99,78 @@ class FiberBase {
     //
     // We keep these separate as I'm not sure how Eigen's automatic operation magic works through tying
     // to something like std::pair
+    //
+    // XXX Could probably be helper functions and not in the class
     Eigen::Ref<Eigen::VectorXd> SplitX1(Eigen::Ref<Eigen::VectorXd> x, unsigned int n) { return x.segment(0, n); }
     Eigen::Ref<Eigen::VectorXd> SplitX2(Eigen::Ref<Eigen::VectorXd> x, unsigned int n) {
         return x.segment(n, x.size() - n);
+    }
+
+    // Divide and construct all derivatives of fiber state vector XX
+    void DivideAndConstruct(double L) {
+        // Get temporary Ref's to internal variables, using auto for the Eigen::Ref<VectorXd> since it allows us to
+        // chain it correctly together.
+        XssssC_ = SplitX1(XW(), n_equations_);
+        YssssC_ = SplitX1(YW(), n_equations_);
+        TsC_ = SplitX1(TW(), n_equations_tension_);
+        // Get the other auxilliary variables we want
+        auto Ax = SplitX2(XW(), n_equations_);
+        auto Ay = SplitX2(YW(), n_equations_);
+        auto At = SplitX2(TW(), n_equations_tension_);
+
+        // Now integrate up our solution
+        // Get the integration matrices (in order) as we might have different ones later
+        //
+        // XXX should probably do this as a variadic template so that we can integrate an arbitrary number of this based
+        // on what we provide.
+        double rat = L / 2.0;
+        IntegrateUp(XsssC_, XssC_, XsC_, XC_, XssssC_, rat, Ax[0], Ax[1], Ax[2], Ax[3]);
+        IntegrateUp(YsssC_, YssC_, YsC_, YC_, YssssC_, rat, Ay[0], Ay[1], Ay[2], Ay[3]);
+        TensionIntegrateUpConstraint(TC_, TsC_, IMT_, rat, At[0]);
+    }
+
+    // Do all 4 integrals for fibers
+    //
+    // Takes in references to the actual vector locations in order to fill them with data.
+    //
+    // XXX Could probably be helper functions and not in the class.
+    //
+    // 4th -> 3rd derivative
+    void IntegrateUp(Eigen::VectorXd &XsssC, Eigen::VectorXd &XssC, Eigen::VectorXd &XsC, Eigen::VectorXd &XC,
+                     VectorRef &XssssC, const double rat, const double Ax, const double Bx, const double Cx,
+                     const double Dx) {
+        XsssC = (IM_ * XssssC) * rat;
+        XsssC[0] += 6.0 * Dx;
+        IntegrateUp(XssC, XsC, XC, XsssC, rat, Ax, Bx, Cx);
+    }
+    // 3rd -> 2nd derivative
+    void IntegrateUp(Eigen::VectorXd &XssC, Eigen::VectorXd &XsC, Eigen::VectorXd &XC, VectorRef &XsssC,
+                     const double rat, const double Ax, const double Bx, const double Cx) {
+        XssC = (IM_ * XsssC) * rat;
+        XssC[0] += 2.0 * Cx;
+        IntegrateUp(XsC, XC, XssC, rat, Ax, Bx);
+    }
+    // 2nd -> 1st derivative
+    void IntegrateUp(Eigen::VectorXd &XsC, Eigen::VectorXd &XC, VectorRef &XssC, const double rat, const double Ax,
+                     const double Bx) {
+        XsC = (IM_ * XssC) * rat;
+        XsC[0] += Bx;
+        IntegrateUp(XC, XsC, rat, Ax);
+    }
+    // 1st -> 0th derivative
+    void IntegrateUp(Eigen::VectorXd &XC, VectorRef &XsC, const double rat, const double Ax) {
+        XC = (IM_ * XsC) * rat;
+        XC[0] += Ax;
+    }
+
+    // Tension integrals
+    //
+    // XXX This should integrate up our tension conditions, but only for the CONSTRAINT version right now. Should make
+    // this more general as well
+    void TensionIntegrateUpConstraint(Eigen::VectorXd &TC, VectorRef &TsC, MatrixRef &IMT, const double rat,
+                                      const double At) {
+        TC = (IMT * TsC) * rat;
+        TC[0] += At;
     }
 };
 
