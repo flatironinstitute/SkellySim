@@ -84,6 +84,37 @@ TEST(FiberBase, views) {
     EXPECT_TRUE(s1_new.isApprox(s1));
 }
 
+// Test the ability to integrate various quantities
+TEST(FiberBase, integrate_up) {
+    // Create a smaller fiber
+    int N = 8;
+    FiberBase FS(N, N - 3, N - 4, N - 4);
+
+    // Create a canned state vector
+    Eigen::VectorXd initXX{
+        {1, 2, 3, 4, 5, 6, 7, 8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.01, 0.02, 0.03, 0.04, 0.05}};
+    FS.XX_ = initXX;
+
+    // Try to use IntegrateUp starting at the lowest level
+    // Need to have somewhere to shove the return type
+    Eigen::VectorXd XC_first = Eigen::VectorXd::Zero(4);
+    Eigen::VectorXd XsC_first{{6.0, 7.0078125, 2.9921875, -0.0026041666666666665}};
+    double Ax = 5.0;
+    double Bx = 6.0;
+    FS.IntegrateUp(XC_first, XsC_first, 0.5, Ax);
+
+    Eigen::VectorXd XC_first_real{{5.0, 2.251953125, 0.8759765625, 0.24934895833333331}};
+    EXPECT_TRUE(XC_first_real.isApprox(XC_first));
+
+    // Try the second level
+    Eigen::VectorXd XC_second = Eigen::VectorXd::Zero(4);
+    Eigen::VectorXd XsC_second = Eigen::VectorXd::Zero(4);
+    Eigen::VectorXd XssC_second{{14.0, 23.9375, -0.03125, 0.020833333333333332}};
+    FS.IntegrateUp(XsC_second, XC_second, XssC_second, 0.5, Ax, Bx);
+
+    EXPECT_TRUE(XC_first_real.isApprox(XC_second));
+}
+
 // Test divide and construct abilities
 TEST(FiberBase, divide_and_construct) {
     int N = 8;
@@ -94,8 +125,8 @@ TEST(FiberBase, divide_and_construct) {
         {1, 2, 3, 4, 5, 6, 7, 8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.01, 0.02, 0.03, 0.04, 0.05}};
     FS.XX_ = initXX;
 
-    // Call divide and construct, even though some of the values are bogus, to see if they are constructed internally
-    // correctly
+    // Call divide and construct, even though some of the values are bogus, to see if they are constructed
+    // internally correctly
     FS.DivideAndConstruct(0.5);
     EXPECT_TRUE(FS.XssssC_.isApprox(initXX.segment(0, 4)));
     EXPECT_TRUE(FS.YssssC_.isApprox(initXX.segment(8, 4)));
@@ -167,8 +198,8 @@ TEST(FiberBase, integration) {
 // Fake objective function to compare to
 Eigen::VectorXd lobj_generator(Eigen::VectorXd &XXold, Eigen::VectorXd &XX, FiberBase &FSold, FiberBase &FS,
                                const double L) {
-    // Assume the fiber generators are setup correclty for the number of equations, but don't have their state vectors
-    // assigned yet
+    // Assume the fiber generators are setup correclty for the number of equations, but don't have their state
+    // vectors assigned yet
     Eigen::VectorXd retval = Eigen::VectorXd::Zero(FS.n_equations_);
 
     // Have to run DivideAndConstruct for every new fiber position after setting the state vector
@@ -177,8 +208,8 @@ Eigen::VectorXd lobj_generator(Eigen::VectorXd &XXold, Eigen::VectorXd &XX, Fibe
 
     // Use the fake objective function
     //
-    // XXX Special note: To get a syntax like Julia's element-wise operations, you have to coerce the VectorXd into an
-    // ArrayXd format.
+    // XXX Special note: To get a syntax like Julia's element-wise operations, you have to coerce the VectorXd
+    // into an ArrayXd format.
     Eigen::VectorXd W1 = FS.YC_.array() * FSold.XssssC_.array() * FSold.TsC_.array();
     Eigen::VectorXd W2 = FSold.YC_.array() * FS.XssssC_.array() * FSold.TsC_.array();
     Eigen::VectorXd W3 = FSold.YC_.array() * FSold.XssssC_.array() * FS.TsC_.array();

@@ -76,9 +76,22 @@ class FiberBase {
         IM_.row(0).setZero();
         IMT_.row(0).setZero();
 
-        // Set the main state vector to the proper size and zero it out
-        XX_ = Eigen::VectorXd(2 * n_nodes_ + n_nodes_tension_);
-        XX_.setZero();
+        // Set the main state vectors to their proper size and zero out. Have to create them explicitly, otherwise,
+        // later VectorRef operations will cause segfaults
+        XX_ = Eigen::VectorXd::Zero(2 * n_nodes_ + n_nodes_tension_);
+        XssssC_ = Eigen::VectorXd::Zero(n_equations_);
+        XsssC_ = Eigen::VectorXd::Zero(n_equations_);
+        XssC_ = Eigen::VectorXd::Zero(n_equations_);
+        XsC_ = Eigen::VectorXd::Zero(n_equations_);
+        XC_ = Eigen::VectorXd::Zero(n_equations_);
+        YssssC_ = Eigen::VectorXd::Zero(n_equations_);
+        YsssC_ = Eigen::VectorXd::Zero(n_equations_);
+        YssC_ = Eigen::VectorXd::Zero(n_equations_);
+        YsC_ = Eigen::VectorXd::Zero(n_equations_);
+        YC_ = Eigen::VectorXd::Zero(n_equations_);
+        TssC_ = Eigen::VectorXd::Zero(n_equations_);
+        TsC_ = Eigen::VectorXd::Zero(n_equations_);
+        TC_ = Eigen::VectorXd::Zero(n_equations_);
     }
 
     // Views
@@ -129,29 +142,28 @@ class FiberBase {
     // XXX Could probably be helper functions and not in the class.
     //
     // 4th -> 3rd derivative
-    void IntegrateUp(Eigen::VectorXd &XsssC, Eigen::VectorXd &XssC, Eigen::VectorXd &XsC, Eigen::VectorXd &XC,
-                     CVectorRef &XssssC, const double rat, const double Ax, const double Bx, const double Cx,
-                     const double Dx) {
+    void IntegrateUp(VectorRef XsssC, VectorRef XssC, VectorRef XsC, VectorRef XC, CVectorRef &XssssC, const double rat,
+                     const double Ax, const double Bx, const double Cx, const double Dx) {
         XsssC = (IM_ * XssssC) * rat;
         XsssC[0] += 6.0 * Dx;
         IntegrateUp(XssC, XsC, XC, XsssC, rat, Ax, Bx, Cx);
     }
     // 3rd -> 2nd derivative
-    void IntegrateUp(Eigen::VectorXd &XssC, Eigen::VectorXd &XsC, Eigen::VectorXd &XC, CVectorRef &XsssC,
-                     const double rat, const double Ax, const double Bx, const double Cx) {
+    void IntegrateUp(VectorRef XssC, VectorRef XsC, VectorRef &XC, CVectorRef &XsssC, const double rat, const double Ax,
+                     const double Bx, const double Cx) {
         XssC = (IM_ * XsssC) * rat;
         XssC[0] += 2.0 * Cx;
         IntegrateUp(XsC, XC, XssC, rat, Ax, Bx);
     }
     // 2nd -> 1st derivative
-    void IntegrateUp(Eigen::VectorXd &XsC, Eigen::VectorXd &XC, CVectorRef &XssC, const double rat, const double Ax,
+    void IntegrateUp(VectorRef XsC, VectorRef XC, CVectorRef &XssC, const double rat, const double Ax,
                      const double Bx) {
         XsC = (IM_ * XssC) * rat;
         XsC[0] += Bx;
         IntegrateUp(XC, XsC, rat, Ax);
     }
     // 1st -> 0th derivative
-    void IntegrateUp(Eigen::VectorXd &XC, CVectorRef &XsC, const double rat, const double Ax) {
+    void IntegrateUp(VectorRef XC, CVectorRef &XsC, const double rat, const double Ax) {
         XC = (IM_ * XsC) * rat;
         XC[0] += Ax;
     }
@@ -160,7 +172,7 @@ class FiberBase {
     //
     // XXX This should integrate up our tension conditions, but only for the CONSTRAINT version right now. Should make
     // this more general as well
-    void TensionIntegrateUpConstraint(Eigen::VectorXd &TC, CVectorRef &TsC, CMatrixRef &IMT, const double rat,
+    void TensionIntegrateUpConstraint(VectorRef TC, CVectorRef &TsC, CMatrixRef &IMT, const double rat,
                                       const double At) {
         TC = (IMT * TsC) * rat;
         TC[0] += At;
