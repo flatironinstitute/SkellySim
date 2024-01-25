@@ -74,8 +74,7 @@ TEST(FiberBase, views) {
     EXPECT_TRUE(initXX.segment(16, 5).isApprox(FS.TW()));
 
     // Try views into the split_at function
-    auto s1 = FS.SplitX1(FS.XW(), 4);
-    auto s2 = FS.SplitX2(FS.XW(), 4);
+    auto [s1, s2] = FS.SplitAt(FS.XW(), 4);
     EXPECT_TRUE(s1.isApprox(initXX.segment(0, 4)));
     EXPECT_TRUE(s2.isApprox(initXX.segment(4, 4)));
 

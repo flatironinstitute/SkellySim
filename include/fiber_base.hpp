@@ -95,26 +95,21 @@ class FiberBase {
     VectorRef YW() { return XX_.segment(n_nodes_, n_nodes_); }
     VectorRef TW() { return XX_.segment(2 * n_nodes_, n_nodes_tension_); }
 
-    // SplitXN an Eigen::Ref into different components (don't tie to std::pair for return)
-    //
-    // We keep these separate as I'm not sure how Eigen's automatic operation magic works through tying
-    // to something like std::pair
-    //
+    // SplitXN an Eigen::Ref into different components
     // XXX Could probably be helper functions and not in the class
-    VectorRef SplitX1(VectorRef x, unsigned int n) { return x.segment(0, n); }
-    VectorRef SplitX2(VectorRef x, unsigned int n) { return x.segment(n, x.size() - n); }
+    std::tuple<VectorRef, VectorRef> SplitAt(VectorRef x, unsigned int n) {
+        return std::make_tuple(x.segment(0, n), x.segment(n, x.size() - n));
+    }
 
     // Divide and construct all derivatives of fiber state vector XX
     void DivideAndConstruct(double L) {
-        // Get temporary Ref's to internal variables, using auto for the Eigen::Ref<VectorXd> since it allows us to
-        // chain it correctly together.
-        XssssC_ = SplitX1(XW(), n_equations_);
-        YssssC_ = SplitX1(YW(), n_equations_);
-        TsC_ = SplitX1(TW(), n_equations_tension_);
-        // Get the other auxilliary variables we want
-        auto Ax = SplitX2(XW(), n_equations_);
-        auto Ay = SplitX2(YW(), n_equations_);
-        auto At = SplitX2(TW(), n_equations_tension_);
+        // Divide up the main state array into its components
+        Eigen::VectorXd Ax;
+        Eigen::VectorXd Ay;
+        Eigen::VectorXd At;
+        std::tie(XssssC_, Ax) = SplitAt(XW(), n_equations_);
+        std::tie(YssssC_, Ay) = SplitAt(YW(), n_equations_);
+        std::tie(TsC_, At) = SplitAt(TW(), n_equations_tension_);
 
         // Now integrate up our solution
         // Get the integration matrices (in order) as we might have different ones later
