@@ -18,7 +18,7 @@
 ///
 /// @param[in] x_local [3 * n_nodes_local] vector of 'x' local to this rank
 /// @return [3 * n_nodes_local] vector of P * x_local
-Eigen::VectorXd Periphery::apply_preconditioner(VectorRef &x_local) const {
+Eigen::VectorXd Periphery::apply_preconditioner(CVectorRef &x_local) const {
     if (!n_nodes_global_)
         return Eigen::VectorXd();
     assert(x_local.size() == get_local_solution_size());
@@ -35,7 +35,7 @@ Eigen::VectorXd Periphery::apply_preconditioner(VectorRef &x_local) const {
 /// @param[in] x_local [3 * n_nodes_local] vector of 'x' local to this rank
 /// @param[in] v_local [3 * n_nodes_local] vector of velocities 'v' local to this rank
 /// @return [3 * n_nodes_local] vector of A * x_local
-Eigen::VectorXd Periphery::matvec(VectorRef &x_local, MatrixRef &v_local) const {
+Eigen::VectorXd Periphery::matvec(CVectorRef &x_local, CMatrixRef &v_local) const {
     if (!n_nodes_global_)
         return Eigen::VectorXd();
     assert(x_local.size() == get_local_solution_size());
@@ -52,7 +52,7 @@ Eigen::VectorXd Periphery::matvec(VectorRef &x_local, MatrixRef &v_local) const 
 /// @param[in] density [3 x n_nodes_local] matrix of node source strengths
 /// @param[in] eta fluid viscosity
 /// @return [3 x n_trg_local] matrix of velocity at target coordinates
-Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta) const {
+Eigen::MatrixXd Periphery::flow(CMatrixRef &r_trg, CMatrixRef &density, double eta) const {
     spdlog::debug("Started shell flow");
     if (!n_nodes_global_)
         return Eigen::MatrixXd::Zero(3, r_trg.cols());
@@ -83,7 +83,7 @@ Eigen::MatrixXd Periphery::flow(MatrixRef &r_trg, MatrixRef &density, double eta
 ///
 /// @param[in] v_on_shell [3 x n_nodes_local] matrix of velocity at shell nodes on local to this MPI rank
 /// @return true if collision, false otherwise
-void Periphery::update_RHS(MatrixRef &v_on_shell) { RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size()); }
+void Periphery::update_RHS(CMatrixRef &v_on_shell) { RHS_ = -CVectorMap(v_on_shell.data(), v_on_shell.size()); }
 
 /// @brief Check for collision between SphericalPeriphery and SphericalBody
 /// If any point on body > (this->radius_ - threshold), then a collision is detected
@@ -123,7 +123,7 @@ bool SphericalPeriphery::check_collision(const EllipsoidalBody &body, double thr
 /// @param[in] point_cloud [3 x n_points] matrix of points to check collision
 /// @param[in] threshold signed threshold to check collision
 /// @return true if collision, false otherwise
-bool SphericalPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {
+bool SphericalPeriphery::check_collision(const CMatrixRef &point_cloud, double threshold) const {
     const double r2 = pow(radius_ - threshold, 2);
     for (int i = 0; i < point_cloud.cols(); ++i)
         if (point_cloud.col(i).squaredNorm() >= r2)
@@ -142,7 +142,7 @@ Eigen::MatrixXd SphericalPeriphery::fiber_interaction(const FiberFiniteDifferenc
     if (!n_nodes_global_)
         return Eigen::MatrixXd::Zero(fiber.x_.rows(), fiber.x_.cols());
 
-    const MatrixRef &pc = fiber.x_;
+    const CMatrixRef &pc = fiber.x_;
     Eigen::MatrixXd f_points = Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
 
     const int start_index = fiber.minus_clamped_ ? 1 : 0;
@@ -201,8 +201,8 @@ bool EllipsoidalPeriphery::check_collision(const EllipsoidalBody &body, double t
 /// @param[in] point_cloud [3 x n_points] matrix of points to check collision
 /// @param[in] threshold signed threshold to check collision
 /// @return true if collision, false otherwise
-bool EllipsoidalPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {
-    const MatrixRef &pc = point_cloud;
+bool EllipsoidalPeriphery::check_collision(const CMatrixRef &point_cloud, double threshold) const {
+    const CMatrixRef &pc = point_cloud;
     for (int i = 0; i < pc.cols(); ++i) {
         Eigen::Vector3d r_scaled = pc.col(i).array() / Eigen::Array3d{a_, b_, c_};
         double r_scaled_mag = r_scaled.norm();
@@ -231,7 +231,7 @@ bool EllipsoidalPeriphery::check_collision(const MatrixRef &point_cloud, double 
 /// @return [3 x n_points] matrix of forces on points due to the Periphery
 Eigen::MatrixXd EllipsoidalPeriphery::fiber_interaction(const FiberFiniteDifference &fiber,
                                                         const fiber_periphery_interaction_t &fp_params) const {
-    const MatrixRef &pc = fiber.x_;
+    const CMatrixRef &pc = fiber.x_;
     if (!n_nodes_global_)
         return Eigen::MatrixXd::Zero(pc.rows(), pc.cols());
 
@@ -306,10 +306,10 @@ bool GenericPeriphery::check_collision(const EllipsoidalBody &body, double thres
 
 /// @brief STUB Check for collision between GenericPeriphery and point_cloud
 ///
-/// @param[in] body MatrixRef (point cloud) to check collision
+/// @param[in] body CMatrixRef (point cloud) to check collision
 /// @param[in] threshold signed threshold to check collision
 /// @return always false
-bool GenericPeriphery::check_collision(const MatrixRef &point_cloud, double threshold) const {
+bool GenericPeriphery::check_collision(const CMatrixRef &point_cloud, double threshold) const {
     static bool first_call = true;
     if (!world_rank_ && first_call) {
         spdlog::warn("check_collision not implemented for point clouds");

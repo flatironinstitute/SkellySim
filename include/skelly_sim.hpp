@@ -18,8 +18,8 @@
 #define EIGEN_QUATERNION_PLUGIN "eigen_quaternion_plugin.h"
 
 #include <Eigen/Core>
-#include <spdlog/spdlog.h>
 #include <mpi.h>
+#include <spdlog/spdlog.h>
 
 typedef Eigen::Map<Eigen::VectorXd> VectorMap;
 typedef Eigen::Map<const Eigen::VectorXd> CVectorMap;
@@ -27,9 +27,12 @@ typedef Eigen::Map<Eigen::ArrayXd> ArrayMap;
 typedef Eigen::Map<const Eigen::ArrayXd> CArrayMap;
 typedef Eigen::Map<Eigen::MatrixXd> MatrixMap;
 typedef Eigen::Map<const Eigen::MatrixXd> CMatrixMap;
-typedef const Eigen::Ref<const Eigen::ArrayXd> ArrayRef;
-typedef const Eigen::Ref<const Eigen::VectorXd> VectorRef;
-typedef const Eigen::Ref<const Eigen::MatrixXd> MatrixRef;
+typedef Eigen::Ref<Eigen::ArrayXd> ArrayRef;
+typedef const Eigen::Ref<const Eigen::ArrayXd> CArrayRef;
+typedef Eigen::Ref<Eigen::VectorXd> VectorRef;
+typedef const Eigen::Ref<const Eigen::VectorXd> CVectorRef;
+typedef Eigen::Ref<Eigen::MatrixXd> MatrixRef;
+typedef const Eigen::Ref<const Eigen::MatrixXd> CMatrixRef;
 
 /// Struct of parameters for exponentially decaying fiber-periphery interaction
 typedef struct {

@@ -27,14 +27,14 @@ class DeformableBody : public Body {
 
     void min_copy(const std::shared_ptr<DeformableBody> &other);
 
-    void update_RHS(MatrixRef &v_on_body) override;
+    void update_RHS(CMatrixRef &v_on_body) override;
     void update_cache_variables(double eta) override;
     void update_preconditioner(double eta) override;
     void load_precompute_data(const std::string &input_file) override;
-    void step(double dt, VectorRef &body_solution) override;
+    void step(double dt, CVectorRef &body_solution) override;
     int get_solution_size() const override { return n_nodes_ * 4; };
-    Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
-    Eigen::VectorXd apply_preconditioner(VectorRef &x) const override;
+    Eigen::VectorXd matvec(CMatrixRef &v_bodies, CVectorRef &body_solution) const override;
+    Eigen::VectorXd apply_preconditioner(CVectorRef &x) const override;
     Eigen::Vector3d get_position() const override;
 
     bool check_collision(const Periphery &periphery, double threshold) const override;

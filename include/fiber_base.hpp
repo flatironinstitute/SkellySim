@@ -91,9 +91,9 @@ class FiberBase {
     // Get the different spatial and tension components of the state vector
     //
     // XXX could probably just be helper functions ane not in the class
-    Eigen::Ref<Eigen::VectorXd> XW() { return XX_.segment(0, n_nodes_); }
-    Eigen::Ref<Eigen::VectorXd> YW() { return XX_.segment(n_nodes_, n_nodes_); }
-    Eigen::Ref<Eigen::VectorXd> TW() { return XX_.segment(2 * n_nodes_, n_nodes_tension_); }
+    VectorRef XW() { return XX_.segment(0, n_nodes_); }
+    VectorRef YW() { return XX_.segment(n_nodes_, n_nodes_); }
+    VectorRef TW() { return XX_.segment(2 * n_nodes_, n_nodes_tension_); }
 
     // SplitXN an Eigen::Ref into different components (don't tie to std::pair for return)
     //
@@ -101,10 +101,8 @@ class FiberBase {
     // to something like std::pair
     //
     // XXX Could probably be helper functions and not in the class
-    Eigen::Ref<Eigen::VectorXd> SplitX1(Eigen::Ref<Eigen::VectorXd> x, unsigned int n) { return x.segment(0, n); }
-    Eigen::Ref<Eigen::VectorXd> SplitX2(Eigen::Ref<Eigen::VectorXd> x, unsigned int n) {
-        return x.segment(n, x.size() - n);
-    }
+    VectorRef SplitX1(VectorRef x, unsigned int n) { return x.segment(0, n); }
+    VectorRef SplitX2(VectorRef x, unsigned int n) { return x.segment(n, x.size() - n); }
 
     // Divide and construct all derivatives of fiber state vector XX
     void DivideAndConstruct(double L) {
@@ -137,28 +135,28 @@ class FiberBase {
     //
     // 4th -> 3rd derivative
     void IntegrateUp(Eigen::VectorXd &XsssC, Eigen::VectorXd &XssC, Eigen::VectorXd &XsC, Eigen::VectorXd &XC,
-                     VectorRef &XssssC, const double rat, const double Ax, const double Bx, const double Cx,
+                     CVectorRef &XssssC, const double rat, const double Ax, const double Bx, const double Cx,
                      const double Dx) {
         XsssC = (IM_ * XssssC) * rat;
         XsssC[0] += 6.0 * Dx;
         IntegrateUp(XssC, XsC, XC, XsssC, rat, Ax, Bx, Cx);
     }
     // 3rd -> 2nd derivative
-    void IntegrateUp(Eigen::VectorXd &XssC, Eigen::VectorXd &XsC, Eigen::VectorXd &XC, VectorRef &XsssC,
+    void IntegrateUp(Eigen::VectorXd &XssC, Eigen::VectorXd &XsC, Eigen::VectorXd &XC, CVectorRef &XsssC,
                      const double rat, const double Ax, const double Bx, const double Cx) {
         XssC = (IM_ * XsssC) * rat;
         XssC[0] += 2.0 * Cx;
         IntegrateUp(XsC, XC, XssC, rat, Ax, Bx);
     }
     // 2nd -> 1st derivative
-    void IntegrateUp(Eigen::VectorXd &XsC, Eigen::VectorXd &XC, VectorRef &XssC, const double rat, const double Ax,
+    void IntegrateUp(Eigen::VectorXd &XsC, Eigen::VectorXd &XC, CVectorRef &XssC, const double rat, const double Ax,
                      const double Bx) {
         XsC = (IM_ * XssC) * rat;
         XsC[0] += Bx;
         IntegrateUp(XC, XsC, rat, Ax);
     }
     // 1st -> 0th derivative
-    void IntegrateUp(Eigen::VectorXd &XC, VectorRef &XsC, const double rat, const double Ax) {
+    void IntegrateUp(Eigen::VectorXd &XC, CVectorRef &XsC, const double rat, const double Ax) {
         XC = (IM_ * XsC) * rat;
         XC[0] += Ax;
     }
@@ -167,7 +165,7 @@ class FiberBase {
     //
     // XXX This should integrate up our tension conditions, but only for the CONSTRAINT version right now. Should make
     // this more general as well
-    void TensionIntegrateUpConstraint(Eigen::VectorXd &TC, VectorRef &TsC, MatrixRef &IMT, const double rat,
+    void TensionIntegrateUpConstraint(Eigen::VectorXd &TC, CVectorRef &TsC, CMatrixRef &IMT, const double rat,
                                       const double At) {
         TC = (IMT * TsC) * rat;
         TC[0] += At;

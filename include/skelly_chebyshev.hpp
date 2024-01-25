@@ -54,7 +54,7 @@ inline T inverse_chebyshev_ratio(T lb, T ub) {
 }
 
 // inline Eigen::VectorXd to_scaled_space(double lb, double ub, Eigen::VectorXd x) {
-inline Eigen::VectorXd to_scaled_space(double lb, double ub, VectorRef &x) {
+inline Eigen::VectorXd to_scaled_space(double lb, double ub, CVectorRef &x) {
     Eigen::ArrayXd scaled_ret = (x.array() + 1.0) * chebyshev_ratio(lb, ub) + lb;
     return scaled_ret;
 }
@@ -80,10 +80,10 @@ Eigen::VectorXd ChebyshevTPoints(double lb, double ub, const unsigned int order)
 }
 
 /// @brief vander from the Julia Polynomials library specifically for chebyshev points
-/// @param VectorRef& x Const vector reference of Chebyshev zeros
+/// @param CVectorRef& x Const vector reference of Chebyshev zeros
 /// @param const unsigned int n Order of chebyshev to use
 /// @return Eigen::MatrixXd Vandermonde matrix for associated Chebyshev points at given order
-Eigen::MatrixXd vander_julia_chebyshev(VectorRef &x, const unsigned int n) {
+Eigen::MatrixXd vander_julia_chebyshev(CVectorRef &x, const unsigned int n) {
     Eigen::MatrixXd A(x.size(), n + 1);
     // Set the first column to ones
     A.col(0).setOnes();
@@ -106,15 +106,15 @@ Eigen::MatrixXd VandermondeMatrix(const unsigned int order) {
 
 /// @brief VandermondeMatrix construction for a chebyshev of vector x
 /// @param const unsigned int order Order of Vandermonde matrix
-/// @param VectorRef& x Points to create matrix for
+/// @param CVectorRef& x Points to create matrix for
 /// @return Eigen::MatrixXd Vandermonde matrix of order order for points x
-Eigen::MatrixXd VandermondeMatrix(const unsigned int order, VectorRef &x) {
+Eigen::MatrixXd VandermondeMatrix(const unsigned int order, CVectorRef &x) {
     return vander_julia_chebyshev(x, order - 1);
 }
 
 /// @brief Inverse VandermondeMatrix construction for ChebyshevTPoints at specified order
 /// @param const unsigned int order Order of inverse Vandermonde matrix
-/// @param VectorRef& x Points to create matrix for
+/// @param CVectorRef& x Points to create matrix for
 /// @return Eigen::MatrixXd Inverse Vandermonde matrix of order order for points x
 Eigen::MatrixXd InverseVandermondeMatrix(const unsigned int order) {
     Eigen::MatrixXd IVM = VandermondeMatrix(order);
@@ -130,7 +130,7 @@ Eigen::MatrixXd InverseVandermondeMatrix(const unsigned int order) {
 /// For example, if OP acts from nodes --> nodes, then:
 ///     NOP = ToggleRepresentation(OP, CTYPE::n, CTYPE::n, CTYPE::c, CTYPE::n)
 /// returns a new operator NOP that acts from coefficients --> nodees
-Eigen::MatrixXd ToggleRepresentation(MatrixRef &op, REPR op_in, REPR op_out, REPR req_in, REPR req_out) {
+Eigen::MatrixXd ToggleRepresentation(CMatrixRef &op, REPR op_in, REPR op_out, REPR req_in, REPR req_out) {
     // Explicitly use MatrixXd, otherwise there are reports of it doing a shallow copy
     Eigen::MatrixXd nop = op;
 
@@ -152,11 +152,11 @@ Eigen::MatrixXd ToggleRepresentation(MatrixRef &op, REPR op_in, REPR op_out, REP
 }
 
 /// @brief derivative from the julia library
-/// @param VectorRef& p Vector of coefficients to construct derivative from
+/// @param CVectorRef& p Vector of coefficients to construct derivative from
 /// @return Eigen::VectorXd Derivative of input vector in coefficient space
 ///
 /// Implemented based on julia's polynomials. See julia source code for more details
-Eigen::VectorXd derivative_julia_chebyshev(VectorRef &p) {
+Eigen::VectorXd derivative_julia_chebyshev(CVectorRef &p) {
     // Copy the input vector to be able to modify on the fly
     Eigen::VectorXd q = p.segment(1, p.size() - 1);
     // Get the size

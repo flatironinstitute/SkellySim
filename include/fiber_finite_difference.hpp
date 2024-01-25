@@ -143,13 +143,13 @@ class FiberFiniteDifference {
         c_1_ = 2.0 / (8.0 * M_PI * eta);
     }
 
-    Eigen::VectorXd matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const;
+    Eigen::VectorXd matvec(CVectorRef x, CMatrixRef v, CVectorRef v_boundary) const;
     void update_preconditioner();
     void update_force_operator();
     void update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding);
-    void update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external);
+    void update_RHS(double dt, CMatrixRef &flow, CMatrixRef &f_external);
     void update_linear_operator(double dt, double eta);
-    void apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber);
+    void apply_bc_rectangular(double dt, CMatrixRef &v_on_fiber, CMatrixRef &f_on_fiber);
     void translate(const Eigen::Vector3d &r) { x_.colwise() += r; };
     void update_derivatives();
     void update_stokeslet(double);

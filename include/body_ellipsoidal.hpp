@@ -51,16 +51,16 @@ class EllipsoidalBody : public Body {
     Eigen::MatrixXd A_;                         ///< Matrix representation of body for solver
     Eigen::PartialPivLU<Eigen::MatrixXd> A_LU_; ///< LU decomposition of A_ for preconditioner
 
-    void update_RHS(MatrixRef &v_on_body) override;
+    void update_RHS(CMatrixRef &v_on_body) override;
     void update_cache_variables(double eta) override;
     void update_preconditioner(double eta) override;
     void load_precompute_data(const std::string &input_file) override;
-    void step(double dt, VectorRef &body_solution) override;
+    void step(double dt, CVectorRef &body_solution) override;
     void min_copy(const std::shared_ptr<EllipsoidalBody> &other);
 
     int get_solution_size() const override { return n_nodes_ * 3 + 6; };
-    Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const override;
-    Eigen::VectorXd apply_preconditioner(VectorRef &x) const override;
+    Eigen::VectorXd matvec(CMatrixRef &v_bodies, CVectorRef &body_solution) const override;
+    Eigen::VectorXd apply_preconditioner(CVectorRef &x) const override;
 
     Eigen::Vector3d get_position() const override { return position_; }
     void place(const Eigen::Vector3d &new_pos, const Eigen::Quaterniond &new_orientation);

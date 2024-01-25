@@ -7,7 +7,7 @@ class BackgroundSource {
   public:
     BackgroundSource() = default;
     BackgroundSource(const toml::value &background_table);
-    Eigen::MatrixXd flow(const MatrixRef &r_trg, double eta);
+    Eigen::MatrixXd flow(CMatrixRef &r_trg, double eta);
     bool is_active() { return uniform_.norm() + scale_factor_.norm(); }
 
   private:

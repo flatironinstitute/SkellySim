@@ -2,7 +2,6 @@
 #include <parse_util.hpp>
 #include <point_source.hpp>
 
-
 PointSource::PointSource(const toml::value &point_table) {
     if (point_table.contains("position"))
         position_ = parse_util::convert_array<>(point_table.at("position").as_array());
@@ -14,7 +13,7 @@ PointSource::PointSource(const toml::value &point_table) {
         time_to_live_ = point_table.at("time_to_live").as_floating();
 }
 
-Eigen::MatrixXd PointSourceContainer::flow(const MatrixRef &r_trg, double eta, double time) {
+Eigen::MatrixXd PointSourceContainer::flow(const CMatrixRef &r_trg, double eta, double time) {
     Eigen::MatrixXd vel = Eigen::MatrixXd::Zero(3, r_trg.cols());
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> forcers;
     std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> torquers;

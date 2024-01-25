@@ -11,7 +11,7 @@ BackgroundSource::BackgroundSource(const toml::value &background_table) {
         uniform_ = parse_util::convert_array<>(background_table.at("uniform").as_array());
 }
 
-Eigen::MatrixXd BackgroundSource::flow(const MatrixRef &r_trg, double eta) {
+Eigen::MatrixXd BackgroundSource::flow(const CMatrixRef &r_trg, double eta) {
     Eigen::MatrixXd vel = Eigen::MatrixXd::Zero(3, r_trg.cols());
 
     for (int i = 0; i < r_trg.cols(); ++i)

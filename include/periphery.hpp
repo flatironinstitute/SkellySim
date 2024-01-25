@@ -23,7 +23,7 @@ class Periphery {
     Periphery() = default;
     Periphery(const toml::value &periphery_table, const Params &params);
 
-    Eigen::MatrixXd flow(MatrixRef &trg, MatrixRef &density, double eta) const;
+    Eigen::MatrixXd flow(CMatrixRef &trg, CMatrixRef &density, double eta) const;
 
     /// @brief Get the number of nodes local to the MPI rank
     int get_local_node_count() const { return M_inv_.rows() / 3; };
@@ -36,12 +36,12 @@ class Periphery {
 
     Eigen::MatrixXd get_local_node_positions() const { return node_pos_; };
 
-    void update_RHS(MatrixRef &v_on_shell);
+    void update_RHS(CMatrixRef &v_on_shell);
 
     Eigen::VectorXd get_RHS() const { return RHS_; };
 
-    Eigen::VectorXd apply_preconditioner(VectorRef &x) const;
-    Eigen::VectorXd matvec(VectorRef &x_local, MatrixRef &v_local) const;
+    Eigen::VectorXd apply_preconditioner(CVectorRef &x) const;
+    Eigen::VectorXd matvec(CVectorRef &x_local, CMatrixRef &v_local) const;
 
     /// pointer to FMM object (pointer to avoid constructing object with empty Periphery)
     kernels::Evaluator stresslet_kernel_;
@@ -66,7 +66,7 @@ class Periphery {
     /// MPI_WORLD_SIZE+1 array that specifies row displacements. Is essentially the CDF of row_counts_
     Eigen::VectorXi row_displs_;
 
-    void step(VectorRef &solution) { solution_vec_ = solution; }
+    void step(CVectorRef &solution) { solution_vec_ = solution; }
     void set_evaluator(const std::string &evaluator);
 
     bool is_active() const { return n_nodes_global_; }
@@ -95,7 +95,7 @@ class Periphery {
         throw std::runtime_error("Collision (EllipsoidalBody) undefined on base Periphery class\n");
     };
 
-    virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const {
+    virtual bool check_collision(const CMatrixRef &point_cloud, double threshold) const {
         if (!n_nodes_global_)
             return false;
         throw std::runtime_error("Collision undefined on base Periphery class\n");
@@ -136,7 +136,7 @@ class SphericalPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const EllipsoidalBody &body, double threshold) const;
-    virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
+    virtual bool check_collision(const CMatrixRef &point_cloud, double threshold) const;
     virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
                                               const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {radius_, radius_, radius_}; };
@@ -158,7 +158,7 @@ class EllipsoidalPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const EllipsoidalBody &body, double threshold) const;
-    virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
+    virtual bool check_collision(const CMatrixRef &point_cloud, double threshold) const;
     virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
                                               const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };
@@ -181,7 +181,7 @@ class GenericPeriphery : public Periphery {
     virtual bool check_collision(const SphericalBody &body, double threshold) const;
     virtual bool check_collision(const DeformableBody &body, double threshold) const;
     virtual bool check_collision(const EllipsoidalBody &body, double threshold) const;
-    virtual bool check_collision(const MatrixRef &point_cloud, double threshold) const;
+    virtual bool check_collision(const CMatrixRef &point_cloud, double threshold) const;
     virtual Eigen::MatrixXd fiber_interaction(const FiberFiniteDifference &fiber,
                                               const fiber_periphery_interaction_t &fp_params) const;
     virtual std::tuple<double, double, double> get_dimensions() { return {a_, b_, c_}; };

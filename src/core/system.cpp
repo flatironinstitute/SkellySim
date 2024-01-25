@@ -245,7 +245,7 @@ get_node_maps(Eigen::MatrixBase<Derived> &x) {
 /// \f[ P^{-1} * x = y \f]
 /// @param [in] x [local_solution_size] Vector to apply preconditioner on
 /// @return [local_solution_size] Preconditioned input vector
-Eigen::VectorXd apply_preconditioner(VectorRef &x) {
+Eigen::VectorXd apply_preconditioner(CVectorRef &x) {
     const auto [fib_sol_size, shell_sol_size, body_sol_size] = get_local_solution_sizes();
     const int sol_size = fib_sol_size + shell_sol_size + body_sol_size;
     assert(sol_size == x.size());
@@ -266,7 +266,7 @@ Eigen::VectorXd apply_preconditioner(VectorRef &x) {
 /// \f[ A * x = y \f]
 /// @param [in] x [local_solution_size] Vector to apply matvec on
 /// @return [local_solution_size] Vector y, the result of the operator applied to x.
-Eigen::VectorXd apply_matvec(VectorRef &x) {
+Eigen::VectorXd apply_matvec(CVectorRef &x) {
     spdlog::trace("System::apply_matvec");
 
     using Eigen::Block;
@@ -327,7 +327,7 @@ Eigen::VectorXd apply_matvec(VectorRef &x) {
 ///
 /// @param[in] r_trg [3 x n_trg] matrix of points to evaluate velocities
 /// @return [3 x n_trg] matrix of velocities at r_trg
-Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg) {
+Eigen::MatrixXd velocity_at_targets(CMatrixRef &r_trg) {
     if (!r_trg.size())
         return Eigen::MatrixXd(3, 0);
     Eigen::MatrixXd u_trg(r_trg.rows(), r_trg.cols());

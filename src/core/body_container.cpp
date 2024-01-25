@@ -19,7 +19,7 @@ using Eigen::VectorXd;
 /// @brief Update the RHS for all bodies for given velocities
 ///
 /// @param[in] v_on_bodies [3 x n_local_body_nodes] matrix of velocities at the body nodes
-void BodyContainer::update_RHS(MatrixRef &v_on_bodies) {
+void BodyContainer::update_RHS(CMatrixRef &v_on_bodies) {
     if (world_rank_)
         return;
     int offset = 0;
@@ -45,7 +45,7 @@ VectorXd BodyContainer::get_RHS() const {
     return RHS;
 }
 
-void BodyContainer::step(VectorRef &bodies_solution, double dt) const {
+void BodyContainer::step(CVectorRef &bodies_solution, double dt) const {
     const int global_solution_size = get_global_solution_size();
     VectorXd bodies_solution_global(global_solution_size);
     if (world_rank_ == 0)
@@ -100,7 +100,7 @@ MatrixXd BodyContainer::get_local_node_normals(const T &body_vec) const {
 }
 
 template <typename T>
-VectorXd BodyContainer::get_local_solution(const T &body_vec, VectorRef &body_solutions) const {
+VectorXd BodyContainer::get_local_solution(const T &body_vec, CVectorRef &body_solutions) const {
     VectorXd sub_solution;
 
     if (world_rank_ == 0) {
@@ -168,7 +168,7 @@ MatrixXd BodyContainer::get_local_center_positions(const T &body_vec) const {
 /// Ordering is [fib1.nodes.x, fib1.nodes.y, fib1.nodes.z, fib1.T, fib2.nodes.x, ...]
 /// @param[in] x_bodies entire body component of the solution vector (deformable+rigid)
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
-BodyContainer::calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies,
+BodyContainer::calculate_link_conditions(CVectorRef &fiber_sol, CVectorRef &x_bodies,
                                          const FiberContainerFiniteDifference &fc) const {
     using Eigen::ArrayXXd;
     using Eigen::MatrixXd;
@@ -266,7 +266,7 @@ BodyContainer::calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodi
     return std::make_tuple(std::move(velocities_on_fiber), std::move(body_forces_torques));
 }
 
-MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions,
+MatrixXd BodyContainer::flow_spherical(CMatrixRef &r_trg, CVectorRef &body_solutions, CMatrixRef &link_conditions,
                                        double eta) const {
     spdlog::debug("Started body (spherical) flow");
     utils::LoggerRedirect redirect(std::cout);
@@ -338,7 +338,7 @@ MatrixXd BodyContainer::flow_spherical(MatrixRef &r_trg, VectorRef &body_solutio
     return v_bdy2all;
 }
 
-MatrixXd BodyContainer::flow_ellipsoidal(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions,
+MatrixXd BodyContainer::flow_ellipsoidal(CMatrixRef &r_trg, CVectorRef &body_solutions, CMatrixRef &link_conditions,
                                          double eta) const {
     spdlog::debug("Started body (ellipsoidal) flow");
     utils::LoggerRedirect redirect(std::cout);
@@ -446,7 +446,7 @@ Eigen::MatrixXd BodyContainer::calculate_external_forces_torques(double time) co
     return forces_torques;
 }
 
-MatrixXd BodyContainer::flow_deformable(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions,
+MatrixXd BodyContainer::flow_deformable(CMatrixRef &r_trg, CVectorRef &body_solutions, CMatrixRef &link_conditions,
                                         double eta) const {
     if (!deformable_bodies.size())
         return MatrixXd::Zero(3, r_trg.cols());
@@ -468,7 +468,7 @@ MatrixXd BodyContainer::flow_deformable(MatrixRef &r_trg, VectorRef &body_soluti
 /// @param[in] forces_torques [6 x n_bodies] Matrix of body center-of-mass forces and torques
 /// @param[in] eta Fluid viscosity
 /// @return [3 x n_trg_local] Matrix of velocities due to bodies at target coordinates
-MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions,
+MatrixXd BodyContainer::flow(CMatrixRef &r_trg, CVectorRef &body_solutions, CMatrixRef &link_conditions,
                              double eta) const {
     MatrixXd v_spherical = flow_spherical(r_trg, body_solutions, link_conditions, eta);
     MatrixXd v_deformable = flow_deformable(r_trg, body_solutions, link_conditions, eta);
@@ -484,7 +484,7 @@ MatrixXd BodyContainer::flow(MatrixRef &r_trg, VectorRef &body_solutions, Matrix
 /// @param[in] x_bodies [3 * n_body_nodes_local + 6 * n_bodies_global] vector of body source strength "densities", then
 /// com velocities, then com angular velocities
 /// @return [body_local_solution_size] vector 'y' in the formulation above
-VectorXd BodyContainer::matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const {
+VectorXd BodyContainer::matvec(CMatrixRef &v_bodies, CVectorRef &x_bodies) const {
     VectorXd res(get_local_solution_size());
     if (world_rank_ == 0) {
         int node_offset = 0;
@@ -507,7 +507,7 @@ VectorXd BodyContainer::matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const {
 ///
 /// \f[ P^{-1}_{\textrm{bodies}} * x_\textrm{bodies} = y_{\textrm{bodies}} \f]
 /// @return [body_local_solution_size] preconditioned vector 'y' in the formulation above
-VectorXd BodyContainer::apply_preconditioner(VectorRef &x) const {
+VectorXd BodyContainer::apply_preconditioner(CVectorRef &x) const {
     VectorXd res(get_local_solution_size());
     if (world_rank_ == 0) {
         int offset = 0;

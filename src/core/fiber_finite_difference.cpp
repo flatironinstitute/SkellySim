@@ -195,7 +195,7 @@ void FiberFiniteDifference::update_linear_operator(double dt, double eta) {
 /// @param[in] dt timestep size
 /// @param[in] flow [ 3 x n_nodes_ ] matrix of flow field sampled at the fiber points
 /// @param[in] f_external [ 3 x n_nodes_ ] matrix of external forces on the fiber points
-void FiberFiniteDifference::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_external) {
+void FiberFiniteDifference::update_RHS(double dt, CMatrixRef &flow, CMatrixRef &f_external) {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0 * std::pow(2.0 / length_, 1);
@@ -273,7 +273,7 @@ void FiberFiniteDifference::update_RHS(double dt, MatrixRef &flow, MatrixRef &f_
     }
 }
 
-VectorXd FiberFiniteDifference::matvec(VectorRef x, MatrixRef v, VectorRef v_boundary) const {
+VectorXd FiberFiniteDifference::matvec(CVectorRef x, CMatrixRef v, CVectorRef v_boundary) const {
     auto &mats = matrices_.at(n_nodes_);
     const int np = n_nodes_;
     const int bc_start_i = 4 * np - 14;
@@ -344,7 +344,7 @@ void FiberFiniteDifference::update_preconditioner() { A_LU_.compute(A_); }
 /// @param[in] dt current timestep size
 /// @param[in] v_on_fiber [3 x n_nodes_] matrix of velocities on fiber nodes
 /// @param[in] f_on_fiber [3 x n_nodes_] matrix of forces on fiber nodes
-void FiberFiniteDifference::apply_bc_rectangular(double dt, MatrixRef &v_on_fiber, MatrixRef &f_on_fiber) {
+void FiberFiniteDifference::apply_bc_rectangular(double dt, CMatrixRef &v_on_fiber, CMatrixRef &f_on_fiber) {
     const int np = n_nodes_;
     const auto &mats = matrices_.at(np);
     MatrixXd D_1 = mats.D_1_0.transpose() * std::pow(2.0 / length_, 1);

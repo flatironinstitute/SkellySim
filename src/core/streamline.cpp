@@ -53,7 +53,7 @@ struct push_back_points_and_time {
     }
 };
 
-Eigen::MatrixXd join_back_and_forward(MatrixRef &back, MatrixRef &forward) {
+Eigen::MatrixXd join_back_and_forward(CMatrixRef &back, CMatrixRef &forward) {
     Eigen::MatrixXd x(back.rows(), back.cols() + forward.cols() - 1);
 
     for (int i_col = 0; i_col < back.cols() - 1; ++i_col)
