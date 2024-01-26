@@ -5,7 +5,7 @@ set(TEST_LIST
   unit_test_serialization
   unit_test_body_ellipsoidal
   unit_test_skelly_chebyshev
-  unit_test_fiber_base
+  unit_test_fiber_chebyshev_constraint
 )
 
 # Setup the MPI testing environment for the MPI tests
