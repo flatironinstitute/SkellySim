@@ -66,6 +66,7 @@ set(SKELLY_INCLUDES_SYSTEM
   ${PROJECT_SOURCE_DIR}/extern/toml11
   ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
   ${PROJECT_SOURCE_DIR}/extern/eigen
+  ${PROJECT_SOURCE_DIR}/extern/autodiff
   ${MPI_CXX_INCLUDE_DIRS}
   ${PVFMM_INCLUDE_DIR}/pvfmm
   ${PVFMM_DEP_INCLUDE_DIR}
