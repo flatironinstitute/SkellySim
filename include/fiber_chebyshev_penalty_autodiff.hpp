@@ -26,6 +26,7 @@
 // SkellySim libs
 #include <fiber_state.hpp>
 #include <skelly_chebyshev.hpp>
+#include <skelly_fiber.hpp>
 #include <skelly_sim.hpp>
 
 template <typename VecT>
@@ -149,7 +150,7 @@ class FiberChebyshevPenaltyAutodiff {
         VecT TC;
         TsC[0] += BT[BT.size() - 1];
         VecT AT = BT.segment(0, BT.size() - 1);
-        std::tie(TC) = IntegrateUpTension1(TsC, rat, BT);
+        std::tie(TC) = IntegrateUpTension1(TsC, rat, AT);
         return std::make_tuple(TsC, TC);
     }
     // Tension 1st -> 0th derivative
@@ -173,7 +174,7 @@ class FiberChebyshevPenaltyAutodiff {
     // ****************************************************************************************************************
 
     // Simple deflection objective mirroring what David did
-    VecT DeflectionObjective(const VecT& XX, const VecT& oldXX, const double L, const double zeta, const double dt) {
+    VecT DeflectionObjective(const VecT &XX, const VecT &oldXX, const double L, const double zeta, const double dt) {
         auto Div = DivideAndConstruct(XX, L);
         auto oDiv = DivideAndConstruct(oldXX, L);
 
