@@ -267,3 +267,30 @@ TEST(FiberChebyshevConstraintAutodiff, dual_jacobian) {
     // Check if we are close to the 'real' A
     EXPECT_TRUE(A_real.isApprox(J));
 }
+
+// ********************************************************************************************************************
+// Physics tests
+// See if we can do a full physics test
+// ********************************************************************************************************************
+
+// Test a full sheer flow implementation
+TEST(FiberChebysehvConstraintAutodiff, real_sheerflow) {
+    // Create a fiber object
+    int N = 20;
+    int NT = N - 3;
+    int Neq = N - 4;
+    int NTeq = NT - 1;
+    double mlength = 1.0;
+    FiberChebyshevConstraintAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
+    std::cout << FS;
+
+    // Now create our fiber in XYT
+    Eigen::VectorXd init_X = Eigen::VectorXd::Zero(FS.n_nodes_);
+    Eigen::VectorXd init_Y = Eigen::VectorXd::Zero(FS.n_nodes_);
+    Eigen::VectorXd init_T = Eigen::VectorXd::Zero(FS.n_nodes_tension_);
+    init_Y[init_Y.size() - 1 - 3] = mlength/2.0;
+    init_Y[init_Y.size() - 1 - 2] = 1.0;
+    Eigen::VectorXd XX(init_X.size() + init_Y.size() + init_T.size());
+    XX << init_X, init_Y, init_T;
+    std::cout << "Initial vector:\n" << XX << "\n    size: " << XX.size() << std::endl;
+}

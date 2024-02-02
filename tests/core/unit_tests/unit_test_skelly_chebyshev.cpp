@@ -1,4 +1,3 @@
-
 /// \file unit_test_skelly_chebyshev.cpp
 /// \brief Unit tests for Chebyshev polynomial helper functions
 
@@ -11,6 +10,12 @@
 // skelly includes
 #include <msgpack.hpp>
 #include <skelly_chebyshev.hpp>
+
+// External includes
+#include <autodiff/forward/dual.hpp>
+#include <autodiff/forward/dual/eigen.hpp>
+#include <autodiff/forward/real.hpp>
+#include <autodiff/forward/real/eigen.hpp>
 
 // test files
 #include "./mpi_environment.hpp"
@@ -138,4 +143,112 @@ TEST(SkellyChebyshev, integrals) {
                             {0.0000000000000000, 0.0000000000000000, 0.0000000000000000, 0.0000000000000000,
                              0.0000000000000000, 0.0000000000000000, 0.0714285714285714, 0.0000000000000000}};
     EXPECT_TRUE(i8.isApprox(i8_true));
+}
+
+// Test vandermonde matrix cache
+TEST(SkellyChebyshev, vandermonde_cache) {
+    auto vm4 = getVM(4);
+    auto vm8 = getVM(8);
+    auto VM4 = VandermondeMatrix(4);
+    auto VM8 = VandermondeMatrix(8);
+
+    EXPECT_TRUE(VM4.isApprox(vm4));
+    EXPECT_TRUE(VM8.isApprox(vm8));
+
+    auto ivm4 = getIVM(4);
+    auto ivm8 = getIVM(8);
+    auto IVM4 = InverseVandermondeMatrix(4);
+    auto IVM8 = InverseVandermondeMatrix(8);
+
+    EXPECT_TRUE(IVM4.isApprox(ivm4));
+    EXPECT_TRUE(IVM8.isApprox(ivm8));
+}
+
+// Test conversion of vectors to and from coefficient and node space
+TEST(SkellyChebyshev, c2f_f2c) {
+    // Try with auto
+    auto s4 = ChebyshevTPoints(4);
+    auto vm4 = VandermondeMatrix(4);
+    auto c2f4_true = vm4 * s4;
+    auto c2f4 = C2F(s4, vm4);
+    EXPECT_TRUE(c2f4_true.isApprox(c2f4));
+
+    // Try the one that just automatically gets the cached version
+    autodiff::VectorXreal s8 = ChebyshevTPoints(8);
+    auto vm8 = VandermondeMatrix(8);
+    autodiff::VectorXreal c2f8_true = vm8 * s8;
+    autodiff::VectorXreal c2f8 = C2F(s8);
+    EXPECT_TRUE(c2f8_true.isApprox(c2f8));
+
+    // Try with the inverse operation with a larger array
+    autodiff::VectorXdual s40 = ChebyshevTPoints(40);
+    auto ivm40 = InverseVandermondeMatrix(40);
+    autodiff::VectorXdual f2c40_true = ivm40 * s40;
+    autodiff::VectorXdual f2c40 = F2C(s40);
+    EXPECT_TRUE(f2c40_true.isApprox(f2c40));
+}
+
+// Test toggle representation on a vector
+TEST(SkellyChebyshev, toggle_representation_vector) {
+    autodiff::VectorXreal s = Eigen::VectorXd::Ones(20);
+
+    // Try toggling to itself
+    auto s_nochange = ToggleRepresentation(s, REPR::c, REPR::c);
+    // Toggling from coefficient to node
+    auto s_c2f = ToggleRepresentation(s, REPR::c, REPR::n);
+    // Toggling from node to coefficient
+    auto s_f2c = ToggleRepresentation(s, REPR::n, REPR::c);
+
+    autodiff::VectorXreal c2f_real{{0.4803549464961659,  0.5591788998203820, 0.4005438163101717,  0.6410145841510756,
+                                    0.3155402614450867,  0.7305031572136578, 0.2199865457629623,  0.8340893189596487,
+                                    0.1058317827074546,  0.9621952458291025, -0.0408969526537215, 1.1342469763726617,
+                                    -0.2483028813327439, 1.3928142423769696, -0.5845838426771245, 1.8553093046674527,
+                                    -1.2728662712798653, 3.0136697460629245, -3.7244786699107979, 13.2258497896785379}};
+    autodiff::VectorXreal f2c_real{{1.0000000000000000,  0.0000000000000002,  0.0000000000000000,  -0.0000000000000001,
+                                    0.0000000000000000,  0.0000000000000000,  -0.0000000000000000, -0.0000000000000000,
+                                    -0.0000000000000000, 0.0000000000000000,  0.0000000000000000,  0.0000000000000000,
+                                    0.0000000000000000,  0.0000000000000000,  0.0000000000000000,  0.0000000000000000,
+                                    -0.0000000000000000, -0.0000000000000000, -0.0000000000000000, 0.0000000000000001}};
+
+    EXPECT_TRUE(s.isApprox(s_nochange));
+    EXPECT_TRUE(c2f_real.isApprox(s_c2f));
+    EXPECT_TRUE(f2c_real.isApprox(s_f2c));
+}
+
+// Test resize of vectors
+TEST(SkellyChebyshev, resize) {
+    // Create a vector that we can inspect pretty easily
+    autodiff::VectorXreal X{{1, 2, 3, 4}};
+    autodiff::VectorXreal XC3 = Resize(X, 3, REPR::c, REPR::c);
+    autodiff::VectorXreal XC4 = Resize(X, 4, REPR::c, REPR::c);
+    autodiff::VectorXreal XC8 = Resize(X, 8, REPR::c, REPR::c);
+    autodiff::VectorXreal XC3true{{1, 2, 3}};
+    autodiff::VectorXreal XC8true{{1, 2, 3, 4, 0, 0, 0, 0}};
+
+    EXPECT_TRUE(XC3.isApprox(XC3true));
+    EXPECT_TRUE(XC4.isApprox(X));
+    EXPECT_TRUE(XC8.isApprox(XC8true));
+
+    autodiff::VectorXreal XF4 = Resize(X, 4, REPR::n, REPR::n);
+    autodiff::VectorXreal XF8 = Resize(X, 8, REPR::n, REPR::n);
+    autodiff::VectorXreal XF8true{{0.8599481023526306, 1.2105053156859162, 1.7337079805154423, 2.2545824516802759,
+                                   2.7454175483197241, 3.2662920194845584, 3.7894946843140835, 4.1400518976473686}};
+
+    EXPECT_TRUE(XF4.isApprox(X));
+    EXPECT_TRUE(XF8.isApprox(XF8true));
+}
+
+// Test multiply functions
+TEST(SkellyChebyshev, multiply) {
+    // Test the multiply functionality
+    autodiff::VectorXreal X{{1, 2, 3, 4}};
+    autodiff::VectorXreal Y{{5, 6, 7, 8}};
+
+    autodiff::VectorXreal ZC = Multiply(X, Y, REPR::c, REPR::c, REPR::c);
+    autodiff::VectorXreal ZF = Multiply(X, Y, REPR::n, REPR::n, REPR::n);
+    autodiff::VectorXreal ZCtrue{{37.5000000000000071, 57.9999999999999929, 47.9999999999999929, 44.0000000000000000}};
+    autodiff::VectorXreal ZFtrue{{5.0044417382415922, 11.9955582617584042, 20.9955582617584078, 32.0044417382415958}};
+
+    EXPECT_TRUE(ZC.isApprox(ZCtrue));
+    EXPECT_TRUE(ZF.isApprox(ZFtrue));
 }

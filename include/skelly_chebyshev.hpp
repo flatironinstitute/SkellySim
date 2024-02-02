@@ -18,6 +18,8 @@
 
 // C++ core libs
 #include <iostream>
+#include <optional>
+#include <unordered_map>
 
 // SkellySim libs
 #include <skelly_sim.hpp>
@@ -235,6 +237,107 @@ Eigen::MatrixXd IntegrationMatrix(const unsigned int order, REPR in_type = REPR:
     A << DMat, VM;
 
     return ToggleRepresentation(A.inverse(), REPR::c, REPR::c, in_type, out_type);
+}
+
+// ****************************************************************************************************************
+// New hotness with templating for different functions
+// ****************************************************************************************************************
+
+// Need a cache for the vandermonde (and inverse vandermonde) matrices
+std::unordered_map<unsigned int, Eigen::MatrixXd> vandermonde_cache;
+std::unordered_map<unsigned int, Eigen::MatrixXd> inverse_vandermonde_cache;
+// Have a function that looks if the key exists and then return it if it does, construct if it doesn't
+// XXX Could be replaced with 'contains' if we move to c++20
+inline Eigen::MatrixXd getVM(unsigned int order) {
+    auto vit = vandermonde_cache.find(order);
+    if (vit != vandermonde_cache.end()) {
+        // Found the key, return it
+        return vit->second;
+    }
+    vandermonde_cache[order] = VandermondeMatrix(order);
+    return vandermonde_cache[order];
+}
+// Get the inverse vandermonde matrix
+inline Eigen::MatrixXd getIVM(unsigned int order) {
+    auto ivit = inverse_vandermonde_cache.find(order);
+    if (ivit != inverse_vandermonde_cache.end()) {
+        // Found the key, return it
+        return ivit->second;
+    }
+    inverse_vandermonde_cache[order] = InverseVandermondeMatrix(order);
+    return inverse_vandermonde_cache[order];
+}
+
+/// @brief Convert from coefficient to function space specifying vandermonde matrix returning vector
+template <typename VecT>
+inline VecT C2F(const VecT &XC, CMatrixRef &VM) {
+    return VM * XC;
+}
+
+/// @brief Convert from coefficient to function space returning vector
+template <typename VecT>
+inline VecT C2F(const VecT &XC) {
+    return getVM(XC.size()) * XC;
+}
+
+/// @brief Convert from function to coefficient space specifying vandermonde matrix returning vector
+template <typename VecT>
+inline VecT F2C(const VecT &XF, CMatrixRef &IVM) {
+    return IVM * XF;
+}
+
+/// @brief Convert from function to coefficient space returning vector
+template <typename VecT>
+inline VecT F2C(const VecT &XF) {
+    return getIVM(XF.size()) * XF;
+}
+
+/// @brief Toggle the representation of a vector quantity
+template <typename VecT>
+inline VecT ToggleRepresentation(const VecT &X, REPR in_type, REPR out_type) {
+    if (in_type == out_type) {
+        return X;
+    } else if (in_type == REPR::n) {
+        return F2C(X);
+    } else {
+        return C2F(X);
+    }
+}
+
+/// @brief Resize a vector for multiplication based on its representation
+template <typename VecT>
+inline VecT Resize(const VecT &X, const unsigned int n, REPR in_type, REPR out_type) {
+    VecT WXO = Eigen::VectorXd::Zero(n);
+
+    // Toggle representation to coefficient type
+    VecT WX = ToggleRepresentation(X, in_type, REPR::c);
+    // Do the resize
+    if (n > X.size()) {
+        WXO.segment(0, WX.size()) = WX;
+    } else {
+        WXO = WX.segment(0, WXO.size());
+    }
+    // Toggle representation
+    VecT XO = ToggleRepresentation(WXO, REPR::c, out_type);
+
+    return XO;
+}
+
+/// @brief Multiply two vectors together
+template <typename VecT>
+inline VecT Multiply(const VecT &X, const VecT &Y, REPR XT, REPR YT, REPR XYT,
+                     const std::optional<unsigned int> &Nout = std::nullopt,
+                     const std::optional<unsigned int> &NM = std::nullopt) {
+    // Set defaults if we aren't passed them in
+    unsigned int nin = std::max(X.size(), Y.size());
+    unsigned int nout = Nout ? Nout.value() : nin;
+    unsigned int nm = NM ? NM.value() : 2 * nin;
+
+    VecT XR = Resize(X, nm, XT, REPR::n);
+    VecT YR = Resize(Y, nm, YT, REPR::n);
+    VecT XYR = XR.array() * YR.array();
+
+    return Resize(XYR, nout, REPR::n, XYT);
 }
 
 } // namespace skelly_chebyshev

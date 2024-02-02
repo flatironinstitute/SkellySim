@@ -7,6 +7,7 @@ set(TEST_LIST
   unit_test_skelly_chebyshev
   unit_test_fiber_chebyshev_constraint
   unit_test_fiber_chebyshev_constraint_autodiff
+  unit_test_fiber_chebyshev_penalty_autodiff
 )
 
 # Setup the MPI testing environment for the MPI tests
