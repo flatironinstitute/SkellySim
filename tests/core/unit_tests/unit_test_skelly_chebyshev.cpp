@@ -252,3 +252,19 @@ TEST(SkellyChebyshev, multiply) {
     EXPECT_TRUE(ZC.isApprox(ZCtrue));
     EXPECT_TRUE(ZF.isApprox(ZFtrue));
 }
+
+// Test evaluation of polynomials
+TEST(SkellyChebyshev, evalpoly) {
+    // Create Chebyshev coefficients we can use to test
+    autodiff::VectorXreal initX{{0.1, 0.2, 0.3, 0.4}};
+    autodiff::real mone{-1.0};
+    autodiff::real xeval = evalpoly(mone, initX);
+    EXPECT_DOUBLE_EQ(-0.2, xeval.val());
+
+    // Check that we can do the left evaluation of the same
+    autodiff::VectorXreal initY{{0.1, 0.2, 0.3, 0.4, 0.5}};
+    autodiff::real yevalL = LeftEvalPoly<autodiff::real, autodiff::VectorXreal>(initY);
+    autodiff::real yevalR = RightEvalPoly<autodiff::real, autodiff::VectorXreal>(initY);
+    EXPECT_DOUBLE_EQ(0.3, yevalL.val());
+    EXPECT_DOUBLE_EQ(1.5, yevalR.val());
+}

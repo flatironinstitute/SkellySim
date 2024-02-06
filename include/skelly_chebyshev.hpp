@@ -340,6 +340,45 @@ inline VecT Multiply(const VecT &X, const VecT &Y, REPR XT, REPR YT, REPR XYT,
     return Resize(XYR, nout, REPR::n, XYT);
 }
 
+/// @brief Evaluate function for Chebyshev series, assuming that the order is >= 2
+template <typename T, typename VecT>
+inline T evalpoly(const T &x, const VecT &ch) {
+    T c0 = ch[ch.size() - 2];
+    T c1 = ch[ch.size() - 1];
+
+    for (int i = ch.size() - 3; i >= 0; i--) {
+        T oldc0 = c0;
+        c0 = ch[i] - c1;
+        c1 = oldc0 + c1 * 2.0 * x;
+    }
+
+    return c0 + c1 * x;
+}
+
+/// @brief Evalulate Chebyshev Polynomial
+///
+/// Note, this is just reversed from evalpoly in terms of arguments
+template <typename T, typename VecT>
+inline T EvalPoly(const VecT &XC, const T &x) {
+    return evalpoly(x, XC);
+}
+
+/// @brief Evaluate function for Chebyshev series at Left boundary (-1)
+template <typename T, typename VecT>
+inline T LeftEvalPoly(const VecT &X) {
+    // Set this to the correct type
+    T mone{-1.0};
+    return EvalPoly(X, mone);
+}
+
+/// @brief Evaluate function for Chebyshev series at Right boundary (+1)
+template <typename T, typename VecT>
+inline T RightEvalPoly(const VecT &X) {
+    // Set this to the correct type
+    T one{1.0};
+    return EvalPoly(X, one);
+}
+
 } // namespace skelly_chebyshev
 
 #endif // SKELLY_CHEBYSHEV_HPP_

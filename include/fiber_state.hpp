@@ -97,4 +97,29 @@ class FiberState {
     }
 };
 
+// Boundary condition data class for holding the 5 BCs
+template <typename T>
+class FiberBoundaryCondition {
+  public:
+    T X1_;
+    T X2_;
+    T Y1_;
+    T Y2_;
+    T T_;
+
+    FiberBoundaryCondition(const T &X1, const T &X2, const T &Y1, const T &Y2, const T &Tension)
+        : X1_(X1), X2_(X2), Y1_(Y1), Y2_(Y2), T_(Tension) {}
+
+    // Write to console
+    friend auto operator<<(std::ostream& os, const FiberBoundaryCondition<T>& m) -> std::ostream & {
+      os << "X1: " << m.X1_ << std::endl;
+      os << "X2: " << m.X2_ << std::endl;
+      os << "Y1: " << m.Y1_ << std::endl;
+      os << "Y2: " << m.Y2_ << std::endl;
+      os << "T:  " << m.T_;
+
+      return os;
+    }
+};
+
 #endif // FIBER_STATE_HPP_
