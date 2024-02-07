@@ -13,7 +13,11 @@
 #include <msgpack.hpp>
 
 // test files
+#include "./julia_fiber_penalty_results.hpp"
 #include "./mpi_environment.hpp"
+
+// Make it a little easier to get the class calls
+using namespace skelly_fiber;
 
 // Test the penalty version constructor
 TEST(FiberChebysehvPenaltyAutodiff, real_constructor) {
@@ -136,227 +140,8 @@ TEST(FiberChebysehvPenaltyAutodiff, real_forces) {
     EXPECT_TRUE(AFyC.isApprox(AFyC_true));
 }
 
-// // Test the deflection objective from Julia
-// TEST(FiberChebysehvPenaltyAutodiff, real_evolution_xy) {
-//     // Create a fiber object
-//     int N = 20;
-//     int NT = N - 2;
-//     int Neq = N - 4;
-//     int NTeq = NT - 2;
-//     double mlength = 1.0;
-//     double zeta = 1000.0;
-//     double dt = 1.0 / zeta / 4.0;
-//     FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
-
-//     // Taken from Julia for the first timestep of the function in a sheer flow to compare to
-//     autodiff::VectorXreal XX{{60.0480227998087770,   -101.9506826907408765, 51.9343787940473760,
-//     -10.4540573251306164,
-//                               -11.7091066585494996,  16.2140161411610997, -11.7083971699872880,  6.0289382372732394,
-//                               -2.4070215350084792,   0.6838614991858294,    -0.0049060254621093, -0.1788380697556702,
-//                               0.1602479731360698,    -0.0931454880346660,   0.0424927898922256, -0.0128601494773640,
-//                               0.2193973350388452,    0.4087291888305368,    0.4841441405005029, -1.5750008132303601,
-//                               52.8657357932827736,   -102.2105217746640591, 92.6318267662486647,
-//                               -69.9190532376784688, 39.8751997353422922, -16.1017047444886963,  3.2404279967474698,
-//                               1.5672021673638288, -2.3049734804756610,   1.6231572964223722,    -0.8211937355941242,
-//                               0.3092362423873997, -0.0745206052414949,   -0.0036665860741279,   0.0277860139814897,
-//                               -0.0176334813873533, 0.4561181687022006,    0.9214887152110773,    -0.0592689415721022,
-//                               -0.2571209346937166, -874.5796455234896030, 1281.7605985693051025,
-//                               -953.9504954075138130, 554.5044090342805703, -210.8615366227862467,
-//                               -5.9283405118789814,   94.4457731090606671,   -97.9709166148476669,
-//                               66.5837307017072249,   -33.6612389195228161,  12.2160734371203681, -2.1248214329907982,
-//                               -1.1479555519597531,   1.5078442418778060,    -1.0374971493440193, 0.5394800388411124,
-//                               52.0019688053351885,   -29.9310303532931457}};
-//     autodiff::VectorXreal oldXX{
-//         {14.7463835307163826, -20.6417455684296982, -0.4814512200205823, 15.2029164004962176, -13.0711212011266600,
-//          5.6033741423131938,  -1.1745630201570518,  -0.0218081216966133, 0.0902497715598546,  -0.0288303077441598,
-//          0.0044113201835056,  -0.0001266765326215,  -0.0001003834834743, 0.0000258121148767,  -0.0000030338682357,
-//          0.0000000832824501,  0.1213134041173209,   0.2237146559560383,  0.2609178824818563,  -0.7097415557391460,
-//          -0.0000000000000058, 0.0000000000000155,   0.0000000000000049,  -0.0000000000000044, 0.0000000000000134,
-//          -0.0000000000000011, -0.0000000000000016,  0.0000000000000036,  0.0000000000000015,  -0.0000000000000011,
-//          0.0000000000000005,  -0.0000000000000011,  -0.0000000000000010, 0.0000000000000012,  0.0000000000000002,
-//          -0.0000000000000005, 0.5000000000000000,   1.0000000000000000,  -0.0000000000000000, 0.0000000000000003,
-//          0.0000000000000143,  0.0000000000003712,   0.0000000000000013,  0.0000000000001477,  0.0000000000000488,
-//          -0.0000000000000233, 0.0000000000000439,   0.0000000000000318,  -0.0000000000000579, -0.0000000000000182,
-//          -0.0000000000000174, -0.0000000000000363,  0.0000000000000318,  0.0000000000000120,  -0.0000000000000330,
-//          0.0000000000000127,  0.0000000000000201,   -0.0000000000000323}};
-
-//     // Create the Div and oDiv structures for the forces
-//     auto Div = FS.DivideAndConstruct(XX, mlength);
-//     auto oDiv = FS.DivideAndConstruct(oldXX, mlength);
-
-//     // Try to construct forces...
-//     auto [FxC, FyC, AFxC, AFyC] = skelly_fiber::FiberForces(Div, oDiv, 1.0, FS.n_equations_);
-
-//     // Try to construct the flow
-//     autodiff::VectorXreal UC = zeta * Div.YC_;
-//     autodiff::VectorXreal VC = autodiff::VectorXreal::Zero(Div.YC_.size());
-
-//     // Get the evolution equations
-//     auto [eqXC, eqYC] = skelly_fiber::FiberEvolution(AFxC, AFyC, Div, oDiv, UC, VC, dt);
-
-//     // XXX Currently this fails, so write out the equations, so we can compare to what we expected from Julia
-//     Eigen::IOFormat ColumnAsRowFmt(Eigen::StreamPrecision, 0, ",", ",", "", "", "[", "]");
-//     std::cout << "eqXC = " << eqXC.format(ColumnAsRowFmt) << std::endl;
-//     std::cout << "eqYC = " << eqYC.format(ColumnAsRowFmt) << std::endl;
-
-//     autodiff::VectorXreal eqXC_true{
-//         {-7.632783294297951e-16, -2.1094237467877974e-15, -2.1687296056227545e-15, 2.242130092700023e-16,
-//          -6.231994087446679e-16, -2.0391674460107367e-15, -3.326982786489019e-15, -9.270902662640405e-16,
-//          -1.834188860906985e-15, -5.399593634356197e-15, -1.0565238886263125e-15, -4.610671435387837e-15,
-//          -5.440738024849781e-15, -3.7911695487329455e-15, -3.430589287167387e-15, -3.1364835329386333e-15}};
-//     autodiff::VectorXreal eqYC_true{
-//         {-2.7755575615628914e-16, -5.551115123125783e-16, -3.9445131877483294e-16, -5.570752943877526e-16,
-//          -1.9899901030037113e-16, -4.1278443596493896e-16, -6.505119120294506e-18, -6.909897680852266e-17,
-//          -7.293982911669084e-16, -9.942447639050947e-16, -6.116546983524829e-16, -9.409119737740971e-16,
-//          -1.0044427488318604e-15, -1.3321005710282112e-15, -1.034053459335586e-15, -7.724497061744926e-16}};
-//     EXPECT_TRUE(eqXC.isApprox(eqXC_true, 1e-6));
-//     EXPECT_TRUE(eqYC.isApprox(eqYC_true, 1e-6));
-// }
-
-// // Test the tension equation
-// TEST(FiberChebysehvPenaltyAutodiff, real_tension) {
-//     // Create a fiber object
-//     int N = 20;
-//     int NT = N - 2;
-//     int Neq = N - 4;
-//     int NTeq = NT - 2;
-//     double mlength = 1.0;
-//     double zeta = 1000.0;
-//     double dt = 1.0 / zeta / 4.0;
-//     FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
-
-//     // Taken from Julia for the first timestep of the function in a sheer flow to compare to
-//     autodiff::VectorXreal XX{{60.0480227998087770,   -101.9506826907408765, 51.9343787940473760,
-//     -10.4540573251306164,
-//                               -11.7091066585494996,  16.2140161411610997, -11.7083971699872880,  6.0289382372732394,
-//                               -2.4070215350084792,   0.6838614991858294,    -0.0049060254621093, -0.1788380697556702,
-//                               0.1602479731360698,    -0.0931454880346660,   0.0424927898922256, -0.0128601494773640,
-//                               0.2193973350388452,    0.4087291888305368,    0.4841441405005029, -1.5750008132303601,
-//                               52.8657357932827736,   -102.2105217746640591, 92.6318267662486647,
-//                               -69.9190532376784688, 39.8751997353422922, -16.1017047444886963,  3.2404279967474698,
-//                               1.5672021673638288, -2.3049734804756610,   1.6231572964223722,    -0.8211937355941242,
-//                               0.3092362423873997, -0.0745206052414949,   -0.0036665860741279,   0.0277860139814897,
-//                               -0.0176334813873533, 0.4561181687022006,    0.9214887152110773,    -0.0592689415721022,
-//                               -0.2571209346937166, -874.5796455234896030, 1281.7605985693051025,
-//                               -953.9504954075138130, 554.5044090342805703, -210.8615366227862467,
-//                               -5.9283405118789814,   94.4457731090606671,   -97.9709166148476669,
-//                               66.5837307017072249,   -33.6612389195228161,  12.2160734371203681, -2.1248214329907982,
-//                               -1.1479555519597531,   1.5078442418778060,    -1.0374971493440193, 0.5394800388411124,
-//                               52.0019688053351885,   -29.9310303532931457}};
-//     autodiff::VectorXreal oldXX{
-//         {14.7463835307163826, -20.6417455684296982, -0.4814512200205823, 15.2029164004962176, -13.0711212011266600,
-//          5.6033741423131938,  -1.1745630201570518,  -0.0218081216966133, 0.0902497715598546,  -0.0288303077441598,
-//          0.0044113201835056,  -0.0001266765326215,  -0.0001003834834743, 0.0000258121148767,  -0.0000030338682357,
-//          0.0000000832824501,  0.1213134041173209,   0.2237146559560383,  0.2609178824818563,  -0.7097415557391460,
-//          -0.0000000000000058, 0.0000000000000155,   0.0000000000000049,  -0.0000000000000044, 0.0000000000000134,
-//          -0.0000000000000011, -0.0000000000000016,  0.0000000000000036,  0.0000000000000015,  -0.0000000000000011,
-//          0.0000000000000005,  -0.0000000000000011,  -0.0000000000000010, 0.0000000000000012,  0.0000000000000002,
-//          -0.0000000000000005, 0.5000000000000000,   1.0000000000000000,  -0.0000000000000000, 0.0000000000000003,
-//          0.0000000000000143,  0.0000000000003712,   0.0000000000000013,  0.0000000000001477,  0.0000000000000488,
-//          -0.0000000000000233, 0.0000000000000439,   0.0000000000000318,  -0.0000000000000579, -0.0000000000000182,
-//          -0.0000000000000174, -0.0000000000000363,  0.0000000000000318,  0.0000000000000120,  -0.0000000000000330,
-//          0.0000000000000127,  0.0000000000000201,   -0.0000000000000323}};
-
-//     // Create the Div and oDiv structures for the forces
-//     auto Div = FS.DivideAndConstruct(XX, mlength);
-//     auto oDiv = FS.DivideAndConstruct(oldXX, mlength);
-
-//     // Try to construct the flow
-//     autodiff::VectorXreal UsC = zeta * Div.YsC_;
-//     autodiff::VectorXreal VsC = autodiff::VectorXreal::Zero(Div.YsC_.size());
-//     autodiff::VectorXreal oUsC = zeta * oDiv.YC_;
-//     autodiff::VectorXreal oVsC = autodiff::VectorXreal::Zero(oDiv.YsC_.size());
-
-//     autodiff::VectorXreal eqTC =
-//         skelly_fiber::FiberPenaltyTension(Div, oDiv, UsC, VsC, oUsC, oVsC, dt, FS.n_equations_tension_);
-
-//     // XXX Currently this fails, so write out the equations, so we can compare to what we expected from Julia
-//     Eigen::IOFormat ColumnAsRowFmt(Eigen::StreamPrecision, 0, ",", ",", "", "", "[", "]");
-//     std::cout << "eqTC = " << eqTC.format(ColumnAsRowFmt) << std::endl;
-
-//     autodiff::VectorXreal eqTC_true{
-//         {-0.00000000000019428902930940209165, 0.00000000000003686493568062128302, 0.00000000000010479008103747587113,
-//          -0.00000000000005777659539582771642, -0.00000000000022638566368250633690,
-//          -0.00000000000006333101921228000159, -0.00000000000009057622961147390087,
-//          0.00000000000006400294829630100709, -0.00000000000003925231146709456726, 0.00000000000012660173634986619932,
-//          0.00000000000006490461314998491460, -0.00000000000000298782829892356240,
-//          -0.00000000000003368717510216347958, -0.00000000000015315677922394524796,
-//          -0.00000000000032561460194561578268, -0.00000000000009659957862247440106}};
-
-//     EXPECT_TRUE(eqTC.isApprox(eqTC_true, 1e-6));
-// }
-
-// // Test the clamped boundary conditions
-// TEST(FiberChebysehvPenaltyAutodiff, real_clampedbc) {
-//     // Create a fiber object
-//     int N = 20;
-//     int NT = N - 2;
-//     int Neq = N - 4;
-//     int NTeq = NT - 2;
-//     double mlength = 1.0;
-//     FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
-
-//     // Taken from Julia for the first timestep of the function in a sheer flow to compare to
-//     autodiff::VectorXreal XX{{60.0480227998087770,   -101.9506826907408765, 51.9343787940473760,
-//     -10.4540573251306164,
-//                               -11.7091066585494996,  16.2140161411610997, -11.7083971699872880,  6.0289382372732394,
-//                               -2.4070215350084792,   0.6838614991858294,    -0.0049060254621093, -0.1788380697556702,
-//                               0.1602479731360698,    -0.0931454880346660,   0.0424927898922256, -0.0128601494773640,
-//                               0.2193973350388452,    0.4087291888305368,    0.4841441405005029, -1.5750008132303601,
-//                               52.8657357932827736,   -102.2105217746640591, 92.6318267662486647,
-//                               -69.9190532376784688, 39.8751997353422922, -16.1017047444886963,  3.2404279967474698,
-//                               1.5672021673638288, -2.3049734804756610,   1.6231572964223722,    -0.8211937355941242,
-//                               0.3092362423873997, -0.0745206052414949,   -0.0036665860741279,   0.0277860139814897,
-//                               -0.0176334813873533, 0.4561181687022006,    0.9214887152110773,    -0.0592689415721022,
-//                               -0.2571209346937166, -874.5796455234896030, 1281.7605985693051025,
-//                               -953.9504954075138130, 554.5044090342805703, -210.8615366227862467,
-//                               -5.9283405118789814,   94.4457731090606671,   -97.9709166148476669,
-//                               66.5837307017072249,   -33.6612389195228161,  12.2160734371203681, -2.1248214329907982,
-//                               -1.1479555519597531,   1.5078442418778060,    -1.0374971493440193, 0.5394800388411124,
-//                               52.0019688053351885,   -29.9310303532931457}};
-//     autodiff::VectorXreal oldXX{
-//         {14.7463835307163826, -20.6417455684296982, -0.4814512200205823, 15.2029164004962176, -13.0711212011266600,
-//          5.6033741423131938,  -1.1745630201570518,  -0.0218081216966133, 0.0902497715598546,  -0.0288303077441598,
-//          0.0044113201835056,  -0.0001266765326215,  -0.0001003834834743, 0.0000258121148767,  -0.0000030338682357,
-//          0.0000000832824501,  0.1213134041173209,   0.2237146559560383,  0.2609178824818563,  -0.7097415557391460,
-//          -0.0000000000000058, 0.0000000000000155,   0.0000000000000049,  -0.0000000000000044, 0.0000000000000134,
-//          -0.0000000000000011, -0.0000000000000016,  0.0000000000000036,  0.0000000000000015,  -0.0000000000000011,
-//          0.0000000000000005,  -0.0000000000000011,  -0.0000000000000010, 0.0000000000000012,  0.0000000000000002,
-//          -0.0000000000000005, 0.5000000000000000,   1.0000000000000000,  -0.0000000000000000, 0.0000000000000003,
-//          0.0000000000000143,  0.0000000000003712,   0.0000000000000013,  0.0000000000001477,  0.0000000000000488,
-//          -0.0000000000000233, 0.0000000000000439,   0.0000000000000318,  -0.0000000000000579, -0.0000000000000182,
-//          -0.0000000000000174, -0.0000000000000363,  0.0000000000000318,  0.0000000000000120,  -0.0000000000000330,
-//          0.0000000000000127,  0.0000000000000201,   -0.0000000000000323}};
-
-//     // Create the Div and oDiv structures for the forces
-//     auto Div = FS.DivideAndConstruct(XX, mlength);
-//     auto oDiv = FS.DivideAndConstruct(oldXX, mlength);
-
-//     // Get the clamped boundary conditions
-//     autodiff::VectorXreal cposition{{0.0, 0.0}};
-//     autodiff::VectorXreal cdirector{{0.0, 1.0}};
-//     autodiff::VectorXreal X1;
-//     autodiff::VectorXreal X2;
-//     autodiff::VectorXreal Y1;
-//     autodiff::VectorXreal Y2;
-//     autodiff::VectorXreal T;
-//     FiberBoundaryCondition<autodiff::real> BCL = skelly_fiber::ClampedBC<autodiff::real, autodiff::VectorXreal>(
-//         Div, oDiv, skelly_fiber::FSIDE::left, cposition, cdirector);
-
-//     EXPECT_DOUBLE_EQ(-3.608224830031759e-16, BCL.X1_.val());
-//     EXPECT_DOUBLE_EQ(-3.3306690738754696e-16, BCL.X2_.val());
-//     EXPECT_DOUBLE_EQ(1.1102230246251565e-16, BCL.Y1_.val());
-//     EXPECT_DOUBLE_EQ(2.220446049250313e-16, BCL.Y2_.val());
-//     EXPECT_DOUBLE_EQ(-1.7053025658242404e-13, BCL.T_.val());
-// }
-
-// ********************************************************************************************************************
-// Physics tests
-// See if we can do a full physics test
-// ********************************************************************************************************************
-
-// Test a full sheer flow implementation
-TEST(FiberChebysehvPenaltyAutodiff, deflection_objective) {
+// Test the deflection objective from Julia
+TEST(FiberChebysehvPenaltyAutodiff, real_evolution_xy) {
     // Create a fiber object
     int N = 20;
     int NT = N - 2;
@@ -366,8 +151,139 @@ TEST(FiberChebysehvPenaltyAutodiff, deflection_objective) {
     double zeta = 1000.0;
     double dt = 1.0 / zeta / 4.0;
     FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
-    std::cout << FS;
-    std::cout << "dt = " << dt << std::endl;
+
+    // Taken from Julia for the first timestep of the function in a sheer flow to compare to
+    autodiff::VectorXreal XX = Julia_SecondStep_XX;
+    autodiff::VectorXreal oldXX = Julia_SecondStep_XX;
+
+    // Create the Div and oDiv structures for the forces
+    auto Div = FS.DivideAndConstruct(XX, mlength);
+    auto oDiv = FS.DivideAndConstruct(oldXX, mlength);
+
+    // Try to construct forces...
+    auto [FxC, FyC, AFxC, AFyC] = skelly_fiber::FiberForces(Div, oDiv, 1.0, FS.n_equations_);
+
+    // Try to construct the flow
+    autodiff::VectorXreal UC = zeta * Div.YC_;
+    autodiff::VectorXreal VC = autodiff::VectorXreal::Zero(Div.YC_.size());
+
+    // Get the evolution equations
+    auto [eqXC, eqYC] = skelly_fiber::FiberEvolution(AFxC, AFyC, Div, oDiv, UC, VC, dt);
+
+    // XXX Currently this fails, so write out the equations, so we can compare to what we expected from Julia
+    Eigen::IOFormat ColumnAsRowFmt(Eigen::StreamPrecision, 0, ",", ",", "", "", "[", "]");
+
+    autodiff::VectorXreal eqXC_true{
+        {-0.12110045935008376116748252115940, -0.13041696931395618808124936549575, -0.00024011741515490728302723022480,
+         0.00413358436807732126938574879205, -0.00347666125896568855083157423280, 0.00139757786498634849724209683330,
+         -0.00019089394307293504208025702873, -0.00009068601455517021211420042315, 0.00005429398397426668011495759503,
+         -0.00000354593989260237349455773086, -0.00001201911983736027329371532507, 0.00000943735837424655820261740896,
+         -0.00000409246711197989346644240255, 0.00000098639743942784387821249691, 0.00000004865207879443243569507894,
+         -0.00000017124479775025440439041125}};
+    autodiff::VectorXreal eqYC_true{
+        {0.00083629638311566445452172047226, -0.00107061693862159357237828771758, -0.00031138160225468774957441331352,
+         0.00116758273133083672647158923752, -0.00083258792334591380946556826714, 0.00015962221810961754958971270391,
+         0.00019455921936148808581643065985, -0.00021335438417505181440958494932, 0.00011646354556131292205638227966,
+         -0.00003890865084281206577121806078, 0.00000546705748870515882632988014, 0.00000214165716515491101119188569,
+         -0.00000169446253619582499942242213, 0.00000057113173931634273286663374, -0.00000009882577524035701261197179,
+         -0.00000000356083196810410894713202}};
+
+    for (auto i = 0; i < eqXC.size(); i++) {
+        EXPECT_NEAR(eqXC[i].val(), eqXC_true[i].val(), 1e-10);
+        EXPECT_NEAR(eqYC[i].val(), eqYC_true[i].val(), 1e-10);
+    }
+}
+
+// Test the tension equation
+TEST(FiberChebysehvPenaltyAutodiff, real_tension) {
+    // Create a fiber object
+    int N = 20;
+    int NT = N - 2;
+    int Neq = N - 4;
+    int NTeq = NT - 2;
+    double mlength = 1.0;
+    double zeta = 1000.0;
+    double dt = 1.0 / zeta / 4.0;
+    FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
+
+    // Taken from Julia for the first timestep of the function in a sheer flow to compare to
+    autodiff::VectorXreal XX = Julia_SecondStep_XX;
+    autodiff::VectorXreal oldXX = Julia_SecondStep_XX;
+
+    // Create the Div and oDiv structures for the forces
+    auto Div = FS.DivideAndConstruct(XX, mlength);
+    auto oDiv = FS.DivideAndConstruct(oldXX, mlength);
+
+    // Try to construct the flow
+    autodiff::VectorXreal UsC = zeta * Div.YsC_;
+    autodiff::VectorXreal VsC = autodiff::VectorXreal::Zero(Div.YsC_.size());
+    autodiff::VectorXreal oUsC = zeta * oDiv.YC_;
+    autodiff::VectorXreal oVsC = autodiff::VectorXreal::Zero(oDiv.YsC_.size());
+
+    autodiff::VectorXreal eqTC =
+        skelly_fiber::FiberPenaltyTension(Div, oDiv, UsC, VsC, oUsC, oVsC, dt, FS.n_equations_tension_);
+
+    autodiff::VectorXreal eqTC_true{{891.92151983293001649144571274518967, -654.54080906886895263596670702099800,
+                                     339.62812768393706619463046081364155, -63.10414928298077086310513550415635,
+                                     -93.18622792579498081977362744510174, 145.30077225011501695917104370892048,
+                                     -123.79649573338170398528745863586664, 69.18368540061042892830300843343139,
+                                     -23.01496523415610084839499904774129, 1.26216785094897265828706167667406,
+                                     3.37585681166985240864164552476723, -2.15781791540036849141870334278792,
+                                     0.72220404775986279943822410132270, -0.12418267072039373966063635634782,
+                                     -0.00842310534677920969004460971519, 0.01261420272924905668088246812886}};
+
+    for (auto i = 0; i < eqTC.size(); i++) {
+        EXPECT_NEAR(eqTC[i].val(), eqTC_true[i].val(), 1e-10);
+    }
+}
+
+// Test the clamped boundary conditions
+TEST(FiberChebysehvPenaltyAutodiff, real_clampedbc) {
+    // Create a fiber object
+    int N = 20;
+    int NT = N - 2;
+    int Neq = N - 4;
+    int NTeq = NT - 2;
+    double mlength = 1.0;
+    FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
+
+    // Taken from Julia for the first timestep of the function in a sheer flow to compare to
+    autodiff::VectorXreal XX = Julia_SecondStep_XX;
+    autodiff::VectorXreal oldXX = Julia_SecondStep_XX;
+
+    // Create the Div and oDiv structures for the forces
+    auto Div = FS.DivideAndConstruct(XX, mlength);
+    auto oDiv = FS.DivideAndConstruct(oldXX, mlength);
+
+    // Get the clamped boundary conditions
+    autodiff::VectorXreal cposition{{0.0, 0.0}};
+    autodiff::VectorXreal cdirector{{0.0, 1.0}};
+    autodiff::VectorXreal X1;
+    autodiff::VectorXreal X2;
+    autodiff::VectorXreal Y1;
+    autodiff::VectorXreal Y2;
+    autodiff::VectorXreal T;
+    FiberBoundaryCondition<autodiff::real> BCL = skelly_fiber::ClampedBC<autodiff::real, autodiff::VectorXreal>(
+        Div, oDiv, skelly_fiber::FSIDE::left, cposition, cdirector);
+
+    EXPECT_NEAR(BCL.T_.val(), -133.35780960147738, 1e-10);
+}
+
+// ********************************************************************************************************************
+// Physics tests
+// ********************************************************************************************************************
+
+// Test a full sheer flow implementation jacobian (initial step)
+TEST(FiberChebysehvPenaltyAutodiff, real_jacobian_initial_step) {
+    // Create a fiber object
+    int N = 20;
+    int NT = N - 2;
+    int Neq = N - 4;
+    int NTeq = NT - 2;
+    double mlength = 1.0;
+    double zeta = 1000.0;
+    double dt = 1.0 / zeta / 4.0;
+    FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
 
     // Now create our fiber in XYT
     autodiff::VectorXreal init_X = Eigen::VectorXd::Zero(FS.n_nodes_);
@@ -378,76 +294,58 @@ TEST(FiberChebysehvPenaltyAutodiff, deflection_objective) {
     autodiff::VectorXreal XX(init_X.size() + init_Y.size() + init_T.size());
     XX << init_X, init_Y, init_T;
     autodiff::VectorXreal oldXX = XX;
-    std::cout << "Initial vector:\n" << XX << "\n    size: " << XX.size() << std::endl;
 
-    // Call the deflection objective once
-    autodiff::VectorXreal deflectionXX1 = FS.SheerDeflectionObjective(XX, oldXX, mlength, zeta, dt);
+    // Create the evaluation vector
+    autodiff::VectorXreal F;
 
-    // Write out things if we want to...
-    Eigen::IOFormat ColumnAsRowFmt(Eigen::StreamPrecision, 0, ",", ",", "", "", "[", "]");
-    std::cout << "deflectionXX1: " << deflectionXX1 << std::endl;
+    // Try to push a jacobian through this
+    Eigen::MatrixXd J = autodiff::jacobian(SheerDeflectionObjective<autodiff::VectorXreal>, autodiff::wrt(XX),
+                                           autodiff::at(XX, FS, oldXX, mlength, zeta, dt), F);
 
-    // Try the 'next' timestep
-    autodiff::VectorXreal XXnext{{14.746383530716432,
-                                  -20.641745568429613,
-                                  -0.4814512200204801,
-                                  15.202916400496415,
-                                  -13.071121201126644,
-                                  5.603374142313219,
-                                  -1.174563020157052,
-                                  -0.021808121696615723,
-                                  0.09024977155985386,
-                                  -0.028830307744160278,
-                                  0.004411320183506385,
-                                  -0.00012667653262006716,
-                                  -0.00010038348347489779,
-                                  2.581211487671164e-5,
-                                  -3.03386823651286e-6,
-                                  8.328245128928405e-8,
-                                  0.12131340411732089,
-                                  0.22371465595603862,
-                                  0.2609178824818568,
-                                  -0.7097415557391469,
-                                  -8.342436074747466e-16,
-                                  -1.913496432457208e-15,
-                                  -2.8547704661768873e-15,
-                                  -4.609304259762747e-15,
-                                  -1.1231472514461446e-15,
-                                  2.1090162254568258e-15,
-                                  2.4979209492549252e-15,
-                                  1.083268504729812e-15,
-                                  1.010361278375407e-15,
-                                  1.425320026692271e-15,
-                                  -1.6114343509210892e-15,
-                                  -1.1160903476290877e-15,
-                                  -1.5621324674264817e-15,
-                                  -2.8031518712223773e-15,
-                                  1.3645121507114145e-15,
-                                  2.7115043889586697e-15,
-                                  0.5,
-                                  1.0,
-                                  1.2057633420079187e-17,
-                                  -1.0044569607507868e-17,
-                                  5.5741286701143245e-14,
-                                  -1.499318796998502e-14,
-                                  -8.03246864687803e-15,
-                                  2.0086276663941686e-14,
-                                  1.0241729309173934e-13,
-                                  3.0460060629685295e-14,
-                                  4.737477231939986e-14,
-                                  -3.134848263866237e-14,
-                                  1.9378033716741707e-14,
-                                  -6.316396010506554e-14,
-                                  -3.231695791815389e-14,
-                                  1.4621180750810367e-15,
-                                  1.6884976792610257e-14,
-                                  7.649553502485387e-14,
-                                  1.6274878215516399e-13,
-                                  4.833329027985141e-14,
-                                  -1.8928430114451824e-14,
-                                  2.7928337365239425e-14}};
+    // Test against outputs from Julia where available above the double precision problem
+    // Test the function evaluated at XX
+    EXPECT_DOUBLE_EQ(-0.125, F[0].val());
+    EXPECT_DOUBLE_EQ(-0.125, F[1].val());
 
-    // Call on next timestep
-    autodiff::VectorXreal deflectionXX2 = FS.SheerDeflectionObjective(XXnext, oldXX, mlength, zeta, dt);
-    std::cout << "deflectionXX2: " << deflectionXX2 << std::endl;
+    // Test the jacobian at specific test points that aren't close to 0 to avoid double precision issues
+    for (auto i = 0; i < 1; ++i) {
+        for (auto j = 0; j < 1; ++j) {
+            EXPECT_NEAR(J(i, j), Julia_FirstStep_Jacobian(i, j), 1e-10);
+        }
+    }
+}
+
+// Test a full sheer flow implementation jacobian (second step)
+TEST(FiberChebysehvPenaltyAutodiff, real_jacobian_next_step) {
+    // Create a fiber object
+    int N = 20;
+    int NT = N - 2;
+    int Neq = N - 4;
+    int NTeq = NT - 2;
+    double mlength = 1.0;
+    double zeta = 1000.0;
+    double dt = 1.0 / zeta / 4.0;
+    FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS(N, NT, Neq, NTeq);
+
+    autodiff::VectorXreal XX = Julia_SecondStep_XX;
+    autodiff::VectorXreal oldXX = XX;
+
+    // Create the evaluation vector
+    autodiff::VectorXreal F;
+
+    // Try to push a jacobian through this
+    Eigen::MatrixXd J = autodiff::jacobian(SheerDeflectionObjective<autodiff::VectorXreal>, autodiff::wrt(XX),
+                                           autodiff::at(XX, FS, oldXX, mlength, zeta, dt), F);
+
+    // Test against outputs from Julia where available above the double precision problem
+    // Test the function evaluated at XX
+    EXPECT_NEAR(-0.12110045935008376, F[0].val(), 1e-10);
+    EXPECT_NEAR(-0.1304169693139562, F[1].val(), 1e-10);
+
+    // Test the jacobian at specific test points that aren't close to 0 to avoid double precision issues
+    for (auto i = 0; i < J.rows(); ++i) {
+        for (auto j = 0; j < J.cols(); ++j) {
+            EXPECT_NEAR(J(i, j), Julia_SecondStep_Jacobian(i, j), 1e-10);
+        }
+    }
 }

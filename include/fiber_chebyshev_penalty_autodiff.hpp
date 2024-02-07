@@ -29,6 +29,8 @@
 #include <skelly_fiber.hpp>
 #include <skelly_sim.hpp>
 
+namespace skelly_fiber {
+
 template <typename VecT>
 class FiberChebyshevPenaltyAutodiff {
   public:
@@ -168,82 +170,51 @@ class FiberChebyshevPenaltyAutodiff {
            << m.n_equations_tension_ << std::endl;
         return os;
     }
-
-    // ****************************************************************************************************************
-    // Physics here
-    // ****************************************************************************************************************
-
-    // Simple deflection objective mirroring what David did
-    VecT SheerDeflectionObjective(const VecT &XX, const VecT &oldXX, const double L, const double zeta,
-                                  const double dt) {
-        // Set up a cute 'using' to get the internal scalar type of VecT
-        using ScalarT = typename VecT::Scalar;
-
-        auto Div = DivideAndConstruct(XX, L);
-        auto oDiv = DivideAndConstruct(oldXX, L);
-
-        std::cout << "DeflectionObjective:\n";
-        std::cout << "Div: \n" << Div << std::endl;
-        std::cout << "oDiv:\n" << oDiv << std::endl;
-
-        // Get the forces
-        auto [FxC, FyC, AFxC, AFyC] = skelly_fiber::FiberForces(Div, oDiv, 1.0, n_equations_);
-
-        Eigen::IOFormat ColumnAsRowFmt(Eigen::StreamPrecision, 0, ",", ",", "", "", "[", "]");
-        std::cout << "FxC: " << FxC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "FyC: " << FyC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "AFxC: " << AFxC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "AFyC: " << AFyC.format(ColumnAsRowFmt) << std::endl;
-
-        // Sheer velocity
-        VecT UC = zeta * Div.YC_;
-        VecT VC = VecT::Zero(Div.YC_.size());
-        VecT UsC = zeta * Div.YsC_;
-        VecT VsC = VecT::Zero(Div.YsC_.size());
-        VecT oUsC = zeta * oDiv.YsC_;
-        VecT oVsC = VecT::Zero(oDiv.YsC_.size());
-
-        std::cout << "UC: " << UC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "VC: " << VC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "UsC: " << UsC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "VsC: " << VsC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "oUsC: " << oUsC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "oVsC: " << oVsC.format(ColumnAsRowFmt) << std::endl;
-
-        // Get the evolution equations
-        auto [teqXC, teqYC] = skelly_fiber::FiberEvolution(AFxC, AFyC, Div, oDiv, UC, VC, dt);
-
-        std::cout << "teqXC: " << teqXC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "teqYC: " << teqYC.format(ColumnAsRowFmt) << std::endl;
-
-        // Get the tension equation
-        auto teqTC = skelly_fiber::FiberPenaltyTension(Div, oDiv, UsC, VsC, oUsC, oVsC, dt, n_equations_tension_);
-
-        std::cout << "teqTC: " << teqTC.format(ColumnAsRowFmt) << std::endl;
-
-        // Get the boundary conditions
-        VecT cposition{{0.0, 0.0}};
-        VecT cdirector{{0.0, 1.0}};
-        FiberBoundaryCondition<ScalarT> BCL =
-            skelly_fiber::ClampedBC<ScalarT, VecT>(Div, oDiv, skelly_fiber::FSIDE::left, cposition, cdirector);
-        FiberBoundaryCondition<ScalarT> BCR = skelly_fiber::FreeBC<ScalarT, VecT>(Div, skelly_fiber::FSIDE::right);
-
-        std::cout << "BCL:\n" << BCL <<std::endl;
-        std::cout << "BCR:\n" << BCR <<std::endl;
-
-        // Combine together boundary conditions with the equations
-        auto eqXC = skelly_fiber::CombineXWithBCs<ScalarT, VecT>(teqXC, BCL, BCR);
-        auto eqYC = skelly_fiber::CombineYWithBCs<ScalarT, VecT>(teqYC, BCL, BCR);
-        auto eqTC = skelly_fiber::CombineTPenaltyWithBCs<ScalarT, VecT>(teqTC, BCL, BCR);
-
-        std::cout << "eqXC: " << eqXC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "eqYC: " << eqYC.format(ColumnAsRowFmt) << std::endl;
-        std::cout << "eqTC: " << eqTC.format(ColumnAsRowFmt) << std::endl;
-
-        VecT eq_full(eqXC.size() + eqYC.size() + eqTC.size());
-        eq_full << eqXC, eqYC, eqTC;
-        return eq_full;
-    }
 };
+
+/// @brief Fiber penalty deflection objective (TEST)
+template <typename VecT>
+VecT SheerDeflectionObjective(const VecT &XX, FiberChebyshevPenaltyAutodiff<VecT> &FS, const VecT &oldXX,
+                              const double L, const double zeta, const double dt) {
+    // Set up a cute 'using' to get the internal scalar type of VecT
+    using ScalarT = typename VecT::Scalar;
+
+    auto Div = FS.DivideAndConstruct(XX, L);
+    auto oDiv = FS.DivideAndConstruct(oldXX, L);
+
+    // Get the forces
+    auto [FxC, FyC, AFxC, AFyC] = FiberForces(Div, oDiv, 1.0, FS.n_equations_);
+
+    // Sheer velocity
+    VecT UC = zeta * Div.YC_;
+    VecT VC = VecT::Zero(Div.YC_.size());
+    VecT UsC = zeta * Div.YsC_;
+    VecT VsC = VecT::Zero(Div.YsC_.size());
+    VecT oUsC = zeta * oDiv.YsC_;
+    VecT oVsC = VecT::Zero(oDiv.YsC_.size());
+
+    // Get the evolution equations
+    auto [teqXC, teqYC] = FiberEvolution(AFxC, AFyC, Div, oDiv, UC, VC, dt);
+
+    // Get the tension equation
+    auto teqTC = FiberPenaltyTension(Div, oDiv, UsC, VsC, oUsC, oVsC, dt, FS.n_equations_tension_);
+
+    // Get the boundary conditions
+    VecT cposition{{0.0, 0.0}};
+    VecT cdirector{{0.0, 1.0}};
+    FiberBoundaryCondition<ScalarT> BCL = ClampedBC<ScalarT, VecT>(Div, oDiv, FSIDE::left, cposition, cdirector);
+    FiberBoundaryCondition<ScalarT> BCR = FreeBC<ScalarT, VecT>(Div, FSIDE::right);
+
+    // Combine together boundary conditions with the equations
+    auto eqXC = CombineXWithBCs<ScalarT, VecT>(teqXC, BCL, BCR);
+    auto eqYC = CombineYWithBCs<ScalarT, VecT>(teqYC, BCL, BCR);
+    auto eqTC = CombineTPenaltyWithBCs<ScalarT, VecT>(teqTC, BCL, BCR);
+
+    VecT eq_full(eqXC.size() + eqYC.size() + eqTC.size());
+    eq_full << eqXC, eqYC, eqTC;
+    return eq_full;
+}
+
+} // namespace skelly_fiber
 
 #endif // FIBER_CHEBYSHEV_PENALTY_AUTODIFF_HPP_
