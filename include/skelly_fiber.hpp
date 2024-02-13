@@ -194,6 +194,27 @@ inline VecT CombineTPenaltyWithBCs(const VecT &eq, const FiberBoundaryCondition<
     return eqT;
 }
 
+/// @brief Fiber extensibility error
+template <typename T, typename VecT>
+T ExtensibilityError(const VecT &XsC, const VecT &YsC) {
+    using skelly_chebyshev::Multiply;
+    using skelly_chebyshev::REPR;
+    VecT W1 = Multiply(XsC, XsC, REPR::c, REPR::c, REPR::n);
+    VecT W2 = Multiply(YsC, YsC, REPR::c, REPR::c, REPR::n);
+
+    VecT W12 = W1 + W2 - VecT::Ones(XsC.size());
+
+    // Unfortunatley, it is very hard to coerce eigen with an autodiff type to get a maximum of an absolute value
+    T retval = 0.0;
+    for (auto i = 0; i < W12.size(); ++i) {
+        if (std::fabs(W12(i).val()) > retval.val()) {
+            retval = std::fabs(W12(i).val());
+        }
+    }
+
+    return retval;
+}
+
 } // namespace skelly_fiber
 
 #endif // SKELLY_FIBER_HPP_

@@ -51,6 +51,9 @@ class FiberChebyshevPenaltyAutodiff {
     Eigen::MatrixXd IM_;
     Eigen::MatrixXd IMT_;
 
+    /// @brief Default constructor
+    FiberChebyshevPenaltyAutodiff() = default;
+
     /// @brief Construct a fiber of a given discretizaiton
     FiberChebyshevPenaltyAutodiff(int n_nodes, int n_nodes_tension, int n_equations, int n_equations_tension)
         : n_nodes_(n_nodes), n_nodes_tension_(n_nodes_tension), n_equations_(n_equations),
@@ -167,12 +170,21 @@ class FiberChebyshevPenaltyAutodiff {
         os << "FiberSolver:\n";
         os << "...tension type:         Penalty\n";
         os << "...N / NT / Neq / NeqT:  " << m.n_nodes_ << ", " << m.n_nodes_tension_ << ", " << m.n_equations_ << ", "
-           << m.n_equations_tension_ << std::endl;
+           << m.n_equations_tension_;
         return os;
     }
+
+    // Some getters of internal variables
+    // Get the local node count
+    int get_local_node_count() const { return n_nodes_; }
+
+    // Get the local solution size
+    int get_local_solution_size() const { return 2 * n_nodes_ + n_nodes_tension_; }
 };
 
 /// @brief Fiber penalty deflection objective (TEST)
+//
+// XXX Shoudl the FiberSolver be const?
 template <typename VecT>
 VecT SheerDeflectionObjective(const VecT &XX, FiberChebyshevPenaltyAutodiff<VecT> &FS, const VecT &oldXX,
                               const double L, const double zeta, const double dt) {
@@ -213,6 +225,42 @@ VecT SheerDeflectionObjective(const VecT &XX, FiberChebyshevPenaltyAutodiff<VecT
     VecT eq_full(eqXC.size() + eqYC.size() + eqTC.size());
     eq_full << eqXC, eqYC, eqTC;
     return eq_full;
+}
+
+/// @brief Helper function to construct a FiberSolver of this type and an initial state vector
+///
+/// Note: This is specific to an initial condition and the penalty autodiff types
+template <typename VecT>
+std::tuple<FiberChebyshevPenaltyAutodiff<VecT>, VecT> SetupSolverInitialstate(const int N, const double L) {
+    // Set up the numbers of things that are going on
+    int NT = N - 2;
+    int Neq = N - 4;
+    int NTeq = NT - 2;
+
+    // Create the fiber solver
+    FiberChebyshevPenaltyAutodiff<VecT> FS = FiberChebyshevPenaltyAutodiff<VecT>(N, NT, Neq, NTeq);
+
+    // Now create our fiber in XYT
+    VecT init_X = Eigen::VectorXd::Zero(FS.n_nodes_);
+    VecT init_Y = Eigen::VectorXd::Zero(FS.n_nodes_);
+    VecT init_T = Eigen::VectorXd::Zero(FS.n_nodes_tension_);
+    init_Y[init_Y.size() - 1 - 3] = L / 2.0;
+    init_Y[init_Y.size() - 1 - 2] = 1.0;
+    VecT XX(init_X.size() + init_Y.size() + init_T.size());
+    XX << init_X, init_Y, init_T;
+
+    // return a tuple of these
+    return std::make_tuple(FS, XX);
+}
+
+/// @brief Extricate the 'XC' like variables and the extensibility error
+template <typename T, typename VecT>
+std::tuple<VecT, VecT, VecT, T> Extricate(const VecT &XX, FiberChebyshevPenaltyAutodiff<VecT> &FS, const double L) {
+    // Get the components of XX
+    auto Div = FS.DivideAndConstruct(XX, L);
+
+    auto ext_error = skelly_fiber::ExtensibilityError<T, VecT>(Div.XsC_, Div.YsC_);
+    return std::make_tuple(Div.XC_, Div.YC_, Div.TC_, ext_error);
 }
 
 } // namespace skelly_fiber
