@@ -74,24 +74,25 @@ void run_and_track_singlenewton() {
 
     // Create a fiber solver and initial state
     // NOTE: This is what sets the type(s) for everything...
-    // auto [FS, XX] = setup_fiberchebyshevpenaltyautodiff<autodiff::VectorXreal>(fct::N_, fct::length_);
     auto [FS, XX] = SetupSolverInitialstate<autodiff::VectorXreal>(fct::N_, fct::length_);
     autodiff::VectorXreal oldXX = XX;
     double t = 0.0;
 
-    // For now just use cout to write what is going on
-    std::cout << "---- Initial state ----\n";
-    std::cout << FS << std::endl;
-    std::cout << XX.format(ColumnAsRowFmt) << std::endl;
-    std::cout << "----               ----\n";
+    // Redirect everything through spdlog
+    spdlog::info("---- Initial state ----");
+    std::ostringstream initial_fs_stream;
+    initial_fs_stream << FS;
+    spdlog::info(initial_fs_stream.str());
+    std::ostringstream initial_xx_stream;
+    initial_xx_stream << XX.format(ColumnAsRowFmt);
+    spdlog::info(initial_xx_stream.str());
 
     // Run the timestepping
     for (auto i = 0; i < nsteps; i++) {
-        std::cout << "Timestep: " << i << "; of " << nsteps << std::endl;
+        spdlog::info("Timestep: {}; of {}", i, nsteps);
 
         // Time the solve
         double st = omp_get_wtime();
-        // auto [newJXX, oldJXX] = UpdateSingleNewtonBackwardEuler(XX, FS);
         std::tie(XX, oldXX) = UpdateSingleNewtonBackwardEuler(XX, FS);
         double et = omp_get_wtime() - st;
 
@@ -103,8 +104,17 @@ void run_and_track_singlenewton() {
             skelly_fiber::Extricate<autodiff::VectorXreal::Scalar, autodiff::VectorXreal>(XX, FS, fct::length_);
 
         // Write out some information
-        std::cout << "... runtime:              " << et << std::endl;
-        std::cout << "... Extensibility Error:  " << ext_err << std::endl;
+        spdlog::info("... Runtime:              {}", et);
+        spdlog::info("... Extensibility Error:  {}", ext_err.val());
+        std::ostringstream xc_stream;
+        xc_stream << "XC = " << XC.format(ColumnAsRowFmt);
+        spdlog::info(xc_stream.str());
+        std::ostringstream yc_stream;
+        yc_stream << "YC = " << YC.format(ColumnAsRowFmt);
+        spdlog::info(yc_stream.str());
+        std::ostringstream tc_stream;
+        tc_stream << "TC = " << TC.format(ColumnAsRowFmt);
+        spdlog::info(tc_stream.str());
     }
 }
 
