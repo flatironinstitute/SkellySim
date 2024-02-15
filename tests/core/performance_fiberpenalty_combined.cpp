@@ -1,5 +1,5 @@
-/// \file unit_test_fiber_base.cpp
-/// \brief Unit tests for FiberChebyshevPenalty class
+/// \file performance_fiberpenalty_combined.cpp
+/// \brief Testing the performance of various implementations of a solver for the FiberChebyshevPenaltyAutodiff class
 
 // C++ includes
 #include <iostream>
@@ -24,6 +24,7 @@
 
 // skelly includes
 #include <fiber_chebyshev_penalty_autodiff.hpp>
+#include <skelly_chebyshev.hpp>
 #include <skelly_sim.hpp>
 #include <utils.hpp>
 
@@ -34,7 +35,7 @@ using namespace skelly_fiber;
 // functions. This includes a Fiber, as we need to be able to access it from outside. This includes a Fiber, as we need
 // to be able to access it from outside Namespace fiber_chebyshev_test = fct
 //
-// JX0 is the jacobian at point X0 for use in linear algebra solutions
+// JX0 is the jacobian at point X0 for use in linear algebra solutions with Belos
 namespace fct {
 int N_;
 double dt_;
@@ -54,6 +55,29 @@ Eigen::VectorXd Y0_;
 // Current solution
 Eigen::VectorXd curr_solution_;
 } // namespace fct
+
+// Result data structure for our runs to keep track of
+template <typename VecT>
+class TimingResult {
+  public:
+    std::vector<double> runtimes_;
+    std::vector<double> ts_;
+    std::vector<double> max_extensibility_error_;
+    std::vector<double> deflection_;
+    std::vector<VecT> xx_;
+
+    TimingResult() = default;
+
+    TimingResult(const std::vector<double> &runtimes, const std::vector<double> &ts,
+                 const std::vector<double> &max_extensibility_error, const std::vector<double> &deflection,
+                 const std::vector<VecT> &xx)
+        : runtimes_(runtimes), ts_(ts), max_extensibility_error_(max_extensibility_error), deflection_(deflection),
+          xx_(xx) {}
+};
+
+// ****************************************************************************
+// Belos information and tests
+// ****************************************************************************
 
 // Test for just the get_solution_map calls
 std::tuple<VectorMap> get_fiber_solution_map(double *x) {
@@ -259,14 +283,17 @@ class FCPA_Solver {
     Teuchos::RCP<const Tpetra::Map<>> map_;
 };
 
-// Timestepping function
+// Belos timestepping scheme
 template <typename VecT>
 std::tuple<VecT, VecT> UpdateBelosBackwardEuler(const VecT &XX) {
     // The first thing we need to do is create the jacobian and result vector in the namespace, also the oldXX
     VecT oldXX = XX;
 
     // Prep the state (fct)
+    double st_constructjacobian = omp_get_wtime();
     std::tie(fct::JX0_, fct::Y0_) = ConstructJacobianAndY0<VecT>(XX);
+    double et_constructjacobian = omp_get_wtime() - st_constructjacobian;
+    spdlog::info("... ConstructJacobian time:   {}", et_constructjacobian);
 
     // Build a solver?
     // XXX This should probably not be done over and over and over and over...
@@ -286,7 +313,10 @@ std::tuple<VecT, VecT> UpdateBelosBackwardEuler(const VecT &XX) {
 }
 
 // Create a fiber and run and track the results (do this outside of main for cleanliness and comparisons)
-void run_and_track_belos() {
+template <typename VecT>
+TimingResult<VecT> run_and_track_belos() {
+    // Cute using to get the scalar type of the vector
+    using ScalarT = typename VecT::Scalar;
     // Fancy printing in eigen
     Eigen::IOFormat ColumnAsRowFmt(Eigen::StreamPrecision, 0, ",", ",", "", "", "[", "]");
 
@@ -295,8 +325,8 @@ void run_and_track_belos() {
 
     // Create a fiber solver and initial state
     // NOTE: This is what sets the type(s) for everything...
-    auto [FS, XX] = SetupSolverInitialstate<autodiff::VectorXreal>(fct::N_, fct::length_);
-    autodiff::VectorXreal oldXX = XX;
+    auto [FS, XX] = SetupSolverInitialstate<VecT>(fct::N_, fct::length_);
+    VecT oldXX = XX;
     double t = 0.0;
     // NOTE: Copy FS into the test namespace so we can access it globally
     fct::FS_ = FS;
@@ -309,6 +339,13 @@ void run_and_track_belos() {
     std::ostringstream initial_xx_stream;
     initial_xx_stream << XX.format(ColumnAsRowFmt);
     spdlog::info(initial_xx_stream.str());
+
+    // Vector of results to keep track of...
+    std::vector<double> runtimes;
+    std::vector<double> ts;
+    std::vector<double> max_extensibility_error;
+    std::vector<double> deflection;
+    std::vector<VecT> xx;
 
     // Run the timestepping
     for (auto i = 0; i < nsteps; i++) {
@@ -323,27 +360,133 @@ void run_and_track_belos() {
         t += fct::dt_;
 
         // Get the error in the extensibility
-        auto [XC, YC, TC, ext_err] =
-            skelly_fiber::Extricate<autodiff::VectorXreal::Scalar, autodiff::VectorXreal>(XX, FS, fct::length_);
+        auto [XC, YC, TC, ext_err] = skelly_fiber::Extricate<ScalarT, VecT>(XX, FS, fct::length_);
 
         // Write out some information
         spdlog::info("... Runtime:              {}", et);
         spdlog::info("... Extensibility Error:  {}", ext_err.val());
-        // std::ostringstream xc_stream;
-        // xc_stream << "XC = " << XC.format(ColumnAsRowFmt);
-        // spdlog::info(xc_stream.str());
-        // std::ostringstream yc_stream;
-        // yc_stream << "YC = " << YC.format(ColumnAsRowFmt);
-        // spdlog::info(yc_stream.str());
-        // std::ostringstream tc_stream;
-        // tc_stream << "TC = " << TC.format(ColumnAsRowFmt);
-        // spdlog::info(tc_stream.str());
+
+        // Save information
+        runtimes.push_back(et);
+        ts.push_back(t);
+        max_extensibility_error.push_back(ext_err.val());
+        auto deflection_real = skelly_chebyshev::RightEvalPoly<ScalarT, VecT>(XC);
+        deflection.push_back(deflection_real.val());
+        xx.push_back(XX);
     }
+
+    return TimingResult<VecT>(runtimes, ts, max_extensibility_error, deflection, xx);
+}
+
+// ****************************************************************************
+// Single step Newton solve
+// ****************************************************************************
+// Directly computes the Jacobian inverse to solve the linearized system
+
+// Single step of a Newton solve by hand, using the inverse of the Jacobian
+template <typename VecT>
+VecT JNewtonSingleFiberPenalty(const VecT &XX, FiberChebyshevPenaltyAutodiff<VecT> &FS, const VecT &oldXX) {
+    // Need a non-const version of XX so that we can actually perform the autodiff
+    VecT X = XX;
+    // VecT XXP = oldXX;
+
+    // Create the evaluation vector
+    VecT Y;
+
+    // Try to push a jacobian through this
+    Eigen::MatrixXd J = autodiff::jacobian(skelly_fiber::SheerDeflectionObjective<VecT>, autodiff::wrt(X),
+                                           autodiff::at(X, FS, oldXX, fct::length_, fct::zeta_, fct::dt_), Y);
+
+    // Directly form the inverse of the jacobian
+    VecT dY = J.inverse() * Y;
+
+    // Return the change after a single newton iteration
+    return XX - dY;
+}
+
+// Timestepping function for the newton version of the solve
+template <typename VecT>
+std::tuple<VecT, VecT> UpdateSingleNewtonBackwardEuler(const VecT &XX, FiberChebyshevPenaltyAutodiff<VecT> &FS) {
+    // Make a copy of the 'old' vector for this operation
+    VecT oldXX = XX;
+
+    // Get the new XX values...
+    VecT newXX = JNewtonSingleFiberPenalty<VecT>(XX, FS, oldXX);
+
+    // Return a tuple of both the XXnew and oldXX values...
+    return std::make_tuple(newXX, oldXX);
+}
+
+// Create a fiber and run and track the results (do this outside of main for cleanliness and comparisons)
+template <typename VecT>
+TimingResult<VecT> run_and_track_singlenewton() {
+    // Cute using to get the scalar type of the vector
+    using ScalarT = typename VecT::Scalar;
+    // Fancy printing in eigen
+    Eigen::IOFormat ColumnAsRowFmt(Eigen::StreamPrecision, 0, ",", ",", "", "", "[", "]");
+
+    // Figure out the timesteps we are doing
+    int nsteps = int(fct::max_time_ / fct::dt_);
+
+    // Create a fiber solver and initial state
+    // NOTE: This is what sets the type(s) for everything...
+    auto [FS, XX] = SetupSolverInitialstate<VecT>(fct::N_, fct::length_);
+    VecT oldXX = XX;
+    double t = 0.0;
+
+    // Redirect everything through spdlog
+    spdlog::info("---- Initial state ----");
+    std::ostringstream initial_fs_stream;
+    initial_fs_stream << FS;
+    spdlog::info(initial_fs_stream.str());
+    std::ostringstream initial_xx_stream;
+    initial_xx_stream << XX.format(ColumnAsRowFmt);
+    spdlog::info(initial_xx_stream.str());
+
+    // Vector of results to keep track of...
+    std::vector<double> runtimes;
+    std::vector<double> ts;
+    std::vector<double> max_extensibility_error;
+    std::vector<double> deflection;
+    std::vector<VecT> xx;
+
+    // Run the timestepping
+    for (auto i = 0; i < nsteps; i++) {
+        spdlog::info("Timestep: {}; of {}", i, nsteps);
+
+        // Time the solve
+        double st = omp_get_wtime();
+        std::tie(XX, oldXX) = UpdateSingleNewtonBackwardEuler(XX, FS);
+        double et = omp_get_wtime() - st;
+
+        // Update 'time'
+        t += fct::dt_;
+
+        // Get the error in the extensibility
+        auto [XC, YC, TC, ext_err] = skelly_fiber::Extricate<ScalarT, VecT>(XX, FS, fct::length_);
+
+        // Write out some information
+        spdlog::info("... Runtime:              {}", et);
+        spdlog::info("... Extensibility Error:  {}", ext_err.val());
+
+        // Save information
+        runtimes.push_back(et);
+        ts.push_back(t);
+        max_extensibility_error.push_back(ext_err.val());
+        auto deflection_real = skelly_chebyshev::RightEvalPoly<ScalarT, VecT>(XC);
+        deflection.push_back(deflection_real.val());
+        xx.push_back(XX);
+    }
+
+    return TimingResult<VecT>(runtimes, ts, max_extensibility_error, deflection, xx);
 }
 
 // Try to write a solver for the a chebyshev fiber in the sheer deflection flow based on how we solve the full
 // system
 int main(int argc, char *argv[]) {
+    // Assuming we have an argument (first one) that determines what kind of system we are running
+    std::string run_type(argv[1]);
+
     // Set up some using directives to make calling things easier...
     using namespace skelly_fiber;
 
@@ -375,14 +518,20 @@ int main(int argc, char *argv[]) {
 
     // Here are all of the configurations that we're going to run
     double master_zeta = 1000.0;
-    double max_time = 3.0/master_zeta;
+    double max_time = 3.0 / master_zeta;
     std::vector<double> dts_vec{4.0, 8.0, 16.0, 32.0};
     std::vector<double> dts;
     for (auto idt : dts_vec) {
-        dts.push_back(1.0/master_zeta/idt);
+        dts.push_back(1.0 / master_zeta / idt);
     }
     std::vector<int> NS{20, 40, 80};
     double tolerance = 1e-10;
+
+    // Create some result framework to save things
+    // ["runtype"][N][dt]
+    std::unordered_map<std::string,
+                       std::unordered_map<int, std::unordered_map<double, TimingResult<autodiff::VectorXreal>>>>
+        all_results;
 
     // Wrap everything in a try/catch block to see if something has gone wrong
     try {
@@ -391,6 +540,7 @@ int main(int argc, char *argv[]) {
             for (auto dt : dts) {
                 spdlog::info("----------------------------------------------------------------");
                 spdlog::info("Working on N = {}, dt = {}", N, dt);
+                spdlog::info("Run type: {}", run_type);
 
                 // Set the parameter struct/namespace for this run
                 fct::N_ = N;
@@ -401,7 +551,52 @@ int main(int argc, char *argv[]) {
                 fct::tolerance_ = tolerance;
 
                 // Call the run function
-                run_and_track_belos();
+                if (run_type == "jnewton") {
+                    all_results["jnewton"][N][dt] = run_and_track_singlenewton<autodiff::VectorXreal>();
+                } else if (run_type == "belos") {
+                    all_results["belos"][N][dt] = run_and_track_belos<autodiff::VectorXreal>();
+                } else if (run_type == "all") {
+                    // Catcher for everything!
+                    all_results["jnewton"][N][dt] = run_and_track_singlenewton<autodiff::VectorXreal>();
+                    all_results["belos"][N][dt] = run_and_track_belos<autodiff::VectorXreal>();
+                } else {
+                    throw std::runtime_error("Incorrect run type");
+                }
+            }
+        }
+
+        // Print out something at the end?
+        Eigen::IOFormat ColumnAsRowFmt(Eigen::StreamPrecision, 0, ",", ",", "", "", "[", "]");
+        spdlog::info("");
+        spdlog::info("");
+        spdlog::info("-------- Results --------");
+        std::vector<std::string> solver_types;
+        if (run_type != "all") {
+            solver_types.push_back(run_type);
+        } else {
+            solver_types.push_back("jnewton");
+            solver_types.push_back("belos");
+        }
+        for (auto stype : solver_types) {
+            for (auto N : NS) {
+                for (auto dt : dts) {
+                    auto mresult = all_results[stype][N][dt];
+                    spdlog::info("--------------------------------");
+                    spdlog::info("Run type = {}, N = {}, dt = {}", stype, N, dt);
+
+                    // Eigen::VectorXd has a prettier line print at the moment...
+                    Eigen::VectorXd mdeflection =
+                        Eigen::VectorXd::Map(&mresult.deflection_[0], mresult.deflection_.size());
+                    Eigen::VectorXd mruntime = Eigen::VectorXd::Map(&mresult.runtimes_[0], mresult.runtimes_.size());
+
+                    std::ostringstream deflection_stream;
+                    deflection_stream << "deflection = " << mdeflection.format(ColumnAsRowFmt);
+                    spdlog::info(deflection_stream.str());
+
+                    std::ostringstream runtime_stream;
+                    runtime_stream << "runtime = " << mruntime.format(ColumnAsRowFmt);
+                    spdlog::info(runtime_stream.str());
+                }
             }
         }
 

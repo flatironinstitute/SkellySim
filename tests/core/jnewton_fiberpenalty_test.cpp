@@ -106,15 +106,15 @@ void run_and_track_singlenewton() {
         // Write out some information
         spdlog::info("... Runtime:              {}", et);
         spdlog::info("... Extensibility Error:  {}", ext_err.val());
-        std::ostringstream xc_stream;
-        xc_stream << "XC = " << XC.format(ColumnAsRowFmt);
-        spdlog::info(xc_stream.str());
-        std::ostringstream yc_stream;
-        yc_stream << "YC = " << YC.format(ColumnAsRowFmt);
-        spdlog::info(yc_stream.str());
-        std::ostringstream tc_stream;
-        tc_stream << "TC = " << TC.format(ColumnAsRowFmt);
-        spdlog::info(tc_stream.str());
+        // std::ostringstream xc_stream;
+        // xc_stream << "XC = " << XC.format(ColumnAsRowFmt);
+        // spdlog::info(xc_stream.str());
+        // std::ostringstream yc_stream;
+        // yc_stream << "YC = " << YC.format(ColumnAsRowFmt);
+        // spdlog::info(yc_stream.str());
+        // std::ostringstream tc_stream;
+        // tc_stream << "TC = " << TC.format(ColumnAsRowFmt);
+        // spdlog::info(tc_stream.str());
     }
 }
 
@@ -142,17 +142,35 @@ int main(int argc, char *argv[]) {
     spdlog::stderr_color_mt("SkellySim global");
     spdlog::cfg::load_env_levels();
 
+    // Here are all of the configurations that we're going to run
+    double master_zeta = 1000.0;
+    double max_time = 3.0 / master_zeta;
+    std::vector<double> dts_vec{4.0, 8.0, 16.0, 32.0};
+    std::vector<double> dts;
+    for (auto idt : dts_vec) {
+        dts.push_back(1.0 / master_zeta / idt);
+    }
+    std::vector<int> NS{20, 40, 80};
+
     // Wrap everything in a try/catch block to see if something has gone wrong
     try {
-        // Set the fake parameters for our run
-        fct::N_ = 20;
-        fct::length_ = 1.0;
-        fct::zeta_ = 1000.0;
-        fct::dt_ = 1.0 / fct::zeta_ / 4.0;
-        fct::max_time_ = 3.0 / fct::zeta_;
+        // Setup our runs in two for loops and keep track of the results
+        for (auto N : NS) {
+            for (auto dt : dts) {
+                spdlog::info("----------------------------------------------------------------");
+                spdlog::info("Working on N = {}, dt = {}", N, dt);
 
-        // Call our run function
-        run_and_track_singlenewton();
+                // Set the parameter struct/namespace for this run
+                fct::N_ = N;
+                fct::length_ = 1.0;
+                fct::zeta_ = master_zeta;
+                fct::dt_ = dt;
+                fct::max_time_ = max_time;
+
+                // Call the run function
+                run_and_track_singlenewton();
+            }
+        }
 
     } catch (const std::runtime_error &e) {
         spdlog::critical(std::string("Fatal exception caught: ") + e.what());
