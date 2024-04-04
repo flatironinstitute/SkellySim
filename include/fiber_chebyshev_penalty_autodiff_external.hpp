@@ -256,9 +256,9 @@ inline std::tuple<VecT, VecT> IntegrateUpTension2(const VecT &TssC, const double
 
 // XXX Make sure that the move semantics are correct for the FiberState object here!!!!!
 template <typename VecT>
-FiberState<VecT> DivideAndConstructFCPA(const VecT &XX, const double L, const int n_nodes, const int n_nodes_tension,
-                                        const int n_equations, const int n_equations_tension, CMatrixRef &IM,
-                                        CMatrixRef &IMT) {
+inline FiberState<VecT> DivideAndConstructFCPA(const VecT &XX, const double L, const int n_nodes,
+                                               const int n_nodes_tension, const int n_equations,
+                                               const int n_equations_tension, CMatrixRef &IM, CMatrixRef &IMT) {
     // Create a return object
     // XXX Check the number of dimensions later on this, for 3d, as this does the init of the size of things to make
     // sure that we can tie to them later...

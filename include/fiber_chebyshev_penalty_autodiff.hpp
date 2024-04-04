@@ -36,7 +36,7 @@ class FiberChebyshevPenaltyAutodiff {
   public:
     // typedefs
     typedef VecT vector_type;
-    
+
     // Input parameters
     unsigned int n_nodes_;             ///< number of nodes representing XYZ
     unsigned int n_nodes_tension_;     ///< number of nodes representing tension

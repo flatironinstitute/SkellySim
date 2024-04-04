@@ -289,6 +289,7 @@ FiberTimingResult run_and_track_singlenewton(const std::string &solver, const st
     Eigen::VectorXd deflection = Eigen::VectorXd::Zero(nsteps);
 
     // Run the timestepping
+    double start_runtime = omp_get_wtime();
     for (auto i = 0; i < nsteps; i++) {
         spdlog::info("Timestep: {}; of {}", i, nsteps);
 
@@ -314,6 +315,9 @@ FiberTimingResult run_and_track_singlenewton(const std::string &solver, const st
 
         deflection(i) = deflection_real.val();
     }
+    double end_runtime = omp_get_wtime();
+    spdlog::info("Total Runtime:            {}", end_runtime - start_runtime);
+    spdlog::info("Average Update Runtime:   {}", runtimes.mean());
 
     return FiberTimingResult(solver, autodiffvar, runtimes, max_extensibility_error, deflection);
 }
