@@ -44,7 +44,7 @@ double length_;
 double max_time_;
 double tolerance_;
 
-// Fiber that we keep track of
+// Fiber(s) that we keep track of
 FiberChebyshevPenaltyAutodiff<autodiff::VectorXreal> FS_;
 
 // The Jacobian at state X0

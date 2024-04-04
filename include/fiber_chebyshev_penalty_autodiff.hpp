@@ -34,6 +34,9 @@ namespace skelly_fiber {
 template <typename VecT>
 class FiberChebyshevPenaltyAutodiff {
   public:
+    // typedefs
+    typedef VecT vector_type;
+    
     // Input parameters
     unsigned int n_nodes_;             ///< number of nodes representing XYZ
     unsigned int n_nodes_tension_;     ///< number of nodes representing tension
@@ -184,7 +187,7 @@ class FiberChebyshevPenaltyAutodiff {
 
 /// @brief Fiber penalty deflection objective (TEST)
 //
-// XXX Shoudl the FiberSolver be const?
+// XXX Should the FiberSolver be const?
 template <typename VecT>
 VecT SheerDeflectionObjective(const VecT &XX, FiberChebyshevPenaltyAutodiff<VecT> &FS, const VecT &oldXX,
                               const double L, const double zeta, const double dt) {

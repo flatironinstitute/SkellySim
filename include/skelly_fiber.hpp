@@ -204,7 +204,7 @@ T ExtensibilityError(const VecT &XsC, const VecT &YsC) {
 
     VecT W12 = W1 + W2 - VecT::Ones(XsC.size());
 
-    // Unfortunatley, it is very hard to coerce eigen with an autodiff type to get a maximum of an absolute value
+    // Unfortunately, it is very hard to coerce eigen with an autodiff type to get a maximum of an absolute value
     T retval = 0.0;
     for (auto i = 0; i < W12.size(); ++i) {
         if (std::fabs(W12(i).val()) > retval.val()) {
