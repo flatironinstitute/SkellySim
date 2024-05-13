@@ -36,16 +36,16 @@ class Body {
     Body(const toml::value &body_table, const Params &params);
     Body() = default; ///< default constructor...
 
-    virtual void update_RHS(MatrixRef &v_on_body) = 0;
+    virtual void update_RHS(CMatrixRef &v_on_body) = 0;
     virtual void update_cache_variables(double eta) = 0;
     virtual void update_preconditioner(double eta) = 0;
     virtual void load_precompute_data(const std::string &input_file) = 0;
-    virtual void step(double dt, VectorRef &body_solution) = 0;
+    virtual void step(double dt, CVectorRef &body_solution) = 0;
 
     virtual int get_solution_size() const = 0;
     virtual Eigen::Vector3d get_position() const = 0;
-    virtual Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &body_solution) const = 0;
-    virtual Eigen::VectorXd apply_preconditioner(VectorRef &x) const = 0;
+    virtual Eigen::VectorXd matvec(CMatrixRef &v_bodies, CVectorRef &body_solution) const = 0;
+    virtual Eigen::VectorXd apply_preconditioner(CVectorRef &x) const = 0;
 
     /// @brief Make a copy of this instance
     virtual std::shared_ptr<Body> clone() const = 0;

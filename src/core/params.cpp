@@ -100,4 +100,7 @@ void Params::print() {
     spdlog::info("periphery_interaction_flag        = {}", periphery_interaction_flag);
     spdlog::info("pair_evaluator                    = {}", pair_evaluator);
     spdlog::info("fiber_type                        = {}", fiber_type);
+    spdlog::info("******      STKFMM       ******");
+    spdlog::info("periphery_stresslet_multipole_order   = {}", stkfmm.periphery_stresslet_multipole_order);
+    spdlog::info("periphery_stresslet_max_points        = {}", stkfmm.periphery_stresslet_max_points);
 }

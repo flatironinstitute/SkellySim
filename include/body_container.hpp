@@ -48,7 +48,7 @@ class BodyContainer {
     void populate_sublists();
 
     template <typename T>
-    Eigen::VectorXd get_local_solution(const T &body_vec, VectorRef &body_solutions) const;
+    Eigen::VectorXd get_local_solution(const T &body_vec, CVectorRef &body_solutions) const;
 
     template <typename T>
     Eigen::MatrixXd get_local_node_positions(const T &body_vec) const;
@@ -68,7 +68,7 @@ class BodyContainer {
     Eigen::MatrixXd calculate_external_forces_torques(double time) const;
 
     std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
-    calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies,
+    calculate_link_conditions(CVectorRef &fiber_sol, CVectorRef &x_bodies,
                               const FiberContainerFiniteDifference &fc) const;
 
     /// @brief Get total number of nodes associated with body
@@ -98,19 +98,19 @@ class BodyContainer {
     /// process handles all components of the solution.
     int get_local_solution_size() const { return world_rank_ == 0 ? get_global_solution_size() : 0; }
 
-    void update_RHS(MatrixRef &v_on_body);
+    void update_RHS(CMatrixRef &v_on_body);
     Eigen::VectorXd get_RHS() const;
 
-    Eigen::VectorXd matvec(MatrixRef &v_bodies, VectorRef &x_bodies) const;
-    Eigen::VectorXd apply_preconditioner(VectorRef &X) const;
-    Eigen::MatrixXd flow(MatrixRef &r_trg, VectorRef &body_solutions, MatrixRef &link_conditions, double eta) const;
-    Eigen::MatrixXd flow_spherical(MatrixRef &r_trg, VectorRef &body_solution, MatrixRef &link_conditions,
+    Eigen::VectorXd matvec(CMatrixRef &v_bodies, CVectorRef &x_bodies) const;
+    Eigen::VectorXd apply_preconditioner(CVectorRef &X) const;
+    Eigen::MatrixXd flow(CMatrixRef &r_trg, CVectorRef &body_solutions, CMatrixRef &link_conditions, double eta) const;
+    Eigen::MatrixXd flow_spherical(CMatrixRef &r_trg, CVectorRef &body_solution, CMatrixRef &link_conditions,
                                    double eta) const;
-    Eigen::MatrixXd flow_ellipsoidal(MatrixRef &r_trg, VectorRef &body_solution, MatrixRef &link_conditions,
+    Eigen::MatrixXd flow_ellipsoidal(CMatrixRef &r_trg, CVectorRef &body_solution, CMatrixRef &link_conditions,
                                      double eta) const;
-    Eigen::MatrixXd flow_deformable(MatrixRef &r_trg, VectorRef &body_solution, MatrixRef &link_conditions,
+    Eigen::MatrixXd flow_deformable(CMatrixRef &r_trg, CVectorRef &body_solution, CMatrixRef &link_conditions,
                                     double eta) const;
-    void step(VectorRef &body_sol, double dt) const;
+    void step(CVectorRef &body_sol, double dt) const;
     void set_evaluator(const std::string &evaluator);
 
     /// @brief Update cache variables for each Body. @see Body::update_cache_variables

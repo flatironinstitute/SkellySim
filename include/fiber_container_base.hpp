@@ -90,18 +90,18 @@ class FiberContainerBase {
     }
 
     /// @brief Generate the flow
-    virtual Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta,
+    virtual Eigen::MatrixXd flow(const CMatrixRef &r_trg, const CMatrixRef &forces, double eta,
                                  bool subtract_self = true) const {
         throw std::runtime_error("flow undefined on base FiberContainer class\n");
     }
 
     /// @brief Matvec operator
-    virtual Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const {
+    virtual Eigen::VectorXd matvec(CVectorRef &x_all, CMatrixRef &v_fib, CMatrixRef &v_fib_boundary) const {
         throw std::runtime_error("matvec undefined on base FiberContainer class\n");
     }
 
     /// @brief Update the RHS of the equation
-    virtual void update_rhs(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+    virtual void update_rhs(double dt, CMatrixRef &v_on_fibers, CMatrixRef &f_on_fibers) {
         throw std::runtime_error("update_rhs undefined on base FiberContainer class\n");
     }
 
@@ -111,28 +111,28 @@ class FiberContainerBase {
     }
 
     /// @brief Apply the boundary conditions of the system
-    virtual void apply_bcs(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+    virtual void apply_bcs(double dt, CMatrixRef &v_on_fibers, CMatrixRef &f_on_fibers) {
         throw std::runtime_error("apply_bcs undefined on base FiberContainer class\n");
     }
 
     /// @brief Apply preconditioner
-    virtual Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const {
+    virtual Eigen::VectorXd apply_preconditioner(CVectorRef &x_all) const {
         throw std::runtime_error("apply_preconditioner undefined on base FiberContainer class\n");
     }
 
     /// @brief Apply fiber force
-    virtual Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const {
+    virtual Eigen::MatrixXd apply_fiber_force(CVectorRef &x_all) const {
         throw std::runtime_error("apply_fiber_force undefined on base FiberContainer class\n");
     }
 
     /// @brief calculate conditions of body-fiber connections
     virtual std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
-    calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies, const BodyContainer &bc) const {
+    calculate_link_conditions(CVectorRef &fiber_sol, CVectorRef &x_bodies, const BodyContainer &bc) const {
         throw std::runtime_error("calculate_link_conditions undefined on base FiberContainer class\n");
     }
 
     /// @brief Perform a timestep
-    virtual void step(VectorRef &fiber_sol) {
+    virtual void step(CVectorRef &fiber_sol) {
         throw std::runtime_error("step undefined on base FiberContainer class\n");
     }
 

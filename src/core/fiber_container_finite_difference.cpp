@@ -54,7 +54,7 @@ bool FiberContainerFiniteDifference::check_collision(const Periphery &periphery,
 }
 
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd>
-FiberContainerFiniteDifference::calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies,
+FiberContainerFiniteDifference::calculate_link_conditions(CVectorRef &fiber_sol, CVectorRef &x_bodies,
                                                           const BodyContainer &bc) const {
     return bc.calculate_link_conditions(fiber_sol, x_bodies, *this);
 }
@@ -169,7 +169,7 @@ MatrixXd FiberContainerFiniteDifference::generate_constant_force() const {
 }
 
 /// @brief Fiber flow
-MatrixXd FiberContainerFiniteDifference::flow(const MatrixRef &r_trg, const MatrixRef &fib_forces, double eta,
+MatrixXd FiberContainerFiniteDifference::flow(const CMatrixRef &r_trg, const CMatrixRef &fib_forces, double eta,
                                               bool subtract_self) const {
     spdlog::debug("FiberContainerFiniteDifference::flow starting");
 
@@ -213,8 +213,8 @@ MatrixXd FiberContainerFiniteDifference::flow(const MatrixRef &r_trg, const Matr
     return vel;
 }
 
-Eigen::VectorXd FiberContainerFiniteDifference::matvec(VectorRef &x_all, MatrixRef &v_fib,
-                                                       MatrixRef &v_fib_boundary) const {
+Eigen::VectorXd FiberContainerFiniteDifference::matvec(CVectorRef &x_all, CMatrixRef &v_fib,
+                                                       CMatrixRef &v_fib_boundary) const {
     VectorXd res = VectorXd::Zero(get_local_solution_size());
 
     size_t offset = 0;
@@ -234,7 +234,7 @@ Eigen::VectorXd FiberContainerFiniteDifference::matvec(VectorRef &x_all, MatrixR
 }
 
 /// @brief Update the RHS of the equation for finite difference fibers
-void FiberContainerFiniteDifference::update_rhs(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+void FiberContainerFiniteDifference::update_rhs(double dt, CMatrixRef &v_on_fibers, CMatrixRef &f_on_fibers) {
     size_t offset = 0;
     for (auto &fib : *this) {
         fib.update_RHS(dt, v_on_fibers.block(0, offset, 3, fib.n_nodes_),
@@ -252,13 +252,13 @@ void FiberContainerFiniteDifference::update_boundary_conditions(Periphery &shell
 }
 
 /// @brief Apply the boundary conditions
-void FiberContainerFiniteDifference::apply_bcs(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+void FiberContainerFiniteDifference::apply_bcs(double dt, CMatrixRef &v_on_fibers, CMatrixRef &f_on_fibers) {
     // Call the underlying rectangular BC code
     apply_bc_rectangular(dt, v_on_fibers, f_on_fibers);
 }
 
 /// @brief Apply the rectangular BC
-void FiberContainerFiniteDifference::apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) {
+void FiberContainerFiniteDifference::apply_bc_rectangular(double dt, CMatrixRef &v_on_fibers, CMatrixRef &f_on_fibers) {
     size_t offset = 0;
     for (auto &fib : *this) {
         fib.apply_bc_rectangular(dt, v_on_fibers.block(0, offset, 3, fib.n_nodes_),
@@ -269,7 +269,7 @@ void FiberContainerFiniteDifference::apply_bc_rectangular(double dt, MatrixRef &
 }
 
 /// Apply the fiber force
-Eigen::MatrixXd FiberContainerFiniteDifference::apply_fiber_force(VectorRef &x_all) const {
+Eigen::MatrixXd FiberContainerFiniteDifference::apply_fiber_force(CVectorRef &x_all) const {
     MatrixXd fw(3, x_all.size() / 4);
 
     size_t offset = 0;
@@ -289,7 +289,7 @@ Eigen::MatrixXd FiberContainerFiniteDifference::apply_fiber_force(VectorRef &x_a
 /// @brief Step fiber to new position according to current fiber solution
 /// Updates: [fibers].x_
 /// @param[in] fiber_sol [4 x n_nodes_tot] fiber solution vector
-void FiberContainerFiniteDifference::step(VectorRef &fiber_sol) {
+void FiberContainerFiniteDifference::step(CVectorRef &fiber_sol) {
     size_t offset = 0;
     for (auto &fib : *this) {
         for (int i = 0; i < 3; ++i) {
@@ -328,7 +328,7 @@ VectorXd FiberContainerFiniteDifference::get_rhs() const {
 }
 
 /// @brief Apply the preconditioner to the fibers
-Eigen::VectorXd FiberContainerFiniteDifference::apply_preconditioner(VectorRef &x_all) const {
+Eigen::VectorXd FiberContainerFiniteDifference::apply_preconditioner(CVectorRef &x_all) const {
     VectorXd y(x_all.size());
     size_t offset = 0;
     for (auto &fib : *this) {

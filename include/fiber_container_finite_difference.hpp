@@ -43,29 +43,29 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
     Eigen::MatrixXd generate_constant_force() const override;
 
     /// Generate the flow
-    Eigen::MatrixXd flow(const MatrixRef &r_trg, const MatrixRef &forces, double eta,
+    Eigen::MatrixXd flow(const CMatrixRef &r_trg, const CMatrixRef &forces, double eta,
                          bool subtract_self = true) const override;
 
     /// Apply the matvec operator
-    virtual Eigen::VectorXd matvec(VectorRef &x_all, MatrixRef &v_fib, MatrixRef &v_fib_boundary) const override;
+    virtual Eigen::VectorXd matvec(CVectorRef &x_all, CMatrixRef &v_fib, CMatrixRef &v_fib_boundary) const override;
 
     /// Update the RHS of the equation
-    void update_rhs(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) override;
+    void update_rhs(double dt, CMatrixRef &v_on_fibers, CMatrixRef &f_on_fibers) override;
 
     /// Update the boundary conditions
     void update_boundary_conditions(Periphery &shell, const periphery_binding_t &periphery_binding) override;
 
     /// Apply boundary conditions
-    void apply_bcs(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers) override;
+    void apply_bcs(double dt, CMatrixRef &v_on_fibers, CMatrixRef &f_on_fibers) override;
 
     /// Apply the preconditioner
-    Eigen::VectorXd apply_preconditioner(VectorRef &x_all) const override;
+    Eigen::VectorXd apply_preconditioner(CVectorRef &x_all) const override;
 
     /// Apply fiber force
-    virtual Eigen::MatrixXd apply_fiber_force(VectorRef &x_all) const override;
+    virtual Eigen::MatrixXd apply_fiber_force(CVectorRef &x_all) const override;
 
     /// Perform a timestep
-    void step(VectorRef &fiber_sol) override;
+    void step(CVectorRef &fiber_sol) override;
 
     /// Repin the fibers to a body
     void repin_to_bodies(BodyContainer &bodies) override;
@@ -110,7 +110,7 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
     Eigen::MatrixXd periphery_force(const Periphery &, const fiber_periphery_interaction_t &) const override;
 
     /// @brief calculate conditions of body-fiber connections
-    std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> calculate_link_conditions(VectorRef &fiber_sol, VectorRef &x_bodies,
+    std::tuple<Eigen::MatrixXd, Eigen::MatrixXd> calculate_link_conditions(CVectorRef &fiber_sol, CVectorRef &x_bodies,
                                                                            const BodyContainer &bc) const override;
 
     //@}
@@ -130,7 +130,7 @@ class FiberContainerFiniteDifference : public FiberContainerBase {
     //@{
 
     /// Apply the rectangular BCs for a finite difference fiber
-    void apply_bc_rectangular(double dt, MatrixRef &v_on_fibers, MatrixRef &f_on_fibers);
+    void apply_bc_rectangular(double dt, CMatrixRef &v_on_fibers, CMatrixRef &f_on_fibers);
 
     //@}
 };

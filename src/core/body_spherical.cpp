@@ -10,7 +10,7 @@
 #include <periphery.hpp>
 #include <utils.hpp>
 
-void SphericalBody::step(double dt, VectorRef &body_solution) {
+void SphericalBody::step(double dt, CVectorRef &body_solution) {
     int sol_offset = 3 * n_nodes_;
 
     velocity_ = body_solution.segment(sol_offset, 3);
@@ -34,9 +34,9 @@ void SphericalBody::step(double dt, VectorRef &body_solution) {
     }
 }
 
-Eigen::VectorXd SphericalBody::apply_preconditioner(VectorRef &x) const { return A_LU_.solve(x); }
+Eigen::VectorXd SphericalBody::apply_preconditioner(CVectorRef &x) const { return A_LU_.solve(x); }
 
-Eigen::VectorXd SphericalBody::matvec(MatrixRef &v_body, VectorRef &x_body) const {
+Eigen::VectorXd SphericalBody::matvec(CMatrixRef &v_body, CVectorRef &x_body) const {
     Eigen::VectorXd res(get_solution_size());
 
     CMatrixMap d(x_body.data(), 3, n_nodes_);      // Body 'densities'
@@ -131,7 +131,7 @@ void SphericalBody::update_preconditioner(double eta) {
 /// Updates only SphericalBody::RHS_
 /// \f[ \textrm{RHS} = -\left[{\bf v}_0, {\bf v}_1, ..., {\bf v}_N \right] \f]
 /// @param[in] v_on_body [ 3 x n_nodes ] matrix representing the velocity on each node
-void SphericalBody::update_RHS(MatrixRef &v_on_body) {
+void SphericalBody::update_RHS(CMatrixRef &v_on_body) {
     RHS_.resize(n_nodes_ * 3 + 6);
     RHS_.segment(0, n_nodes_ * 3) = -CVectorMap(v_on_body.data(), v_on_body.size());
     RHS_.segment(n_nodes_ * 3, 6).setZero();

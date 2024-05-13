@@ -51,8 +51,8 @@ inline std::pair<int, int> get_chunk_start_and_size(int i_thr, int n_thr, int pr
 }
 
 static auto g_memmgr = pvfmm::mem::MemoryManager(0);
-Eigen::MatrixXd kernels::stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
-                                              MatrixRef &f_dl, double eta) {
+Eigen::MatrixXd kernels::stokeslet_direct_cpu(CMatrixRef &r_sl, CMatrixRef &r_dl, CMatrixRef &r_trg, CMatrixRef &f_sl,
+                                              CMatrixRef &f_dl, double eta) {
     Eigen::MatrixXd u_trg = Eigen::MatrixXd::Zero(3, r_trg.cols());
 
 #pragma omp parallel for schedule(static)
@@ -66,8 +66,8 @@ Eigen::MatrixXd kernels::stokeslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, 
     return u_trg / eta;
 }
 
-Eigen::MatrixXd kernels::stresslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
-                                              MatrixRef &f_dl, double eta) {
+Eigen::MatrixXd kernels::stresslet_direct_cpu(CMatrixRef &r_sl, CMatrixRef &r_dl, CMatrixRef &r_trg, CMatrixRef &f_sl,
+                                              CMatrixRef &f_dl, double eta) {
     Eigen::MatrixXd u_trg = Eigen::MatrixXd::Zero(3, r_trg.cols());
 
 #pragma omp parallel for schedule(static)
@@ -82,7 +82,7 @@ Eigen::MatrixXd kernels::stresslet_direct_cpu(MatrixRef &r_sl, MatrixRef &r_dl, 
     return u_trg / eta;
 }
 
-Eigen::MatrixXd kernels::oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density,
+Eigen::MatrixXd kernels::oseen_tensor_contract_direct(CMatrixRef &r_src, CMatrixRef &r_trg, CMatrixRef &density,
                                                       double eta, double reg, double epsilon_distance) {
     using namespace Eigen;
     const int N_src = r_src.size() / 3;
@@ -143,7 +143,7 @@ Eigen::MatrixXd kernels::oseen_tensor_contract_direct(MatrixRef &r_src, MatrixRe
 ///
 /// Output:
 ///   G = Oseen tensor with dimensions (3*num_points) x (3*num_points).
-Eigen::MatrixXd kernels::oseen_tensor_direct(MatrixRef &r_src, MatrixRef &r_trg, double eta, double reg,
+Eigen::MatrixXd kernels::oseen_tensor_direct(CMatrixRef &r_src, CMatrixRef &r_trg, double eta, double reg,
                                              double epsilon_distance) {
 
     using Eigen::MatrixXd;
@@ -203,7 +203,7 @@ Eigen::MatrixXd kernels::oseen_tensor_direct(MatrixRef &r_src, MatrixRef &r_trg,
 /// @param[in] reg regularization term
 /// @param[in] epsilon_distance threshold distance, below which source-target distances will be regularized
 /// @return [3 x n_trg] rotlet at target given source points
-Eigen::MatrixXd kernels::rotlet(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &density, double eta, double reg,
+Eigen::MatrixXd kernels::rotlet(CMatrixRef &r_src, CMatrixRef &r_trg, CMatrixRef &density, double eta, double reg,
                                 double epsilon_distance) {
     using Eigen::MatrixXd;
     const int N_src = r_src.size() / 3;
@@ -261,7 +261,7 @@ Eigen::MatrixXd kernels::rotlet(MatrixRef &r_src, MatrixRef &r_trg, MatrixRef &d
 ///               | ...                      |
 ///     with S_normal12 the stresslet between points r_1 and r_2.
 ///     S_normal12 has dimensions 3 x 3.
-Eigen::MatrixXd kernels::stresslet_times_normal(MatrixRef &r_src, MatrixRef &normals, double eta, double reg,
+Eigen::MatrixXd kernels::stresslet_times_normal(CMatrixRef &r_src, CMatrixRef &normals, double eta, double reg,
                                                 double epsilon_distance) {
     const double factor = -3.0 / (4.0 * M_PI);
     const double reg2 = reg * reg;
@@ -304,8 +304,9 @@ Eigen::MatrixXd kernels::stresslet_times_normal(MatrixRef &r_src, MatrixRef &nor
 ///   @param[in] reg regularization term
 ///   @param[in] epsilon_distance threshold distance, below which return elements will be zero
 ///   @return [3 x num_points] contracted stresslet tensor 'S_normal'
-Eigen::MatrixXd kernels::stresslet_times_normal_times_density(MatrixRef &r_src, MatrixRef &normals, MatrixRef &density,
-                                                              double eta, double reg, double epsilon_distance) {
+Eigen::MatrixXd kernels::stresslet_times_normal_times_density(CMatrixRef &r_src, CMatrixRef &normals,
+                                                              CMatrixRef &density, double eta, double reg,
+                                                              double epsilon_distance) {
     const int N = r_src.size() / 3;
     const double factor = -3.0 / (4.0 * M_PI);
     const double reg2 = reg * reg;
@@ -334,7 +335,7 @@ Eigen::MatrixXd kernels::stresslet_times_normal_times_density(MatrixRef &r_src, 
 
 // FIXME: FMM kernel functions are unnecessary. The kernel dimension and kernel enum value can
 // be cached and just called directly from the FMM() operator.
-Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, MatrixRef &f_sl, MatrixRef &f_dl, stkfmm::STKFMM *fmmPtr) {
+Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, CMatrixRef &f_sl, CMatrixRef &f_dl, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(3, n_trg);
     fmmPtr->clearFMM(stkfmm::KERNEL::Stokes);
     fmmPtr->evaluateFMM(stkfmm::KERNEL::Stokes, f_sl.size() / 3, f_sl.data(), n_trg, res.data(), f_dl.size() / 3,
@@ -342,7 +343,7 @@ Eigen::MatrixXd kernels::stokes_vel_fmm(const int n_trg, MatrixRef &f_sl, Matrix
     return res;
 }
 
-Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, MatrixRef &f_sl, MatrixRef &f_dl, stkfmm::STKFMM *fmmPtr) {
+Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, CMatrixRef &f_sl, CMatrixRef &f_dl, stkfmm::STKFMM *fmmPtr) {
     Eigen::MatrixXd res = Eigen::MatrixXd::Zero(4, n_trg);
     fmmPtr->clearFMM(stkfmm::KERNEL::PVel);
     fmmPtr->evaluateFMM(stkfmm::KERNEL::PVel, f_sl.size() / 4, f_sl.data(), n_trg, res.data(), f_dl.size() / 9,
@@ -350,15 +351,15 @@ Eigen::MatrixXd kernels::stokes_pvel_fmm(const int n_trg, MatrixRef &f_sl, Matri
     return res.block(1, 0, 3, n_trg);
 }
 
-Eigen::MatrixXd kernels::stresslet_direct_gpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
-                                              MatrixRef &f_dl, double eta) {
+Eigen::MatrixXd kernels::stresslet_direct_gpu(CMatrixRef &r_sl, CMatrixRef &r_dl, CMatrixRef &r_trg, CMatrixRef &f_sl,
+                                              CMatrixRef &f_dl, double eta) {
     Eigen::MatrixXd u = Eigen::MatrixXd::Zero(3, r_trg.cols());
     kernels::stresslet_direct_gpu_impl(r_dl.data(), f_dl.data(), r_dl.cols(), r_trg.data(), u.data(), r_trg.cols());
     return u / eta;
 }
 
-Eigen::MatrixXd kernels::stokeslet_direct_gpu(MatrixRef &r_sl, MatrixRef &r_dl, MatrixRef &r_trg, MatrixRef &f_sl,
-                                              MatrixRef &f_dl, double eta) {
+Eigen::MatrixXd kernels::stokeslet_direct_gpu(CMatrixRef &r_sl, CMatrixRef &r_dl, CMatrixRef &r_trg, CMatrixRef &f_sl,
+                                              CMatrixRef &f_dl, double eta) {
     Eigen::MatrixXd u = Eigen::MatrixXd::Zero(3, r_trg.cols());
     kernels::stokeslet_direct_gpu_impl(r_sl.data(), f_sl.data(), r_sl.cols(), r_trg.data(), u.data(), r_trg.cols());
     return u / eta;

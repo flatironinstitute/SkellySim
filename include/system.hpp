@@ -27,10 +27,10 @@ Periphery *get_shell();
 PointSourceContainer *get_point_source_container();
 toml::value *get_param_table();
 
-Eigen::MatrixXd calculate_body_fiber_link_conditions(VectorRef &fibers_xt, VectorRef &x_bodies);
+Eigen::MatrixXd calculate_body_fiber_link_conditions(CVectorRef &fibers_xt, CVectorRef &x_bodies);
 std::tuple<int, int, int> get_local_solution_sizes();
-Eigen::VectorXd apply_preconditioner(VectorRef &x);
-Eigen::VectorXd apply_matvec(VectorRef &x);
+Eigen::VectorXd apply_preconditioner(CVectorRef &x);
+Eigen::VectorXd apply_matvec(CVectorRef &x);
 void dynamic_instability();
 void prep_state_for_solver();
 bool solve();
@@ -51,7 +51,7 @@ struct properties_t &get_properties();
 Eigen::VectorXd &get_curr_solution();
 std::tuple<VectorMap, VectorMap, VectorMap> get_solution_maps(double *x);
 std::tuple<CVectorMap, CVectorMap, CVectorMap> get_solution_maps(const double *x);
-Eigen::MatrixXd velocity_at_targets(MatrixRef &r_trg);
+Eigen::MatrixXd velocity_at_targets(CMatrixRef &r_trg);
 
 }; // namespace System
 

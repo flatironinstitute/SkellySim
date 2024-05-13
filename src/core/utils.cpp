@@ -1,5 +1,5 @@
-#include <skelly_sim.hpp>
 #include <limits>
+#include <skelly_sim.hpp>
 
 #include <utils.hpp>
 
@@ -9,7 +9,7 @@
 /// @param[in] x [N] vector of points x_k.
 /// @param[in] y [N-m] vector
 /// @return Resampling matrix P_{N, -m}
-Eigen::MatrixXd utils::barycentric_matrix(ArrayRef &x, ArrayRef &y) {
+Eigen::MatrixXd utils::barycentric_matrix(CArrayRef &x, CArrayRef &y) {
     int N = x.size();
     int M = y.size();
 
@@ -35,7 +35,6 @@ Eigen::MatrixXd utils::barycentric_matrix(ArrayRef &x, ArrayRef &y) {
     return P;
 }
 
-
 //  Following the paper Calculation of weights in finite different formulas,
 //  Bengt Fornberg, SIAM Rev. 40 (3), 685 (1998).
 //
@@ -46,7 +45,7 @@ Eigen::MatrixXd utils::barycentric_matrix(ArrayRef &x, ArrayRef &y) {
 //
 //  Outputs:
 //  D_s = Mth derivative matrix
-Eigen::MatrixXd utils::finite_diff(ArrayRef &s, int M, int n_s) {
+Eigen::MatrixXd utils::finite_diff(CArrayRef &s, int M, int n_s) {
     int N = s.size() - 1;
     Eigen::MatrixXd D_s = Eigen::MatrixXd::Zero(N + 1, N + 1);
     int n_s_half = (n_s - 1) / 2;
@@ -110,7 +109,7 @@ Eigen::MatrixXd utils::finite_diff(ArrayRef &s, int M, int n_s) {
 ///
 /// @param[in] local_vec vector to collect
 /// @returns Concatenated vector of local_vec on rank 0, empty vector otherwise
-Eigen::VectorXd utils::collect_into_global(VectorRef &local_vec) {
+Eigen::VectorXd utils::collect_into_global(CVectorRef &local_vec) {
     int size, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -139,7 +138,9 @@ Eigen::VectorXd utils::collect_into_global(VectorRef &local_vec) {
 }
 
 Eigen::MatrixXd utils::load_mat(cnpy::npz_t &npz, const char *var) {
-    return Eigen::Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0]).matrix().transpose();
+    return Eigen::Map<Eigen::ArrayXXd>(npz[var].data<double>(), npz[var].shape[1], npz[var].shape[0])
+        .matrix()
+        .transpose();
 }
 
 Eigen::VectorXd utils::load_vec(cnpy::npz_t &npz, const char *var) {

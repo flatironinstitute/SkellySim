@@ -9,9 +9,9 @@ using npz_t = std::map<std::string, NpyArray>;
 } // namespace cnpy
 
 namespace utils {
-Eigen::MatrixXd barycentric_matrix(ArrayRef &x, ArrayRef &y);
-Eigen::MatrixXd finite_diff(ArrayRef &s, int M, int n_s);
-Eigen::VectorXd collect_into_global(VectorRef &local_vec);
+Eigen::MatrixXd barycentric_matrix(CArrayRef &x, CArrayRef &y);
+Eigen::MatrixXd finite_diff(CArrayRef &s, int M, int n_s);
+Eigen::VectorXd collect_into_global(CVectorRef &local_vec);
 
 Eigen::MatrixXd load_mat(cnpy::npz_t &npz, const char *var);
 Eigen::VectorXd load_vec(cnpy::npz_t &npz, const char *var);
